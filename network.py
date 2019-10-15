@@ -28,6 +28,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, channels_in: int, channels_out: int):
+        super(Decoder, self).__init__()
         self.up1 = up(channels_in, channels_in, bilinear=False)
         self.up2 = up(channels_in, channels_in, bilinear=False)
         self.up3 = up(channels_in, 64, bilinear=False)
