@@ -107,10 +107,10 @@ def flip_cv2(img, patch):
     if random.random() < 0.5:
         img = img[:, ::-1, :].copy()
 
-        assert img.shape[2] == 13, img.shape
+        # assert img.shape[2] == 13, img.shape
         # height first, and then width. but BMV is (width, height)... sorry..
-        img[:, :, 9] = img[:, :, 9] * (-1.0)
-        img[:, :, 11] = img[:, :, 11] * (-1.0)
+        # img[:, :, 9] = img[:, :, 9] * (-1.0)
+        # img[:, :, 11] = img[:, :, 11] * (-1.0)
     return img
 
 
@@ -249,16 +249,16 @@ class ImageFolder(data.Dataset):
             # If use_bmv, * -1.0 on bmv for flipped images.
             img = flip_cv2(img, self.patch)
 
-        if self.identity_grid is None:
-            self.identity_grid = get_identity_grid(img.shape[:2])
+        # if self.identity_grid is None:
+        #     self.identity_grid = get_identity_grid(img.shape[:2])
 
-        img[..., 9 :11] += self.identity_grid
-        img[..., 11:13] += self.identity_grid
+        # img[..., 9 :11] += self.identity_grid
+        # img[..., 11:13] += self.identity_grid
 
         # Split img.
         ctx_frames = img[..., [0, 1, 2, 6, 7, 8]]
 
-        assert img.shape[2] == 13
+        # assert img.shape[2] == 13
         assert ctx_frames.shape[2] == 6
 
         # CV2 cropping in CPU is faster.
