@@ -40,9 +40,8 @@ def get_eval_loaders() -> Dict[str, data.DataLoader]:
 
 ############### Model ###############
 encoder = Encoder(3, 128).cuda()
-decoder = Decoder(128, 4).cuda()
-binarizer = None
-nets = [encoder, binarizer, decoder]
+decoder = Decoder(128, 3).cuda()
+nets = [encoder, decoder]
 
 gpus = [int(gpu) for gpu in args.gpus.split(',')]
 if len(gpus) > 1:
@@ -67,7 +66,7 @@ if not os.path.exists(args.model_dir):
 
 
 def resume(index: int) -> None:
-  names = ["encoder", "binarizer", "decoder"]
+  names = ["encoder", "decoder"]
 
   for net_idx, net in enumerate(nets):
     if net is not None:
@@ -81,7 +80,7 @@ def resume(index: int) -> None:
 
 
 def save(index: int) -> None:
-  names = ["encoder", "binarizer", "decoder"]
+  names = ["encoder", "decoder"]
 
   for net_idx, net in enumerate(nets):
     if net is not None:
