@@ -239,38 +239,12 @@ class ImageFolder(data.Dataset):
     def __getitem__(self, index):
         filename = self.imgs[index]
 
-        if self.v_compress:
-            img, main_fn = self.get_group_data(filename)
-        else:
-            img, main_fn = self.get_frame_data(filename)
+        # if self.v_compress:
+        img, main_fn = self.get_group_data(filename)
+        # else:
+            # img, main_fn = self.get_frame_data(filename)
 
-        if self.args.warp:
-            bmv = np.concatenate(get_bmv(
-                img, get_bmv_filenames(self.mv_dir, main_fn)), axis=2)
-
-            img_idx = int(main_fn[:-4].split('_')[-1])
-
-            assert bmv.shape[2] == 4
-            # I 2 3 D 5 6 D 8 9 B 11 12 I
-            if img_idx % 12 in [3, 6, 9, 0]:
-                # From (before, after) to (close, far).
-                tmp = bmv[:, :, :2].copy()
-                bmv[:, :, :2] = bmv[:, :, 2:4].copy()
-                bmv[:, :, 2:4] = tmp
-            else:
-                if self.args.distance1 == 1:
-                    assert img_idx % 12 in [2, 5, 8, 11]
-
-            width, height, c = img.shape
-            # For both train and eval. We use full context.
-            bmv[:, :, 0] = bmv[:, :, 0] / height
-            bmv[:, :, 1] = bmv[:, :, 1] / width
-            bmv[:, :, 2] = bmv[:, :, 2] / height
-            bmv[:, :, 3] = bmv[:, :, 3] / width
-
-        img = np.concatenate([img, bmv], axis=2)
-
-        assert img.shape[2] == 13
+        assert img.shape[2] == 6
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
             img = flip_cv2(img, self.patch)
@@ -287,23 +261,18 @@ class ImageFolder(data.Dataset):
         assert img.shape[2] == 13
         assert ctx_frames.shape[2] == 6
 
-
         # CV2 cropping in CPU is faster.
         if self.is_train:
-            crops = []
-            for i in range(self._num_crops):
-                crop = crop_cv2(img, self.patch)
-                crop[..., :9] /= 255.0
-                crops.append(np_to_torch(crop))
-            data = crops
-        else:
-            img[..., :9] /= 255.0
-            data = np_to_torch(img)
+            img = crop_cv2(img, self.patch)
+        img[..., :9] /= 255.0
+        data = np_to_torch(img)
+
+        frame1, res, frame2 = data[:, 0:3], data[:, 3:6], data[:, 6:9]
 
         ctx_frames /= 255.0
         ctx_frames = np_to_torch(ctx_frames)
 
-        return data, ctx_frames, main_fn
+        return frame1, res, frame2, ctx_frames, main_fn
 
     def __len__(self):
         return len(self.imgs)
