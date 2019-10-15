@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as LS
+import torch.utils.data as data
 
 from dataset import get_loader
 # from evaluate import run_eval
