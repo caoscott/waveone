@@ -228,6 +228,7 @@ class ImageFolder(data.Dataset):
         assert len(filenames) == 3
 
         imgs_ = [self.loader(fn) for fn in filenames]
+        print(type(imgs_[0]))
 
         main_fn = filenames[1]
         return np.concatenate(imgs_, axis=2), main_fn
