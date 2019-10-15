@@ -244,7 +244,7 @@ class ImageFolder(data.Dataset):
         # else:
             # img, main_fn = self.get_frame_data(filename)
 
-        assert img.shape[2] == 6
+        assert img.shape[2] == 9
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
             img = flip_cv2(img, self.patch)
