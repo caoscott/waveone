@@ -29,11 +29,11 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, channels_in: int, channels_out: int):
         super(Decoder, self).__init__()
-        self.up1 = up(channels_in, channels_in, bilinear=False)
-        self.up2 = up(channels_in, channels_in, bilinear=False)
-        self.up3 = up(channels_in, 64, bilinear=False)
-        self.flow = up(64, 2, bilinear=False)
-        self.residual = up(64, channels_out, bilinear=False)
+        self.up1 = upconv(channels_in, channels_in, bilinear=False)
+        self.up2 = upconv(channels_in, channels_in, bilinear=False)
+        self.up3 = upconv(channels_in, 64, bilinear=False)
+        self.flow = upconv(64, 2, bilinear=False)
+        self.residual = upconv(64, channels_out, bilinear=False)
 
     def forward(self, x: nn.Module) -> nn.Module:
         x = self.up1(x)
