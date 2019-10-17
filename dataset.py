@@ -227,7 +227,7 @@ class ImageFolder(data.Dataset):
         assert all(os.path.isfile(fn) for fn in filenames), filenames
         assert len(filenames) == 3
 
-        imgs_ = [self.loader(fn) for fn in filenames]
+        imgs_ = [self.loader(fn).astype(np.float64) for fn in filenames]
         print(imgs_[0].dtype)
 
         main_fn = filenames[1]
