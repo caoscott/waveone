@@ -117,7 +117,8 @@ while True:
 
         solver.zero_grad()
 
-        flows, residuals = decoder(encoder(torch.cat([frame1, frame2], dim=0)))
+        encoder_input = torch.cat([frame1, frame2], dim=0).cuda()
+        flows, residuals = decoder(encoder(encoder_input))
 
         bp_t0 = time.time()
         _, _, height, width = frame1.size()

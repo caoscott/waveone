@@ -41,4 +41,4 @@ class Decoder(nn.Module):
         x = self.up3(x)
         f = self.flow(x)
         r = self.residual(x)
-        return f, x
+        return f, r
