@@ -266,9 +266,10 @@ class ImageFolder(data.Dataset):
             img = crop_cv2(img, self.patch)
         img[..., :9] /= 255.0
         data = np_to_torch(img)
+        print(data.shape)
 
         frame1, res, frame2 = data[:, 0:3], data[:, 3:6], data[:, 6:9]
-        print(frame1.shape)
+        # print(frame1.shape)
 
         ctx_frames /= 255.0
         ctx_frames = np_to_torch(ctx_frames)
