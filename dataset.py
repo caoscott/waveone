@@ -259,7 +259,7 @@ class ImageFolder(data.Dataset):
         ctx_frames = img[[0, 1, 2, 6, 7, 8]]
 
         # assert img.shape[2] == 13
-        assert ctx_frames.shape[2] == 6
+        # assert ctx_frames.shape[2] == 6
 
         # CV2 cropping in CPU is faster.
         if self.is_train:
