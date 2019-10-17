@@ -105,7 +105,7 @@ def crop_cv2(img, patch):
 
 def flip_cv2(img, patch):
     if random.random() < 0.5:
-        img = img[:, ::-1, :].copy()
+        img = img[::-1].copy()
 
         # assert img.shape[2] == 13, img.shape
         # height first, and then width. but BMV is (width, height)... sorry..
@@ -256,7 +256,7 @@ class ImageFolder(data.Dataset):
         # img[..., 11:13] += self.identity_grid
 
         # Split img.
-        ctx_frames = img[..., [0, 1, 2, 6, 7, 8]]
+        ctx_frames = img[[0, 1, 2, 6, 7, 8]]
 
         # assert img.shape[2] == 13
         assert ctx_frames.shape[2] == 6
@@ -264,12 +264,11 @@ class ImageFolder(data.Dataset):
         # CV2 cropping in CPU is faster.
         if self.is_train:
             img = crop_cv2(img, self.patch)
-        img[..., :9] /= 255.0
+        img /= 255.0
         data = np_to_torch(img)
         print(data.shape)
 
-        frame1, res, frame2 = data[:, 0:3], data[:, 3:6], data[:, 6:9]
-        # print(frame1.shape)
+        frame1, res, frame2 = data[0:3], data[3:6], data[6:9]
 
         ctx_frames /= 255.0
         ctx_frames = np_to_torch(ctx_frames)
