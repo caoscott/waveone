@@ -228,7 +228,6 @@ class ImageFolder(data.Dataset):
         assert len(filenames) == 3
 
         imgs_ = [self.loader(fn).astype(np.float64) for fn in filenames]
-        print(imgs_[0].dtype)
 
         main_fn = filenames[1]
         return np.concatenate(imgs_, axis=2), main_fn
@@ -269,6 +268,7 @@ class ImageFolder(data.Dataset):
         data = np_to_torch(img)
 
         frame1, res, frame2 = data[:, 0:3], data[:, 3:6], data[:, 6:9]
+        print(frame1.shape)
 
         ctx_frames /= 255.0
         ctx_frames = np_to_torch(ctx_frames)
