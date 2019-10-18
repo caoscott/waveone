@@ -39,7 +39,7 @@ def get_eval_loaders() -> Dict[str, data.DataLoader]:
 
 
 ############### Model ###############
-encoder = Encoder(3, 128).cuda()
+encoder = Encoder(6, 128).cuda()
 decoder = Decoder(128, 3).cuda()
 nets = [encoder, decoder]
 
