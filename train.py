@@ -123,7 +123,6 @@ while True:
         bp_t0 = time.time()
         _, _, height, width = frame1.size()
 
-        print(frame1.shape, flows.shape)
         out_frame2 = F.grid_sample(frame1, flows) + residuals
         loss = loss_fn(frame2, out_frame2)
 

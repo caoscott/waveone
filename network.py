@@ -39,6 +39,6 @@ class Decoder(nn.Module):
         x = self.up1(x)
         x = self.up2(x)
         x = self.up3(x)
-        f = self.flow(x)
+        f = self.flow(x).permute(0, 2, 3, 1)
         r = self.residual(x)
         return f, r
