@@ -133,13 +133,15 @@ class SSIM(torch.nn.Module):
 
 
 class MSSSIM(torch.nn.Module):
-    def __init__(self, window_size=11, size_average=True, channel=3, val_range=None):
+    def __init__(self, window_size=11, size_average=True, channel=3, val_range=None, normalize=False):
         super(MSSSIM, self).__init__()
         self.window_size = window_size
         self.size_average = size_average
         self.channel = channel
         self.val_range = val_range
+        self.normalize = normalize
 
     def forward(self, img1, img2):
         # TODO: store window between calls if possible
-        return msssim(img1, img2, window_size=self.window_size, size_average=self.size_average, val_range=self.val_range)
+        return msssim(img1, img2, window_size=self.window_size, size_average=self.size_average,
+                      val_range=self.val_range, normalize=self.normalize)

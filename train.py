@@ -16,16 +16,6 @@ from msssim import MSSSIM
 from network import Decoder, Encoder
 from train_options import parser
 
-args = parser.parse_args()
-print(args)
-
-############### Data ###############
-train_loader = get_loader(
-    is_train=True,
-    root=args.train, mv_dir=args.train_mv,
-    args=args
-)
-
 
 def get_eval_loaders() -> Dict[str, data.DataLoader]:
     # We can extend this dict to evaluate on multiple datasets.
@@ -36,31 +26,6 @@ def get_eval_loaders() -> Dict[str, data.DataLoader]:
             args=args),
     }
     return eval_loaders
-
-
-############### Model ###############
-encoder = Encoder(6, 128).cuda()
-decoder = Decoder(128, 3).cuda()
-nets = [encoder, decoder]
-
-gpus = [int(gpu) for gpu in args.gpus.split(',')]
-if len(gpus) > 1:
-    print("Using GPUs {}.".format(gpus))
-    net = nn.DataParallel(net, device_ids=gpus)
-
-params = [{'params': net.parameters()} for net in nets]
-
-solver = optim.Adam(
-    params,
-    lr=args.lr)
-
-milestones = [int(s) for s in args.schedule.split(',')]
-scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
-loss_fn = MSSSIM(val_range=2)
-
-if not os.path.exists(args.model_dir):
-    print("Creating directory %s." % args.model_dir)
-    os.makedirs(args.model_dir)
 
 ############### Checkpoints ###############
 
@@ -90,88 +55,122 @@ def save(index: int) -> None:
                 names[net_idx], index))
 
 
-############### Training ###############
+if __name__ == '__main__':
 
-train_iter = 0
-just_resumed = False
-if args.load_model_name:
-    print('Loading %s@iter %d' % (args.load_model_name,
-                                  args.load_iter))
+    args = parser.parse_args()
+    print(args)
 
-    resume(args.load_iter)
-    train_iter = args.load_iter
-    scheduler.last_epoch = train_iter - 1
-    just_resumed = True
+    ############### Data ###############
+    train_loader = get_loader(
+        is_train=True,
+        root=args.train, mv_dir=args.train_mv,
+        args=args
+    )
 
+    ############### Model ###############
+    encoder = Encoder(6, 128).cuda()
+    decoder = Decoder(128, 3).cuda()
+    nets = [encoder, decoder]
 
-while True:
+    gpus = [int(gpu) for gpu in args.gpus.split(',')]
+    if len(gpus) > 1:
+        print("Using GPUs {}.".format(gpus))
+        net = nn.DataParallel(net, device_ids=gpus)
 
-    for batch, (frame1, res, frame2, ctx_frames, _) in enumerate(train_loader):
-        frame1, frame2 = frame1.cuda(), frame2.cuda()
-        train_iter += 1
+    params = [{'params': net.parameters()} for net in nets]
+
+    solver = optim.Adam(
+        params,
+        lr=args.lr)
+
+    milestones = [int(s) for s in args.schedule.split(',')]
+    scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
+    loss_fn = MSSSIM(val_range=2, normalize=True)
+
+    if not os.path.exists(args.model_dir):
+        print("Creating directory %s." % args.model_dir)
+        os.makedirs(args.model_dir)
+    ############### Training ###############
+
+    train_iter = 0
+    just_resumed = False
+    if args.load_model_name:
+        print('Loading %s@iter %d' % (args.load_model_name,
+                                      args.load_iter))
+
+        resume(args.load_iter)
+        train_iter = args.load_iter
+        scheduler.last_epoch = train_iter - 1
+        just_resumed = True
+
+    while True:
+
+        for batch, (frame1, res, frame2, ctx_frames, _) in enumerate(train_loader):
+            frame1, frame2 = frame1.cuda(), frame2.cuda()
+            train_iter += 1
+
+            if train_iter > args.max_train_iters:
+                break
+
+            batch_t0 = time.time()
+
+            solver.zero_grad()
+
+            encoder_input = torch.cat([frame1, frame2], dim=1)
+            flows, residuals = decoder(encoder(encoder_input))
+
+            bp_t0 = time.time()
+            _, _, height, width = frame1.size()
+
+            out_frame2 = F.grid_sample(frame1, flows) + residuals
+            loss = loss_fn(frame2, out_frame2)
+
+            bp_t1 = time.time()
+
+            loss.backward()
+            for net in nets:
+                if net is not None:
+                    torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
+
+            solver.step()
+            scheduler.step()
+
+            batch_t1 = time.time()
+
+            print(
+                '[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; Backprop: {:.4f} sec; Batch: {:.4f} sec'.
+                format(train_iter,
+                       scheduler.get_lr()[0],
+                       loss.item(),
+                       bp_t1 - bp_t0,
+                       batch_t1 - batch_t0))
+
+            if train_iter % args.checkpoint_iters == 0:
+                save(train_iter)
+
+            if just_resumed or train_iter % args.eval_iters == 0 or train_iter == 100:
+                print('Start evaluation...')
+
+                # set_eval(nets)
+
+                # eval_loaders = get_eval_loaders()
+                # for eval_name, eval_loader in eval_loaders.items():
+                #     eval_begin = time.time()
+                #     eval_loss, mssim, psnr = run_eval(nets, eval_loader, args,
+                #                                       output_suffix='iter%d' % train_iter)
+
+                #     print('Evaluation @iter %d done in %d secs' % (
+                #         train_iter, time.time() - eval_begin))
+                #     print('%s Loss   : ' % eval_name
+                #           + '\t'.join(['%.5f' % el for el in eval_loss.tolist()]))
+                #     print('%s MS-SSIM: ' % eval_name
+                #           + '\t'.join(['%.5f' % el for el in mssim.tolist()]))
+                #     print('%s PSNR   : ' % eval_name
+                #           + '\t'.join(['%.5f' % el for el in psnr.tolist()]))
+
+                # set_train(nets)
+                # just_resumed = False
 
         if train_iter > args.max_train_iters:
+            print('Training done.')
             break
-
-        batch_t0 = time.time()
-
-        solver.zero_grad()
-
-        encoder_input = torch.cat([frame1, frame2], dim=1)
-        flows, residuals = decoder(encoder(encoder_input))
-
-        bp_t0 = time.time()
-        _, _, height, width = frame1.size()
-
-        out_frame2 = F.grid_sample(frame1, flows) + residuals
-        loss = loss_fn(frame2, out_frame2)
-
-        bp_t1 = time.time()
-
-        loss.backward()
-        for net in nets:
-            if net is not None:
-                torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
-
-        solver.step()
-        scheduler.step()
-
-        batch_t1 = time.time()
-
-        print(
-            '[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; Backprop: {:.4f} sec; Batch: {:.4f} sec'.
-            format(train_iter,
-                   scheduler.get_lr()[0],
-                   loss.item(),
-                   bp_t1 - bp_t0,
-                   batch_t1 - batch_t0))
-
-        if train_iter % args.checkpoint_iters == 0:
-            save(train_iter)
-
-        if just_resumed or train_iter % args.eval_iters == 0 or train_iter == 100:
-            print('Start evaluation...')
-
-            # set_eval(nets)
-
-            # eval_loaders = get_eval_loaders()
-            # for eval_name, eval_loader in eval_loaders.items():
-            #     eval_begin = time.time()
-            #     eval_loss, mssim, psnr = run_eval(nets, eval_loader, args,
-            #                                       output_suffix='iter%d' % train_iter)
-
-            #     print('Evaluation @iter %d done in %d secs' % (
-            #         train_iter, time.time() - eval_begin))
-            #     print('%s Loss   : ' % eval_name
-            #           + '\t'.join(['%.5f' % el for el in eval_loss.tolist()]))
-            #     print('%s MS-SSIM: ' % eval_name
-            #           + '\t'.join(['%.5f' % el for el in mssim.tolist()]))
-            #     print('%s PSNR   : ' % eval_name
-            #           + '\t'.join(['%.5f' % el for el in psnr.tolist()]))
-
-            # set_train(nets)
-            # just_resumed = False
-
-    if train_iter > args.max_train_iters:
-        print('Training done.')
-        break
