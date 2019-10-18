@@ -2,7 +2,6 @@ import os
 import time
 from typing import Dict
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,55 +11,26 @@ import torch.utils.data as data
 
 from dataset import get_loader
 # from evaluate import run_eval
-from msssim import MSSSIM
+from losses import MSSSIM, CharbonnierLoss
 from network import Decoder, Encoder
 from train_options import parser
 
 
-def get_eval_loaders() -> Dict[str, data.DataLoader]:
-    # We can extend this dict to evaluate on multiple datasets.
-    eval_loaders = {
-        'TVL': get_loader(
-            is_train=False,
-            root=args.eval, mv_dir=args.eval_mv,
-            args=args),
-    }
-    return eval_loaders
-
-############### Checkpoints ###############
-
-
-def resume(index: int) -> None:
-    names = ["encoder", "decoder"]
-
-    for net_idx, net in enumerate(nets):
-        if net is not None:
-            name = names[net_idx]
-            checkpoint_path = '{}/{}_{}_{:08d}.pth'.format(
-                args.model_dir, args.save_model_name,
-                name, index)
-
-            print('Loading %s from %s...' % (name, checkpoint_path))
-            net.load_state_dict(torch.load(checkpoint_path))
-
-
-def save(index: int) -> None:
-    names = ["encoder", "decoder"]
-
-    for net_idx, net in enumerate(nets):
-        if net is not None:
-            torch.save(encoder.state_dict(),
-                       '{}/{}_{}_{:08d}.pth'.format(
-                args.model_dir, args.save_model_name,
-                names[net_idx], index))
-
-
-if __name__ == '__main__':
-
+def train():
     args = parser.parse_args()
     print(args)
 
     ############### Data ###############
+    def get_eval_loaders() -> Dict[str, data.DataLoader]:
+        # We can extend this dict to evaluate on multiple datasets.
+        eval_loaders = {
+            'TVL': get_loader(
+                is_train=False,
+                root=args.eval, mv_dir=args.eval_mv,
+                args=args),
+        }
+        return eval_loaders
+
     train_loader = get_loader(
         is_train=True,
         root=args.train, mv_dir=args.train_mv,
@@ -85,11 +55,37 @@ if __name__ == '__main__':
 
     milestones = [int(s) for s in args.schedule.split(',')]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
-    loss_fn = MSSSIM(val_range=2, normalize=True)
+    msssim_fn = MSSSIM(val_range=2, normalize=True)
+    charbonnier_loss_fn = CharbonnierLoss()
 
     if not os.path.exists(args.model_dir):
         print("Creating directory %s." % args.model_dir)
         os.makedirs(args.model_dir)
+
+   ############### Checkpoints ###############
+
+    def resume(index: int) -> None:
+        names = ["encoder", "decoder"]
+
+        for net_idx, net in enumerate(nets):
+            if net is not None:
+                name = names[net_idx]
+                checkpoint_path = '{}/{}_{}_{:08d}.pth'.format(
+                    args.model_dir, args.save_model_name,
+                    name, index)
+
+                print('Loading %s from %s...' % (name, checkpoint_path))
+                net.load_state_dict(torch.load(checkpoint_path))
+
+    def save(index: int) -> None:
+        names = ["encoder", "decoder"]
+
+        for net_idx, net in enumerate(nets):
+            if net is not None:
+                torch.save(encoder.state_dict(),
+                           '{}/{}_{}_{:08d}.pth'.format(
+                    args.model_dir, args.save_model_name,
+                    names[net_idx], index))
     ############### Training ###############
 
     train_iter = 0
@@ -105,7 +101,7 @@ if __name__ == '__main__':
 
     while True:
 
-        for batch, (frame1, res, frame2, ctx_frames, _) in enumerate(train_loader):
+        for _, (frame1, _, frame2, _, _) in enumerate(train_loader):
             frame1, frame2 = frame1.cuda(), frame2.cuda()
             train_iter += 1
 
@@ -120,10 +116,11 @@ if __name__ == '__main__':
             flows, residuals = decoder(encoder(encoder_input))
 
             bp_t0 = time.time()
-            _, _, height, width = frame1.size()
 
-            out_frame2 = F.grid_sample(frame1, flows) + residuals
-            loss = loss_fn(frame2, out_frame2)
+            flow_frame2 = F.grid_sample(frame1, flows)
+            reconstructed_frame2 = flow_frame2 + residuals
+            loss = msssim_fn(frame2, reconstructed_frame2) + \
+                charbonnier_loss_fn(frame2, flow_frame2)
 
             bp_t1 = time.time()
 
@@ -138,7 +135,8 @@ if __name__ == '__main__':
             batch_t1 = time.time()
 
             print(
-                '[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; Backprop: {:.4f} sec; Batch: {:.4f} sec'.
+                "[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; "
+                "Backprop: {:.4f} sec; Batch: {:.4f} sec".
                 format(train_iter,
                        scheduler.get_lr()[0],
                        loss.item(),
@@ -174,3 +172,6 @@ if __name__ == '__main__':
         if train_iter > args.max_train_iters:
             print('Training done.')
             break
+
+
+train()
