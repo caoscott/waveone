@@ -131,7 +131,7 @@ while True:
         loss.backward()
         for net in nets:
             if net is not None:
-                torch.nn.utils.clip_grad_norm(net.parameters(), args.clip)
+                torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
 
         solver.step()
         scheduler.step()
@@ -145,11 +145,6 @@ while True:
                    loss.item(),
                    bp_t1 - bp_t0,
                    batch_t1 - batch_t0))
-
-        if train_iter % 100 == 0:
-            print('Loss at each step:')
-            print(('{:.4f} ' * args.iterations +
-                   '\n').format(loss.item()))
 
         if train_iter % args.checkpoint_iters == 0:
             save(train_iter)
