@@ -108,8 +108,6 @@ while True:
 
     for batch, (frame1, res, frame2, ctx_frames, _) in enumerate(train_loader):
         frame1, frame2 = frame1.cuda(), frame2.cuda()
-
-        scheduler.step()
         train_iter += 1
 
         if train_iter > args.max_train_iters:
@@ -125,6 +123,7 @@ while True:
         bp_t0 = time.time()
         _, _, height, width = frame1.size()
 
+        print(frame1.shape, flows.shape)
         out_frame2 = F.grid_sample(frame1, flows) + residuals
         loss = loss_fn(frame2, out_frame2)
 
@@ -136,6 +135,7 @@ while True:
                 torch.nn.utils.clip_grad_norm(net.parameters(), args.clip)
 
         solver.step()
+        scheduler.step()
 
         batch_t1 = time.time()
 
