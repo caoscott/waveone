@@ -155,4 +155,4 @@ class CharbonnierLoss(torch.nn.Module):
         self.eps_squared = 1e-8
 
     def forward(self, img1, img2):
-        return (self.mse(img1 - img2) + self.eps_squared) ** 0.5
+        return (self.mse(img1, img2) + self.eps_squared) ** 0.5
