@@ -28,14 +28,14 @@ train_loader = get_loader(
 
 
 def get_eval_loaders() -> Dict[str, data.DataLoader]:
-  # We can extend this dict to evaluate on multiple datasets.
-  eval_loaders = {
-      'TVL': get_loader(
-          is_train=False,
-          root=args.eval, mv_dir=args.eval_mv,
-          args=args),
-  }
-  return eval_loaders
+    # We can extend this dict to evaluate on multiple datasets.
+    eval_loaders = {
+        'TVL': get_loader(
+            is_train=False,
+            root=args.eval, mv_dir=args.eval_mv,
+            args=args),
+    }
+    return eval_loaders
 
 
 ############### Model ###############
@@ -45,8 +45,8 @@ nets = [encoder, decoder]
 
 gpus = [int(gpu) for gpu in args.gpus.split(',')]
 if len(gpus) > 1:
-  print("Using GPUs {}.".format(gpus))
-  net = nn.DataParallel(net, device_ids=gpus)
+    print("Using GPUs {}.".format(gpus))
+    net = nn.DataParallel(net, device_ids=gpus)
 
 params = [{'params': net.parameters()} for net in nets]
 
@@ -59,35 +59,35 @@ scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
 loss_fn = MSSSIM(val_range=2)
 
 if not os.path.exists(args.model_dir):
-  print("Creating directory %s." % args.model_dir)
-  os.makedirs(args.model_dir)
+    print("Creating directory %s." % args.model_dir)
+    os.makedirs(args.model_dir)
 
 ############### Checkpoints ###############
 
 
 def resume(index: int) -> None:
-  names = ["encoder", "decoder"]
+    names = ["encoder", "decoder"]
 
-  for net_idx, net in enumerate(nets):
-    if net is not None:
-      name = names[net_idx]
-      checkpoint_path = '{}/{}_{}_{:08d}.pth'.format(
-          args.model_dir, args.save_model_name,
-          name, index)
+    for net_idx, net in enumerate(nets):
+        if net is not None:
+            name = names[net_idx]
+            checkpoint_path = '{}/{}_{}_{:08d}.pth'.format(
+                args.model_dir, args.save_model_name,
+                name, index)
 
-      print('Loading %s from %s...' % (name, checkpoint_path))
-      net.load_state_dict(torch.load(checkpoint_path))
+            print('Loading %s from %s...' % (name, checkpoint_path))
+            net.load_state_dict(torch.load(checkpoint_path))
 
 
 def save(index: int) -> None:
-  names = ["encoder", "decoder"]
+    names = ["encoder", "decoder"]
 
-  for net_idx, net in enumerate(nets):
-    if net is not None:
-      torch.save(encoder.state_dict(),
-                 '{}/{}_{}_{:08d}.pth'.format(
-          args.model_dir, args.save_model_name,
-          names[net_idx], index))
+    for net_idx, net in enumerate(nets):
+        if net is not None:
+            torch.save(encoder.state_dict(),
+                       '{}/{}_{}_{:08d}.pth'.format(
+                args.model_dir, args.save_model_name,
+                names[net_idx], index))
 
 
 ############### Training ###############
@@ -107,17 +107,19 @@ if args.load_model_name:
 while True:
 
     for batch, (frame1, res, frame2, ctx_frames, _) in enumerate(train_loader):
+        frame1, frame2 = frame1.cuda(), frame2.cuda()
+
         scheduler.step()
         train_iter += 1
 
         if train_iter > args.max_train_iters:
-          break
+            break
 
         batch_t0 = time.time()
 
         solver.zero_grad()
 
-        encoder_input = torch.cat([frame1, frame2], dim=0).cuda()
+        encoder_input = torch.cat([frame1, frame2], dim=0)
         flows, residuals = decoder(encoder(encoder_input))
 
         bp_t0 = time.time()
@@ -177,5 +179,5 @@ while True:
             # just_resumed = False
 
     if train_iter > args.max_train_iters:
-      print('Training done.')
-      break
+        print('Training done.')
+        break
