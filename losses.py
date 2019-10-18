@@ -2,6 +2,7 @@ from math import exp
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -148,6 +149,10 @@ class MSSSIM(torch.nn.Module):
 
 
 class CharbonnierLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss(reduction="mean")
+        self.eps_squared = 1e-8
+
     def forward(self, img1, img2):
-        eps_squared = 1e-8
-        return ((img1 - img2) ** 2 + eps_squared) ** 0.5
+        return (self.mse(img1 - img2) + self.eps_squared) ** 0.5
