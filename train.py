@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Dict
 
@@ -168,7 +169,7 @@ def train():
                             reconstructed_msssim_score += msssim_fn(
                                 frame2, reconstructed_frame2) * frame1.shape[0]
                             flow_msssim_score += msssim_fn(frame2,
-                                                        flow_frame2) * frame1.shape[0]
+                                                           flow_frame2) * frame1.shape[0]
 
                         reconstructed_msssim_score /= len(eval_loader.dataset)
                         flow_msssim_score /= len(eval_loader.dataset)
