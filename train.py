@@ -179,7 +179,7 @@ def train():
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)
 
-            if just_resumed or train_iter % args.eval_iters == 0 or train_iter == 100:
+            if just_resumed or train_iter % args.eval_iters == 0:
                 eval_loaders = get_eval_loaders()
                 for eval_name, eval_loader in eval_loaders.items():
                     run_eval(eval_name, eval_loader)

@@ -24,6 +24,7 @@ class Encoder(nn.Module):
         x = self.down2(x)
         x = self.down3(x)
         x = self.down4(x)
+        x = self.tanh(x)
         return x
 
 
@@ -33,6 +34,7 @@ class Decoder(nn.Module):
         self.up1 = upconv(channels_in, channels_in, bilinear=False)
         self.up2 = upconv(channels_in, channels_in, bilinear=False)
         self.up3 = upconv(channels_in, 64, bilinear=False)
+        self.tanh = nn.Tanh()
         self.flow = upconv(64, 2, bilinear=False)
         self.residual = upconv(64, channels_out, bilinear=False)
 
@@ -40,7 +42,7 @@ class Decoder(nn.Module):
         x = self.up1(x)
         x = self.up2(x)
         x = self.up3(x)
-        f = self.flow(x).permute(0, 2, 3, 1)
+        f = self.tanh(self.flow(x).permute(0, 2, 3, 1))
         # TODO: tanh?
-        r = self.residual(x)
+        r = self.tanh(self.residual(x))
         return f, r
