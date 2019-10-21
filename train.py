@@ -154,34 +154,34 @@ def train():
 
                 eval_loaders = get_eval_loaders()
                 with torch.no_grad():
-                for eval_name, eval_loader in eval_loaders.items():
-                    eval_begin = time.time()
+                    for eval_name, eval_loader in eval_loaders.items():
+                        eval_begin = time.time()
 
-                    reconstructed_msssim_score = 0
-                    flow_msssim_score = 0
+                        reconstructed_msssim_score = 0
+                        flow_msssim_score = 0
 
-                    for frame1, _, frame2, _, _ in eval_loader:
-                        frame1, frame2 = frame1.cuda(), frame2.cuda()
-                        decoder(encoder(torch.cat([frame1, frame2], dim=1)))
-                        flow_frame2 = F.grid_sample(frame1, flows)
-                        reconstructed_frame2 = flow_frame2 + residuals
-                        reconstructed_msssim_score += msssim_fn(
-                            frame2, reconstructed_frame2) * frame1.shape[0]
-                        flow_msssim_score += msssim_fn(frame2,
-                                                       flow_frame2) * frame1.shape[0]
+                        for frame1, _, frame2, _, _ in eval_loader:
+                            frame1, frame2 = frame1.cuda(), frame2.cuda()
+                            decoder(encoder(torch.cat([frame1, frame2], dim=1)))
+                            flow_frame2 = F.grid_sample(frame1, flows)
+                            reconstructed_frame2 = flow_frame2 + residuals
+                            reconstructed_msssim_score += msssim_fn(
+                                frame2, reconstructed_frame2) * frame1.shape[0]
+                            flow_msssim_score += msssim_fn(frame2,
+                                                        flow_frame2) * frame1.shape[0]
 
-                    reconstructed_msssim_score /= len(eval_loader.dataset)
-                    flow_msssim_score /= len(eval_loader.dataset)
-                    total_score = reconstructed_msssim_score + flow_msssim_score
+                        reconstructed_msssim_score /= len(eval_loader.dataset)
+                        flow_msssim_score /= len(eval_loader.dataset)
+                        total_score = reconstructed_msssim_score + flow_msssim_score
 
-                    print(
-                        f"{eval_name}"
-                        "Flow MS-SSIM: {flow_msssim_score: .2f}\t"
-                        "Reconstructed MS-SSIM: {reconstructed_msssim_score: .2f}\t"
-                        "Total MS-SSIM: {total_score: .2f}")
+                        print(
+                            f"{eval_name}"
+                            "Flow MS-SSIM: {flow_msssim_score: .2f}\t"
+                            "Reconstructed MS-SSIM: {reconstructed_msssim_score: .2f}\t"
+                            "Total MS-SSIM: {total_score: .2f}")
 
-                    # set_train(nets)
-                just_resumed = False
+                        # set_train(nets)
+                    just_resumed = False
 
         if train_iter > args.max_train_iters:
             print('Training done.')
