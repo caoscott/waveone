@@ -1,4 +1,3 @@
-import os
 import time
 from typing import Dict
 
@@ -10,7 +9,6 @@ import torch.optim.lr_scheduler as LS
 import torch.utils.data as data
 
 from dataset import get_loader
-# from evaluate import run_eval
 from losses import MSSSIM, CharbonnierLoss
 from network import Decoder, Encoder
 from train_options import parser
@@ -108,9 +106,11 @@ def train():
             if train_iter > args.max_train_iters:
                 break
 
-            batch_t0 = time.time()
-
+            encoder.train()
+            decoder.train()
             solver.zero_grad()
+
+            batch_t0 = time.time()
 
             encoder_input = torch.cat([frame1, frame2], dim=1)
             flows, residuals = decoder(encoder(encoder_input))
@@ -149,25 +149,39 @@ def train():
             if just_resumed or train_iter % args.eval_iters == 0 or train_iter == 100:
                 print('Start evaluation...')
 
-                # set_eval(nets)
+                encoder.eval()
+                decoder.eval()
 
-                # eval_loaders = get_eval_loaders()
-                # for eval_name, eval_loader in eval_loaders.items():
-                #     eval_begin = time.time()
-                #     eval_loss, mssim, psnr = run_eval(nets, eval_loader, args,
-                #                                       output_suffix='iter%d' % train_iter)
+                eval_loaders = get_eval_loaders()
+                with torch.no_grad():
+                for eval_name, eval_loader in eval_loaders.items():
+                    eval_begin = time.time()
 
-                #     print('Evaluation @iter %d done in %d secs' % (
-                #         train_iter, time.time() - eval_begin))
-                #     print('%s Loss   : ' % eval_name
-                #           + '\t'.join(['%.5f' % el for el in eval_loss.tolist()]))
-                #     print('%s MS-SSIM: ' % eval_name
-                #           + '\t'.join(['%.5f' % el for el in mssim.tolist()]))
-                #     print('%s PSNR   : ' % eval_name
-                #           + '\t'.join(['%.5f' % el for el in psnr.tolist()]))
+                    reconstructed_msssim_score = 0
+                    flow_msssim_score = 0
 
-                # set_train(nets)
-                # just_resumed = False
+                    for frame1, _, frame2, _, _ in eval_loader:
+                        frame1, frame2 = frame1.cuda(), frame2.cuda()
+                        decoder(encoder(torch.cat([frame1, frame2], dim=1)))
+                        flow_frame2 = F.grid_sample(frame1, flows)
+                        reconstructed_frame2 = flow_frame2 + residuals
+                        reconstructed_msssim_score += msssim_fn(
+                            frame2, reconstructed_frame2) * frame1.shape[0]
+                        flow_msssim_score += msssim_fn(frame2,
+                                                       flow_frame2) * frame1.shape[0]
+
+                    reconstructed_msssim_score /= len(eval_loader.dataset)
+                    flow_msssim_score /= len(eval_loader.dataset)
+                    total_score = reconstructed_msssim_score + flow_msssim_score
+
+                    print(
+                        f"{eval_name}"
+                        "Flow MS-SSIM: {flow_msssim_score: .2f}\t"
+                        "Reconstructed MS-SSIM: {reconstructed_msssim_score: .2f}\t"
+                        "Total MS-SSIM: {total_score: .2f}")
+
+                    # set_train(nets)
+                just_resumed = False
 
         if train_iter > args.max_train_iters:
             print('Training done.')

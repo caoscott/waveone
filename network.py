@@ -16,6 +16,7 @@ class Encoder(nn.Module):
         self.down2 = down(channels_out, channels_out)
         self.down3 = down(channels_out, channels_out)
         self.down4 = down(channels_out, channels_out)
+        self.tanh = nn.Tanh()
 
     def forward(self, x: nn.Module) -> nn.Module:
         x = self.inc(x)
@@ -40,5 +41,6 @@ class Decoder(nn.Module):
         x = self.up2(x)
         x = self.up3(x)
         f = self.flow(x).permute(0, 2, 3, 1)
+        # TODO: tanh?
         r = self.residual(x)
         return f, r
