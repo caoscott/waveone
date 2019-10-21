@@ -173,13 +173,13 @@ def train():
                        scheduler.get_lr()[0],
                        loss.item(),
                        bp_t1 - bp_t0,
-                       batch_t1 - batch_t0))
+                       batch_t1 - batch_t0),
+                end="\r")
 
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)
 
             if just_resumed or train_iter % args.eval_iters == 0 or train_iter == 100:
-                print('Start evaluation...')
                 eval_loaders = get_eval_loaders()
                 for eval_name, eval_loader in eval_loaders.items():
                     run_eval(eval_name, eval_loader)
