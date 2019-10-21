@@ -178,9 +178,9 @@ def train():
 
                         print(
                             f"{eval_name}"
-                            "Flow MS-SSIM: {flow_msssim_score: .2f}\t"
-                            "Reconstructed MS-SSIM: {reconstructed_msssim_score: .2f}\t"
-                            "Total MS-SSIM: {total_score: .2f}")
+                            f"Flow MS-SSIM: {flow_msssim_score: .2f}\t"
+                            f"Reconstructed MS-SSIM: {reconstructed_msssim_score: .2f}\t"
+                            f"Total MS-SSIM: {total_score: .2f}")
 
                         # set_train(nets)
                     just_resumed = False
