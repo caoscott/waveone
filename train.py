@@ -142,19 +142,20 @@ def train():
             decoder.train()
             solver.zero_grad()
 
-            batch_t0 = time.time()
+            # batch_t0 = time.time()
 
             encoder_input = torch.cat([frame1, frame2], dim=1)
             flows, residuals = decoder(encoder(encoder_input))
 
-            bp_t0 = time.time()
+            # bp_t0 = time.time()
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
-            loss = -msssim_fn(frame2, reconstructed_frame2)
+            loss = -msssim_fn(frame2, reconstructed_frame2) - \
+                msssim_fn(frame2, flow_frame2)
             # + charbonnier_loss_fn(frame2, flow_frame2)
 
-            bp_t1 = time.time()
+            # bp_t1 = time.time()
 
             loss.backward()
             for net in nets:
@@ -164,7 +165,7 @@ def train():
             solver.step()
             scheduler.step()
 
-            batch_t1 = time.time()
+            # batch_t1 = time.time()
 
             # print(
             #     "[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; "
