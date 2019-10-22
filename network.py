@@ -32,7 +32,8 @@ class Decoder(nn.Module):
         self.up1 = upconv(256, 256, bilinear=False)
         self.up2 = upconv(256, 128, bilinear=False)
         self.up3 = upconv(128, 64, bilinear=False)
-        self.tanh = nn.Tanh()
+        # self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
         self.flow = upconv(64, 2, bilinear=False)
         self.residual = upconv(64, channels_out, bilinear=False)
 
@@ -40,6 +41,6 @@ class Decoder(nn.Module):
         x = self.up1(x)
         x = self.up2(x)
         x = self.up3(x)
-        f = self.tanh(self.flow(x).permute(0, 2, 3, 1))
-        r = self.tanh(self.residual(x))
+        f = self.sigmoid(self.flow(x).permute(0, 2, 3, 1))
+        r = self.sigmoid(self.residual(x))
         return f, r

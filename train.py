@@ -130,7 +130,6 @@ def train():
     while True:
 
         for _, (frame1, _, frame2, _, _) in enumerate(train_loader):
-            print(frame1.max(), frame1.min(), frame2.max(), frame2.min())
             frame1, frame2 = frame1.cuda(), frame2.cuda()
             train_iter += 1
 
