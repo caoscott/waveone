@@ -56,7 +56,7 @@ def train():
 
     milestones = [int(s) for s in args.schedule.split(',')]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
-    msssim_fn = MSSSIM(val_range=2, normalize=True).cuda()
+    msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     charbonnier_loss_fn = CharbonnierLoss().cuda()
 
     if not os.path.exists(args.model_dir):
@@ -166,15 +166,15 @@ def train():
 
             batch_t1 = time.time()
 
-            print(
-                "[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; "
-                "Backprop: {:.4f} sec; Batch: {:.4f} sec".
-                format(train_iter,
-                       scheduler.get_lr()[0],
-                       loss.item(),
-                       bp_t1 - bp_t0,
-                       batch_t1 - batch_t0),
-                end="\r")
+            # print(
+            #     "[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; "
+            #     "Backprop: {:.4f} sec; Batch: {:.4f} sec".
+            #     format(train_iter,
+            #            scheduler.get_lr()[0],
+            #            loss.item(),
+            #            bp_t1 - bp_t0,
+            #            batch_t1 - batch_t0),
+            #     end="\r")
             writer.add_scalar("training_loss", loss.item(), train_iter)
 
             if train_iter % args.checkpoint_iters == 0:
