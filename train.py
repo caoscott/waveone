@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as LS
 import torch.utils.data as data
+from torch.utils.tensorboard import SummaryWriter
 
 from dataset import get_loader
 from losses import MSSSIM, CharbonnierLoss
@@ -35,6 +36,7 @@ def train():
         root=args.train, mv_dir=args.train_mv,
         args=args
     )
+    writer = SummaryWriter()
 
     ############### Model ###############
     encoder = Encoder(6, 128).cuda()
@@ -173,6 +175,7 @@ def train():
                        bp_t1 - bp_t0,
                        batch_t1 - batch_t0),
                 end="\r")
+            writer.add_scalar("training_loss", loss.item(), train_iter)
 
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)
