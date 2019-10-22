@@ -108,13 +108,11 @@ def train():
 
             reconstructed_msssim_score /= len(eval_loader.dataset)
             flow_msssim_score /= len(eval_loader.dataset)
-            total_score = reconstructed_msssim_score + flow_msssim_score
 
             print(
                 f"{eval_name}"
                 f"Flow MS-SSIM: {flow_msssim_score: .6f}\t"
-                f"Reconstructed MS-SSIM: {reconstructed_msssim_score: .6f}\t"
-                f"Total MS-SSIM: {total_score: .6f}")
+                f"Reconstructed MS-SSIM: {reconstructed_msssim_score: .6f}\t")
 
     ############### Training ###############
 
@@ -151,7 +149,7 @@ def train():
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
-            loss = msssim_fn(frame2, reconstructed_frame2) + \
+            loss = -msssim_fn(frame2, reconstructed_frame2) + \
                 charbonnier_loss_fn(frame2, flow_frame2)
 
             bp_t1 = time.time()

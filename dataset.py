@@ -23,7 +23,8 @@ def get_loader(is_train: bool, root: str, mv_dir: str, args) -> data.DataLoader:
         dataset=dset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
         shuffle=is_train,
-        num_workers=2
+        num_workers=2,
+        drop_last=is_train,
     )
 
     print('Loader for {} images ({} batches) created.'.format(
