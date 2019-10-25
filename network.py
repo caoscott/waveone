@@ -48,5 +48,5 @@ class Decoder(nn.Module):
         r = self.up_residual(x)
         f = self.sigmoid(self.flow(f).permute(0, 2, 3, 1))
         r = self.sigmoid(self.residual(r))
-        f += F.affine_grid(self.identity_theta, f.shape)
+        f += F.affine_grid(self.identity_theta, r.shape)
         return f, r
