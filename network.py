@@ -37,7 +37,7 @@ class Decoder(nn.Module):
         self.up2 = upconv(256, 128, bilinear=False)
         self.up_flow = upconv(128, 64, bilinear=False)
         self.up_residual = upconv(128, 64, bilinear=False)
-        # self.tanh = nn.Tanh()
+        self.tanh = nn.Tanh()
         self.sigmoid = nn.Sigmoid()
         self.flow = upconv(64, 2, bilinear=False)
         self.residual = upconv(64, channels_out, bilinear=False)
@@ -50,6 +50,6 @@ class Decoder(nn.Module):
         r = self.sigmoid(self.residual(r))
         identity_theta = torch.tensor(
             Decoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
-        f = self.sigmoid(self.flow(f).permute(0, 2, 3, 1)) + \
+        f = self.tanh(self.flow(f).permute(0, 2, 3, 1)) + \
             F.affine_grid(identity_theta, r.shape)
         return f, r
