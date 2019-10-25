@@ -23,13 +23,13 @@ parser.add_argument('--eval-mv', type=str,
 ######## Model ########
 parser.add_argument('--v-compress', action='store_true',
                     help='True: video compression model. False: image compression.')
-parser.add_argument('--iterations', type=int, default=10, 
+parser.add_argument('--iterations', type=int, default=10,
                     help='# iterations of progressive encoding/decoding.')
-parser.add_argument('--bits', default=16, type=int, 
+parser.add_argument('--bits', default=16, type=int,
                     help='Bottle neck size.')
-parser.add_argument('--patch', default=64, type=int, 
+parser.add_argument('--patch', default=64, type=int,
                     help='Patch size.')
-parser.add_argument('--shrink', type=int, default=2, 
+parser.add_argument('--shrink', type=int, default=2,
                     help='Reducing # channels in U-net by this factor.')
 
 # More model variants for ablation study. Please see paper for details.
@@ -41,7 +41,7 @@ parser.add_argument('--encoder-fuse-level', type=int,
                     help='# encoder layers to fuse context information into.')
 parser.add_argument('--decoder-fuse-level', type=int,
                     help='# decoder layers to fuse context information into.')
-parser.add_argument('--stack', action='store_true', 
+parser.add_argument('--stack', action='store_true',
                     help='Whether to stack context frames as encoder input.')
 
 ######## Learning ########
@@ -51,13 +51,15 @@ parser.add_argument('--lr', type=float, default=0.00025,
                     help='Learning rate.')
 parser.add_argument('--clip', type=float, default=0.5,
                     help='Gradient clipping.')
+parser.add_argument('--weight-decay', type=float,
+                    default=5e-4, help='Weight decay')
 # parser.add_argument('--schedule', default='15000,40000,100000,250000', type=str,
 #                     help='Schedule milestones.')
 parser.add_argument('--schedule', default='50000,60000,70000,80000,90000', type=str,
                     help='Schedule milestones.')
 parser.add_argument('--gamma', type=float, default=0.5,
                     help='LR decay factor.')
-parser.add_argument('--batch-size', type=int, default=16, 
+parser.add_argument('--batch-size', type=int, default=16,
                     help='Batch size.')
 parser.add_argument('--eval-batch-size', type=int, default=1,
                     help='Batch size for evaluation.')

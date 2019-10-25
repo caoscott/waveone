@@ -52,7 +52,8 @@ def train():
 
     solver = optim.Adam(
         params,
-        lr=args.lr)
+        lr=args.lr,
+        weight_decay=args.weight_decay)
 
     milestones = [int(s) for s in args.schedule.split(',')]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
@@ -142,20 +143,13 @@ def train():
             decoder.train()
             solver.zero_grad()
 
-            # batch_t0 = time.time()
-
             encoder_input = torch.cat([frame1, frame2], dim=1)
             flows, residuals = decoder(encoder(encoder_input))
-
-            # bp_t0 = time.time()
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
             loss = -msssim_fn(frame2, reconstructed_frame2) - \
                 msssim_fn(frame2, flow_frame2)
-            # + charbonnier_loss_fn(frame2, flow_frame2)
-
-            # bp_t1 = time.time()
 
             loss.backward()
             for net in nets:
@@ -165,17 +159,6 @@ def train():
             solver.step()
             scheduler.step()
 
-            # batch_t1 = time.time()
-
-            # print(
-            #     "[TRAIN] Iter[{}]; LR: {}; Loss: {:.6f}; "
-            #     "Backprop: {:.4f} sec; Batch: {:.4f} sec".
-            #     format(train_iter,
-            #            scheduler.get_lr()[0],
-            #            loss.item(),
-            #            bp_t1 - bp_t0,
-            #            batch_t1 - batch_t0),
-            #     end="\r")
             writer.add_scalar("training_loss", loss.item(), train_iter)
 
             if train_iter % args.checkpoint_iters == 0:
