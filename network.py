@@ -25,6 +25,7 @@ class Encoder(nn.Module):
         x = self.down3(x)
         x = self.down4(x)
         x = self.tanh(x)
+        print(x.shape)
         return x
 
 
