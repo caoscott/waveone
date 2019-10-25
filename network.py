@@ -47,7 +47,7 @@ class Decoder(nn.Module):
         x = self.up2(x)
         f = self.up_flow(x)
         r = self.up_residual(x)
-        r = self.sigmoid(self.residual(r))
+        r = self.tanh(self.residual(r))
         identity_theta = torch.tensor(
             Decoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
         f = self.tanh(self.flow(f).permute(0, 2, 3, 1)) + \
