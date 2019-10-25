@@ -29,6 +29,8 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
+    IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
+
     def __init__(self, channels_in: int, channels_out: int):
         super(Decoder, self).__init__()
         self.up1 = upconv(512, 256, bilinear=False)
@@ -39,7 +41,6 @@ class Decoder(nn.Module):
         self.sigmoid = nn.Sigmoid()
         self.flow = upconv(64, 2, bilinear=False)
         self.residual = upconv(64, channels_out, bilinear=False)
-        self.identity_theta = torch.tensor([[[1., 0., 0.], [0., 1., 0.]]])
 
     def forward(self, x: nn.Module) -> nn.Module:
         x = self.up1(x)
@@ -48,6 +49,6 @@ class Decoder(nn.Module):
         r = self.up_residual(x)
         f = self.sigmoid(self.flow(f).permute(0, 2, 3, 1))
         r = self.sigmoid(self.residual(r))
-        print(r.shape, f.shape)
-        f += F.affine_grid(self.identity_theta, r.shape)
+        identity_theta = torch.tensor(Decoder.IDENTITY_TRANSFORM * x.shape[0])
+        f += F.affine_grid(identity_theta, r.shape)
         return f, r
