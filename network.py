@@ -1,7 +1,9 @@
 #!/usr/bin/python
 # full assembly of the sub-parts to form the complete net
 
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from network_parts import double_conv, down, inconv, outconv, up, upconv
 
@@ -31,16 +33,20 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.up1 = upconv(512, 256, bilinear=False)
         self.up2 = upconv(256, 128, bilinear=False)
-        self.up3 = upconv(128, 64, bilinear=False)
+        self.up_flow = upconv(128, 64, bilinear=False)
+        self.up_residual = upconv(128, 64, bilinear=False)
         # self.tanh = nn.Tanh()
         self.sigmoid = nn.Sigmoid()
         self.flow = upconv(64, 2, bilinear=False)
         self.residual = upconv(64, channels_out, bilinear=False)
+        self.identity_theta = torch.tensor([[[1, 0, 0], [0, 1, 0]]])
 
     def forward(self, x: nn.Module) -> nn.Module:
         x = self.up1(x)
         x = self.up2(x)
-        x = self.up3(x)
-        f = self.sigmoid(self.flow(x).permute(0, 2, 3, 1))
-        r = self.sigmoid(self.residual(x))
+        f = self.up_flow(x)
+        r = self.up_residual(x)
+        f = self.sigmoid(self.flow(f).permute(0, 2, 3, 1))
+        r = self.sigmoid(self.residual(r))
+        f += F.affine_grid(self.identity_theta, f.shape)
         return f, r
