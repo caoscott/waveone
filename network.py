@@ -18,6 +18,7 @@ class Encoder(nn.Module):
             down(128, 128),
             down(128, 128),
             down(128, 128),
+            down(128, 128),
             nn.Tanh())
 
     def forward(self, x: nn.Module) -> nn.Module:
@@ -30,6 +31,7 @@ class Decoder(nn.Module):
     def __init__(self, channels_in: int, channels_out: int):
         super(Decoder, self).__init__()
         self.ups = nn.Sequential(
+            upconv(128, 128, bilinear=False),
             upconv(128, 128, bilinear=False),
             upconv(128, 128, bilinear=False),
             upconv(128, 128, bilinear=False))
