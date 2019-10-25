@@ -113,8 +113,8 @@ def train():
             flow_msssim_score /= len(eval_loader.dataset)
 
             print(
-                f"{eval_name}\t"
-                f"Flow MS-SSIM: {flow_msssim_score: .6f}\t"
+                f"{eval_name} \t"
+                f"Flow MS-SSIM: {flow_msssim_score: .6f} \t"
                 f"Reconstructed MS-SSIM: {reconstructed_msssim_score: .6f}")
 
     ############### Training ###############
