@@ -13,9 +13,9 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.inc = inconv(channels_in, 64)
         self.down1 = down(64, 128)
-        self.down2 = down(128, 256)
-        self.down3 = down(256, 256)
-        self.down4 = down(256, 256)
+        self.down2 = down(128, 128)
+        self.down3 = down(128, 128)
+        self.down4 = down(128, 128)
         self.tanh = nn.Tanh()
 
     def forward(self, x: nn.Module) -> nn.Module:
@@ -33,8 +33,8 @@ class Decoder(nn.Module):
 
     def __init__(self, channels_in: int, channels_out: int):
         super(Decoder, self).__init__()
-        self.up1 = upconv(256, 256, bilinear=False)
-        self.up2 = upconv(256, 128, bilinear=False)
+        self.up1 = upconv(128, 128, bilinear=False)
+        self.up2 = upconv(128, 128, bilinear=False)
         self.up_flow = upconv(128, 64, bilinear=False)
         self.up_residual = upconv(128, 64, bilinear=False)
         self.tanh = nn.Tanh()
