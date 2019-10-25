@@ -10,7 +10,7 @@ import torch.utils.data as data
 
 
 def get_loader(is_train: bool, root: str, mv_dir: str, args) -> data.DataLoader:
-    print('\nCreating loader for %s...' % root)
+    # print('\nCreating loader for %s...' % root)
 
     dset = ImageFolder(
         is_train=is_train,
@@ -80,8 +80,8 @@ def get_bmv(img, fns):
             bmvs[1] = np.zeros((288, 352, 1))
     else:
         bmvs[0] = bmvs[0] * (-2.0)
-        bmvs[1] = bmvs[1] * (-2.0)        
- 
+        bmvs[1] = bmvs[1] * (-2.0)
+
     if bmvs[2] is None or bmvs[3] is None:
         if 'ultra_video_group' in before_x:
             bmvs[2] = np.zeros((1072, 1920, 1))
@@ -91,7 +91,7 @@ def get_bmv(img, fns):
             bmvs[3] = np.zeros((288, 352, 1))
     else:
         bmvs[2] = bmvs[2] * (-2.0)
-        bmvs[3] = bmvs[3] * (-2.0)        
+        bmvs[3] = bmvs[3] * (-2.0)
 
     return bmvs
 
@@ -101,7 +101,7 @@ def crop_cv2(img, patch):
     start_x = random.randint(0, height - patch)
     start_y = random.randint(0, width - patch)
 
-    return img[start_x : start_x + patch, start_y : start_y + patch]
+    return img[start_x: start_x + patch, start_y: start_y + patch]
 
 
 def flip_cv2(img, patch):
@@ -130,7 +130,8 @@ def get_group_filenames(filename, img_idx, distance1, distance2):
         delta_far = distance2
 
     filenames = [filename[:-4 - len(code)] + str(img_idx + delta_close).zfill(len(code)) + '.%s' % dtype,
-                 filename[:-4 - len(code)] + str(img_idx).zfill(len(code)) + '.%s' % dtype,
+                 filename[:-4 - len(code)] +
+                 str(img_idx).zfill(len(code)) + '.%s' % dtype,
                  filename[:-4 - len(code)] + str(img_idx + delta_far).zfill(len(code)) + '.%s' % dtype]
 
     return filenames
@@ -157,8 +158,8 @@ def get_identity_grid(shape):
 
 
 def np_to_torch(img):
-    img = np.swapaxes(img, 0, 1) #w, h, 9
-    img = np.swapaxes(img, 0, 2) #9, h, w
+    img = np.swapaxes(img, 0, 1)  # w, h, 9
+    img = np.swapaxes(img, 0, 2)  # 9, h, w
     return torch.from_numpy(img).float()
 
 
@@ -183,7 +184,7 @@ class ImageFolder(data.Dataset):
         if is_train:
             random.shuffle(self.imgs)
 
-        print('\tdistance=%d/%d' % (args.distance1, args.distance2))
+        # print('\tdistance=%d/%d' % (args.distance1, args.distance2))
 
     def _load_image_list(self):
         self.imgs = []
@@ -194,7 +195,7 @@ class ImageFolder(data.Dataset):
                 positions = [7]
             elif dist1 == 3 and dist2 == 3:
                 positions = [4, 10]
-            elif dist1 == 1 and dist2 == 2: 
+            elif dist1 == 1 and dist2 == 2:
                 positions = [2, 3, 5, 6, 8, 9, 11, 0]
             else:
                 assert False, 'not implemented.'
@@ -207,7 +208,7 @@ class ImageFolder(data.Dataset):
                     continue
                 if all(os.path.isfile(fn) for fn in
                        get_group_filenames(
-                            filename, img_idx, dist1, dist2)):
+                        filename, img_idx, dist1, dist2)):
 
                     self.imgs.append(filename)
             else:
@@ -222,7 +223,7 @@ class ImageFolder(data.Dataset):
         img_idx = int(filename[:-4].split('_')[-1])
 
         filenames = get_group_filenames(
-            filename, img_idx, 
+            filename, img_idx,
             self.args.distance1,
             self.args.distance2)
         assert all(os.path.isfile(fn) for fn in filenames), filenames
@@ -243,7 +244,7 @@ class ImageFolder(data.Dataset):
         # if self.v_compress:
         img, main_fn = self.get_group_data(filename)
         # else:
-            # img, main_fn = self.get_frame_data(filename)
+        # img, main_fn = self.get_frame_data(filename)
 
         assert img.shape[2] == 9
         if self.is_train:
