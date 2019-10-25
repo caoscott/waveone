@@ -39,7 +39,7 @@ class Decoder(nn.Module):
         self.sigmoid = nn.Sigmoid()
         self.flow = upconv(64, 2, bilinear=False)
         self.residual = upconv(64, channels_out, bilinear=False)
-        self.identity_theta = torch.tensor([[[1, 0, 0], [0, 1, 0]]])
+        self.identity_theta = torch.tensor([[[1., 0., 0.], [0., 1., 0.]]])
 
     def forward(self, x: nn.Module) -> nn.Module:
         x = self.up1(x)
