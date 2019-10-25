@@ -95,20 +95,24 @@ def train():
         decoder.eval()
         with torch.no_grad():
 
+            baseline_msssim_score = 0
             reconstructed_msssim_score = 0
             flow_msssim_score = 0
 
             for frame1, _, frame2, _, _ in eval_loader:
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
+                batch_size = frame1.shape[0]
                 flows, residuals = decoder(
                     encoder(torch.cat([frame1, frame2], dim=1)))
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = flow_frame2 + residuals
+                baseline_msssim_score += msssim_fn(frame1, frame2) * batch_size
                 reconstructed_msssim_score += msssim_fn(
-                    frame2, reconstructed_frame2) * frame1.shape[0]
+                    frame2, reconstructed_frame2) * batch_size
                 flow_msssim_score += msssim_fn(frame2,
-                                               flow_frame2) * frame1.shape[0]
+                                               flow_frame2) * batch_size
 
+            baseline_msssim_score /= len(eval_loader.dataset)
             reconstructed_msssim_score /= len(eval_loader.dataset)
             flow_msssim_score /= len(eval_loader.dataset)
 
@@ -116,6 +120,16 @@ def train():
                 f"{eval_name} \t"
                 f"Flow MS-SSIM: {flow_msssim_score: .6f} \t"
                 f"Reconstructed MS-SSIM: {reconstructed_msssim_score: .6f}")
+
+            writer.add_scalar(
+                "base_msssim", baseline_msssim_score.item(), train_iter
+            )
+            writer.add_scalar(
+                "flow_msssim", flow_msssim_score.item(), train_iter,
+            )
+            writer.add_scalar(
+                "reconstructed_msssim", reconstructed_msssim_score.item(), train_iter
+            )
 
     ############### Training ###############
 
