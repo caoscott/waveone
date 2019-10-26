@@ -118,6 +118,7 @@ def train():
 
             print(
                 f"{eval_name} \t"
+                f"Base MS-SSIM: {baseline_msssim_score: .6f} \t"
                 f"Flow MS-SSIM: {flow_msssim_score: .6f} \t"
                 f"Reconstructed MS-SSIM: {reconstructed_msssim_score: .6f}")
 
