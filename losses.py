@@ -156,3 +156,14 @@ class CharbonnierLoss(torch.nn.Module):
 
     def forward(self, img1, img2):
         return ((self.mse(img1, img2) + self.eps_squared) ** 0.5) / img1.shape[0]
+
+
+# class PSNR(torch.nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.mse_loss = nn.MSELoss(reduction='mean')
+
+#     def forward(self, img1, img2):
+#         mse = self.mse_loss(img1, img2)
+#         return torch.clamp(
+#             torch.mul(torch.log10(255. * 2), 10.), 0., 99.99)[0]
