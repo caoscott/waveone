@@ -7,8 +7,9 @@ import torch.nn.functional as F
 
 
 def gaussian(window_size, sigma):
+    offset = 0.5 if window_size % 2 == 0 else 0
     gauss = torch.Tensor(
-        [exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
+        [exp(-(x + offset - window_size//2)**2/(2.0*sigma**2)) for x in range(window_size)])
     return gauss/gauss.sum()
 
 

@@ -102,6 +102,7 @@ def train():
             for frame1, _, frame2, _, _ in eval_loader:
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
                 batch_size = frame1.shape[0]
+                print(frame1.shape, frame2.shape)
                 flows, residuals = decoder(
                     encoder(torch.cat([frame1, frame2], dim=1)))
                 flow_frame2 = F.grid_sample(frame1, flows)
