@@ -101,7 +101,6 @@ def train():
 
             for frame1, _, frame2, _, _ in eval_loader:
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
-                print(frame1.min(), frame1.max(), frame2.min(), frame2.max())
                 batch_size = frame1.shape[0]
                 flows, residuals = decoder(
                     encoder(torch.cat([frame1, frame2], dim=1)))
