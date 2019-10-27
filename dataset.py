@@ -259,7 +259,6 @@ class ImageFolder(data.Dataset):
 
         # Split img.
         ctx_frames = img[..., [0, 1, 2, 6, 7, 8]]
-        print(ctx_frames.shape)
 
         # assert img.shape[2] == 13
         # assert ctx_frames.shape[2] == 6
