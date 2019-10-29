@@ -239,9 +239,9 @@ class ImageFolder(data.Dataset):
         filename1 = self.imgs[index]
         filename2 = self.imgs[index + 1]
 
-        img1, fn1 = self.get_frame_data(filename1).astype(np.float64)
-        img2, fn2 = self.get_frame_data(filename2).astype(np.float64)
-        img = np.concatenate((img1, img2), axis=2)
+        img1, fn1 = self.get_frame_data(filename1)
+        img2, fn2 = self.get_frame_data(filename2)
+        img = np.concatenate((img1, img2), axis=2).astype(np.float64)
 
         assert img.shape[2] == 6
         if self.is_train:
