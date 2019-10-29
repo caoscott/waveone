@@ -40,7 +40,8 @@ def train():
     writer = SummaryWriter()
 
     ############### Model ###############
-    context_vec_shape = (args.batch_size, 128, 144, 176)
+    context_vec_shape = (args.batch_size, 128,
+                         args.patch or 144, args.patch or 176)
     encoder = Encoder(6, use_context=True).cuda()
     decoder = nn.Sequential(BitToContextDecoder(),
                             ContextToFlowDecoder(3)).cuda()
@@ -166,8 +167,8 @@ def train():
             solver.zero_grad()
 
             encoder_input = torch.cat([frame1, frame2], dim=1)
-            flows, residuals, add_to_context = decoder(
-                encoder(encoder_input, context_vec), context_vec)
+            compressed = encoder(encoder_input, context_vec)
+            flows, residuals, add_to_context = decoder(compressed, context_vec)
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
