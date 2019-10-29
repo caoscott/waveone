@@ -48,7 +48,7 @@ class BitToFlowDecoder(nn.Module):
             outconv(64, channels_out),
             nn.Tanh())
 
-    def forward(self, x: nn.Module, _=_) -> nn.Module:
+    def forward(self, x: nn.Module, _=None) -> nn.Module:
         x = self.ups(x)
         r = self.residual(x)
         identity_theta = torch.tensor(
