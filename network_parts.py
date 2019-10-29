@@ -11,7 +11,7 @@ class double_conv(nn.Module):
     '''(conv => BN => ReLU) * 2'''
 
     def __init__(self, in_ch, out_ch, downsample=False):
-        super(double_conv, self).__init__()
+        super().__init__()
         stride = 2 if downsample else 1
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1),
@@ -23,33 +23,30 @@ class double_conv(nn.Module):
         )
 
     def forward(self, x):
-        x = self.conv(x)
-        return x
+        return self.conv(x)
 
 
 class inconv(nn.Module):
     def __init__(self, in_ch, out_ch):
-        super(inconv, self).__init__()
+        super().__init__()
         self.conv = double_conv(in_ch, out_ch)
 
     def forward(self, x):
-        x = self.conv(x)
-        return x
+        return self.conv(x)
 
 
 class down(nn.Module):
     def __init__(self, in_ch, out_ch):
-        super(down, self).__init__()
+        super().__init__()
         self.mpconv = double_conv(in_ch, out_ch, downsample=True)
 
     def forward(self, x):
-        x = self.mpconv(x)
-        return x
+        return self.mpconv(x)
 
 
 class up(nn.Module):
     def __init__(self, in_ch, out_ch, bilinear=True):
-        super(up, self).__init__()
+        super().__init__()
 
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
@@ -73,7 +70,7 @@ class up(nn.Module):
 
 class upconv(nn.Module):
     def __init__(self, in_ch, out_ch, bilinear=True):
-        super(upconv, self).__init__()
+        super().__init__()
 
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
@@ -92,7 +89,7 @@ class upconv(nn.Module):
 
 class outconv(nn.Module):
     def __init__(self, in_ch, out_ch):
-        super(outconv, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(in_ch, out_ch, 1)
 
     def forward(self, x):
