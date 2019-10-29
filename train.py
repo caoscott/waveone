@@ -101,7 +101,7 @@ def train():
             baseline_msssim_score = 0
             reconstructed_msssim_score = 0
             flow_msssim_score = 0
-            context_vec = torch.zeros(context_vec_shape)
+            context_vec = torch.zeros(context_vec_shape).cuda()
 
             for frame1, frame2, _, _ in eval_loader:
                 batch_size = frame1.shape[0]
@@ -153,7 +153,7 @@ def train():
         just_resumed = True
 
     while True:
-        context_vec = torch.zeros(context_vec_shape, requires_grad=False)
+        context_vec = torch.zeros(context_vec_shape, requires_grad=False).cuda()
         for frame1, frame2, _, _ in train_loader:
             frame1, frame2 = frame1.cuda(), frame2.cuda()
             train_iter += 1
