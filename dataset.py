@@ -245,7 +245,7 @@ class ImageFolder(data.Dataset):
         # else:
         # img, main_fn = self.get_frame_data(filename)
 
-        img = torch.cat((img1, img2))
+        img = np.cat((img1, img2))
 
         assert img.shape[2] == 6
         if self.is_train:
