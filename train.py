@@ -61,7 +61,7 @@ def train():
 
     milestones = [int(s) for s in args.schedule.split(',')]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
-    msssim_fn = MSSSIM(val_range=1, normalize=False).cuda()
+    msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     charbonnier_loss_fn = CharbonnierLoss().cuda()
 
     if not os.path.exists(args.model_dir):
