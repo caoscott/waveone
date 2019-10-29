@@ -86,7 +86,8 @@ class ContextToFlowDecoder(nn.Module):
             outconv(64, channels_out),
             nn.Tanh())
 
-    def forward(self, add_to_context: nn.Module, context_vec: nn.Module) -> nn.Module:
+    def forward(self, input_tuple) -> nn.Module:
+        add_to_context, context_vec = input_tuple
         x = add_to_context + context_vec
         r = self.residual(x)
         identity_theta = torch.tensor(
