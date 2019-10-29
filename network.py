@@ -92,6 +92,6 @@ class ContextToFlowDecoder(nn.Module):
         r = self.residual(x)
         identity_theta = torch.tensor(
             ContextToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
-        f = self.flow().permute(0, 2, 3, 1) + \
+        f = self.flow(x).permute(0, 2, 3, 1) + \
             F.affine_grid(identity_theta, r.shape)
         return f, r, add_to_context
