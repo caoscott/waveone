@@ -107,8 +107,10 @@ def train():
             for frame1, frame2, _, _ in eval_loader:
                 batch_size = frame1.shape[0]
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
+                encoder_input = torch.cat([frame1, frame2], dim=1)
+                compressed = encoder(encoder_input, context_vec)
                 flows, residuals, add_to_context = decoder(
-                    encoder(torch.cat([frame1, frame2], dim=1), context_vec), context_vec)
+                    (compressed, context_vec))
                 context_vec += add_to_context
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = flow_frame2 + residuals
@@ -173,8 +175,8 @@ def train():
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
-            loss = -msssim_fn(frame2, reconstructed_frame2) \
-                + charbonnier_loss_fn(frame2, flow_frame2)
+            loss = -msssim_fn(frame2, reconstructed_frame2)
+            + charbonnier_loss_fn(frame2, flow_frame2)
 
             loss.backward()
             for net in nets:

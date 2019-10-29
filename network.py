@@ -66,7 +66,8 @@ class BitToContextDecoder(nn.Module):
             upconv(128, 128, bilinear=False),
             upconv(128, 128, bilinear=False))
 
-    def forward(self, x: nn.Module, context_vec: nn.Module) -> nn.Module:
+    def forward(self, input_tuple) -> nn.Module:
+        x, context_vec = input_tuple
         add_to_context = self.ups(x)
         return add_to_context, context_vec
 
