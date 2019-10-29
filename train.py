@@ -175,8 +175,8 @@ def train():
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
-            loss = -msssim_fn(frame2, reconstructed_frame2)
-            + charbonnier_loss_fn(frame2, flow_frame2)
+            loss = -msssim_fn(frame2, reconstructed_frame2) \
+                + charbonnier_loss_fn(frame2, flow_frame2)
 
             loss.backward()
             for net in nets:
