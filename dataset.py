@@ -245,9 +245,9 @@ class ImageFolder(data.Dataset):
         # else:
         # img, main_fn = self.get_frame_data(filename)
 
-        img = np.concatenate((img1, img2))
+        img = np.concatenate((img1, img2), axis=2)
 
-        assert img.shape[1] == 6
+        assert img.shape[2] == 6
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
             img = flip_cv2(img)
