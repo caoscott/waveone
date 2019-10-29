@@ -170,7 +170,7 @@ def train():
 
             encoder_input = torch.cat([frame1, frame2], dim=1)
             compressed = encoder(encoder_input, context_vec)
-            flows, residuals, add_to_context = decoder(
+            flows, residuals, new_context_vec = decoder(
                 (compressed, context_vec))
 
             flow_frame2 = F.grid_sample(frame1, flows)
@@ -186,7 +186,7 @@ def train():
             solver.step()
             scheduler.step()
 
-            context_vec += add_to_context
+            context_vec = new_context_vec
 
             writer.add_scalar("training_loss", loss.item(), train_iter)
 
