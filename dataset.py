@@ -22,8 +22,8 @@ def get_loader(is_train: bool, root: str, mv_dir: str, args) -> data.DataLoader:
     loader = data.DataLoader(
         dataset=dset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
-        shuffle=is_train,
-        num_workers=2,
+        shuffle=False,
+        num_workers=1,
         drop_last=is_train,
     )
 
@@ -104,7 +104,7 @@ def crop_cv2(img, patch):
     return img[start_x: start_x + patch, start_y: start_y + patch]
 
 
-def flip_cv2(img, patch):
+def flip_cv2(img):
     if random.random() < 0.5:
         img = img[::-1].copy()
 
@@ -188,34 +188,31 @@ class ImageFolder(data.Dataset):
 
     def _load_image_list(self):
         self.imgs = []
-        dist1, dist2 = self.args.distance1, self.args.distance2
+        # dist1, dist2 = self.args.distance1, self.args.distance2
 
-        if self.v_compress:
-            if dist1 == 6 and dist2 == 6:
-                positions = [7]
-            elif dist1 == 3 and dist2 == 3:
-                positions = [4, 10]
-            elif dist1 == 1 and dist2 == 2:
-                positions = [2, 3, 5, 6, 8, 9, 11, 0]
-            else:
-                assert False, 'not implemented.'
+        # if self.v_compress:
+        #     if dist1 == 6 and dist2 == 6:
+        #         positions = [7]
+        #     elif dist1 == 3 and dist2 == 3:
+        #         positions = [4, 10]
+        #     elif dist1 == 1 and dist2 == 2:
+        #         positions = [2, 3, 5, 6, 8, 9, 11, 0]
+        #     else:
+        #         assert False, 'not implemented.'
 
         for filename in glob.iglob(self.root + '/*png'):
             img_idx = int(filename[:-4].split('_')[-1])
 
-            if self.args.v_compress:
-                if not (img_idx % 12 in positions):
-                    continue
-                if all(os.path.isfile(fn) for fn in
-                       get_group_filenames(
-                        filename, img_idx, dist1, dist2)):
-
-                    self.imgs.append(filename)
-            else:
-                if (img_idx % 12) != 1:
-                    continue
-                if os.path.isfile(filename):
-                    self.imgs.append(filename)
+            # if self.args.v_compress:
+            #     if all(os.path.isfile(fn) for fn in
+            #            get_group_filenames(
+            #             filename, img_idx, dist1, dist2)):
+            #         self.imgs.append(filename)
+            # else:
+            #     if (img_idx % 12) != 1:
+            #         continue
+            if os.path.isfile(filename):
+                self.imgs.append(filename)
 
         print('%d images loaded.' % len(self.imgs))
 
@@ -239,42 +236,34 @@ class ImageFolder(data.Dataset):
         return img, filename
 
     def __getitem__(self, index):
-        filename = self.imgs[index]
+        filename1 = self.imgs[index]
+        filename2 = self.imgs[index + 1]
 
         # if self.v_compress:
-        img, main_fn = self.get_group_data(filename)
+        img1, fn1 = self.get_frame_data(filename1)
+        img2, fn2 = self.get_frame_data(filename2)
         # else:
         # img, main_fn = self.get_frame_data(filename)
 
-        assert img.shape[2] == 9
+        img = torch.cat((img1, img2))
+
+        assert img.shape[2] == 6
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
-            img = flip_cv2(img, self.patch)
-
-        # if self.identity_grid is None:
-        #     self.identity_grid = get_identity_grid(img.shape[:2])
-
-        # img[..., 9 :11] += self.identity_grid
-        # img[..., 11:13] += self.identity_grid
-
-        # Split img.
-        ctx_frames = img[..., [0, 1, 2, 6, 7, 8]]
-
-        # assert img.shape[2] == 13
-        # assert ctx_frames.shape[2] == 6
+            img = flip_cv2(img)
 
         # CV2 cropping in CPU is faster.
-        if self.is_train:
+        if self.is_train and self.patch:
             img = crop_cv2(img, self.patch)
+
         img /= 255.0
-        data = np_to_torch(img)
+        img = np_to_torch(img)
 
-        frame1, res, frame2 = data[0:3], data[3:6], data[6:9]
+        frame1, frame2 = img[:3], img[3:]
 
-        ctx_frames /= 255.0
-        ctx_frames = np_to_torch(ctx_frames)
+        self.shape = frame1.shape
 
-        return frame1, res, frame2, ctx_frames, main_fn
+        return frame1, frame2, fn1, fn2
 
     def __len__(self):
-        return len(self.imgs)
+        return 0 if len(self.imgs) == 0 else len(self.imgs) - 1

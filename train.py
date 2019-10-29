@@ -12,7 +12,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from dataset import get_loader
 from losses import MSSSIM, CharbonnierLoss
-from network import Decoder, Encoder
+from network import (BitToContextDecoder, BitToFlowDecoder,
+                     ContextToFlowDecoder, Encoder)
 from train_options import parser
 
 
@@ -39,8 +40,10 @@ def train():
     writer = SummaryWriter()
 
     ############### Model ###############
-    encoder = Encoder(6, 128).cuda()
-    decoder = Decoder(128, 3).cuda()
+    context_vec_shape = (args.batch_size, 128, 144, 176)
+    encoder = Encoder(6, use_context=True).cuda()
+    decoder = nn.Sequential(BitToContextDecoder(),
+                            ContextToFlowDecoder(3)).cuda()
     nets = [encoder, decoder]
 
     gpus = [int(gpu) for gpu in args.gpus.split(',')]
@@ -93,27 +96,22 @@ def train():
     def run_eval(eval_name: str, eval_loader: data.DataLoader):
         encoder.eval()
         decoder.eval()
-        with torch.no_grad():
 
+        with torch.no_grad():
             baseline_msssim_score = 0
-            # baseline_msssim_score_ctx = 0
             reconstructed_msssim_score = 0
             flow_msssim_score = 0
+            context_vec = torch.zeros(context_vec_shape)
 
-            for frame1, _, frame2, ctx_frames, _ in eval_loader:
-                frame1, frame2 = frame1.cuda(), frame2.cuda()
-                print(frame1.mean().item(), frame1.median().item(), frame1.norm().item(),
-                      frame2.mean().item(), frame2.median().item(), frame2.norm().item())
-                ctx_frames = ctx_frames.cuda()
-                # ctx_frame1, ctx_frame2 = ctx_frames[:, :3], ctx_frames[:, 3:6]
+            for frame1, frame2, _, _ in eval_loader:
                 batch_size = frame1.shape[0]
-                flows, residuals = decoder(
-                    encoder(torch.cat([frame1, frame2], dim=1)))
+                frame1, frame2 = frame1.cuda(), frame2.cuda()
+                flows, residuals, add_to_context = decoder(
+                    encoder(torch.cat([frame1, frame2], dim=1), context_vec), context_vec)
+                context_vec += add_to_context
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = flow_frame2 + residuals
                 baseline_msssim_score += msssim_fn(frame1, frame2) * batch_size
-                # baseline_msssim_score_ctx += msssim_fn(
-                # ctx_frame1, ctx_frame2) * batch_size
                 reconstructed_msssim_score += msssim_fn(
                     frame2, reconstructed_frame2) * batch_size
                 flow_msssim_score += msssim_fn(frame2,
@@ -155,7 +153,8 @@ def train():
         just_resumed = True
 
     while True:
-        for _, (frame1, _, frame2, _, _) in enumerate(train_loader):
+        context_vec = torch.zeros(context_vec_shape, requires_grad=False)
+        for frame1, frame2, _, _ in train_loader:
             frame1, frame2 = frame1.cuda(), frame2.cuda()
             train_iter += 1
 
@@ -167,7 +166,8 @@ def train():
             solver.zero_grad()
 
             encoder_input = torch.cat([frame1, frame2], dim=1)
-            flows, residuals = decoder(encoder(encoder_input))
+            flows, residuals, add_to_context = decoder(
+                encoder(encoder_input, context_vec), context_vec)
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
@@ -181,6 +181,8 @@ def train():
 
             solver.step()
             scheduler.step()
+
+            context_vec += add_to_context
 
             writer.add_scalar("training_loss", loss.item(), train_iter)
 

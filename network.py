@@ -9,29 +9,36 @@ from network_parts import double_conv, down, inconv, outconv, up, upconv
 
 
 class Encoder(nn.Module):
-    def __init__(self, channels_in: int, channels_out: int):
-        super(Encoder, self).__init__()
-        self.encode = nn.Sequential(
+    def __init__(self, channels_in: int, use_context: bool):
+        super().__init__()
+        self.encode_frames = nn.Sequential(
             inconv(channels_in, 64),
             down(64, 128),
-            down(128, 256),
-            down(256, 512),
-            down(512, 1024),
+        )
+        self.encode_context = inconv(128, 128)
+        self.encode = nn.Sequential(
+            down(128, 128),
+            down(128, 128),
+            down(128, 128),
             nn.Tanh())
+        self.use_context = use_context
 
-    def forward(self, x: nn.Module) -> nn.Module:
+    def forward(self, x: nn.Module, context_vec: torch.Tensor) -> nn.Module:
+        x = self.encode_frames(x)
+        if self.use_context:
+            x += self.encode_context(context_vec)
         return self.encode(x)
 
 
-class Decoder(nn.Module):
+class BitToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
-    def __init__(self, channels_in: int, channels_out: int):
-        super(Decoder, self).__init__()
+    def __init__(self, channels_out: int):
+        super().__init__()
         self.ups = nn.Sequential(
-            upconv(1024, 512, bilinear=False),
-            upconv(512, 256, bilinear=False),
-            upconv(256, 128, bilinear=False))
+            upconv(128, 128, bilinear=False),
+            upconv(128, 128, bilinear=False),
+            upconv(128, 128, bilinear=False))
         self.flow = nn.Sequential(
             upconv(128, 64, bilinear=False),
             outconv(64, 2),
@@ -41,11 +48,48 @@ class Decoder(nn.Module):
             outconv(64, channels_out),
             nn.Tanh())
 
-    def forward(self, x: nn.Module) -> nn.Module:
+    def forward(self, x: nn.Module, _=_) -> nn.Module:
         x = self.ups(x)
         r = self.residual(x)
         identity_theta = torch.tensor(
-            Decoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
+            BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
         f = self.flow(x).permute(0, 2, 3, 1) + \
             F.affine_grid(identity_theta, r.shape)
-        return f, r
+        return f, r, None
+
+
+class BitToContextDecoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.ups = nn.Sequential(
+            upconv(128, 128, bilinear=False),
+            upconv(128, 128, bilinear=False),
+            upconv(128, 128, bilinear=False))
+
+    def forward(self, x: nn.Module, context_vec: nn.Module) -> nn.Module:
+        add_to_context = self.ups(x)
+        return add_to_context, context_vec
+
+
+class ContextToFlowDecoder(nn.Module):
+    IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
+
+    def __init__(self, channels_out: int):
+        super().__init__()
+        self.flow = nn.Sequential(
+            upconv(128, 64, bilinear=False),
+            outconv(64, 2),
+            nn.Tanh())
+        self.residual = nn.Sequential(
+            upconv(128, 64, bilinear=False),
+            outconv(64, channels_out),
+            nn.Tanh())
+
+    def forward(self, add_to_context: nn.Module, context_vec: nn.Module) -> nn.Module:
+        x = add_to_context + context_vec
+        r = self.residual(x)
+        identity_theta = torch.tensor(
+            ContextToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
+        f = self.flow().permute(0, 2, 3, 1) + \
+            F.affine_grid(identity_theta, r.shape)
+        return f, r, add_to_context
