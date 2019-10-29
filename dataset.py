@@ -264,8 +264,10 @@ class ImageFolder(data.Dataset):
         # assert ctx_frames.shape[2] == 6
 
         # CV2 cropping in CPU is faster.
+        print("precrop", img.shape)
         if self.is_train:
             img = crop_cv2(img, self.patch)
+            print("crop", img.shape)
         img /= 255.0
         data = np_to_torch(img)
 
