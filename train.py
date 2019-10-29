@@ -204,4 +204,5 @@ def train():
             break
 
 
-train()
+with torch.autograd.set_detect_anomaly(True):
+    train()
