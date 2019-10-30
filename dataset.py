@@ -181,8 +181,6 @@ class ImageFolder(data.Dataset):
         self.identity_grid = None
 
         self._load_image_list()
-        if is_train:
-            random.shuffle(self.imgs)
 
         # print('\tdistance=%d/%d' % (args.distance1, args.distance2))
 
@@ -200,7 +198,7 @@ class ImageFolder(data.Dataset):
         #     else:
         #         assert False, 'not implemented.'
 
-        for filename in glob.iglob(self.root + '/*png'):
+        for filename in sorted(glob.iglob(self.root + '/*png')):
             img_idx = int(filename[:-4].split('_')[-1])
 
             # if self.args.v_compress:
@@ -212,7 +210,8 @@ class ImageFolder(data.Dataset):
             #     if (img_idx % 12) != 1:
             #         continue
             if os.path.isfile(filename):
-                self.imgs.append(filename)
+                self.imgs.append(
+                    (self.loader(filename).astype(np.float64), filename))
 
         print('%d images loaded.' % len(self.imgs))
 
@@ -236,11 +235,8 @@ class ImageFolder(data.Dataset):
         return img, filename
 
     def __getitem__(self, index):
-        filename1 = self.imgs[index]
-        filename2 = self.imgs[index + 1]
-
-        img1, fn1 = self.get_frame_data(filename1)
-        img2, fn2 = self.get_frame_data(filename2)
+        img1, fn1 = self.imgs[index]
+        img2, fn2 = self.imgs[index + 1]
         img = np.concatenate((img1, img2), axis=2).astype(np.float64)
 
         assert img.shape[2] == 6
@@ -256,8 +252,6 @@ class ImageFolder(data.Dataset):
         img = np_to_torch(img)
 
         frame1, frame2 = img[:3], img[3:]
-
-        self.shape = frame1.shape
 
         return frame1, frame2, fn1, fn2
 
