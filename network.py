@@ -11,21 +11,32 @@ from network_parts import double_conv, down, inconv, outconv, up, upconv
 class Encoder(nn.Module):
     def __init__(self, channels_in: int, use_context: bool):
         super().__init__()
+        # self.encode_frame1 = nn.Sequential(
+        #     inconv(channels_in // 2, 64),
+        #     down(64, 128),
+        # )
+        # self.encode_frame2 = nn.Sequential(
+        #     inconv(channels_in // 2, 64),
+        #     down(64, 128),
+        # )
         self.encode_frames = nn.Sequential(
             inconv(channels_in, 64),
             down(64, 128),
         )
-        self.encode_context = inconv(128, 128)
+        self.encode_context = inconv(256, 256)
         self.encode = nn.Sequential(
-            down(128, 128),
-            down(128, 128),
-            down(128, 128),
+            down(256, 512),
+            down(512, 512),
+            down(512, 128),
             nn.Tanh())
         self.use_context = use_context
 
     def forward(self, x: nn.Module, context_vec: torch.Tensor) -> nn.Module:
-        x = self.encode_frames(x) + (
-            self.encode_context(context_vec) if self.use_context else 0.)
+        x = self.encode_frames(x)
+        # + (
+        # self.encode_context(context_vec) if self.use_context else 0.)
+        if self.use_context:
+            x += self.encode_context(context_vec)
         return self.encode(x)
 
 
