@@ -43,19 +43,19 @@ def train():
     context_vec_shape = (args.batch_size, 128,
                          args.patch or 144, args.patch or 176)
     encoder = Encoder(6, use_context=True).cuda()
-    # decoder = nn.Sequential(BitToContextDecoder(),
-                            # ContextToFlowDecoder(3)).cuda()
-    decoder = BitToFlowDecoder(3).cuda()
-    nets=[encoder, decoder]
+    decoder = nn.Sequential(BitToContextDecoder(),
+                            ContextToFlowDecoder(3)).cuda()
+    # decoder = BitToFlowDecoder(3).cuda()
+    nets = [encoder, decoder]
 
-    gpus=[int(gpu) for gpu in args.gpus.split(',')]
+    gpus = [int(gpu) for gpu in args.gpus.split(',')]
     if len(gpus) > 1:
         print("Using GPUs {}.".format(gpus))
-        net=nn.DataParallel(net, device_ids = gpus)
+        net = nn.DataParallel(net, device_ids=gpus)
 
-    params=[{'params': net.parameters()} for net in nets]
+    params = [{'params': net.parameters()} for net in nets]
 
-    solver=optim.Adam(
+    solver = optim.Adam(
         params,
         lr=args.lr,
         weight_decay=args.weight_decay)
