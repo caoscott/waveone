@@ -185,7 +185,7 @@ def train():
             solver.step()
             scheduler.step()
 
-            context_vec = new_context_vec
+            context_vec = new_context_vec.detach()
 
             writer.add_scalar("training_loss", loss.item(), train_iter)
 
