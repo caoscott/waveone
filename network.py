@@ -23,8 +23,10 @@ class Encoder(nn.Module):
         self.encode = nn.Sequential(
             down(512, 512),
             down(512, 512),
-            down(512, 128),
-            nn.Tanh())
+            down(512, 512),
+            nn.Conv2d(512, 128, kernel_size=3, padding=1),
+            nn.Tanh(),
+        )
         self.use_context = use_context
 
     def forward(self, frame1, frame2, context_vec: torch.Tensor) -> nn.Module:
@@ -46,10 +48,12 @@ class BitToFlowDecoder(nn.Module):
         self.flow = nn.Sequential(
             upconv(512, 128, bilinear=False),
             outconv(128, 2),
+            # nn.Conv2d(128, 2, kernel_size=3, padding=1),
             nn.Tanh())
         self.residual = nn.Sequential(
             upconv(512, 128, bilinear=False),
             outconv(128, channels_out),
+            # nn.Conv2d(128, channels_out, kernel_size=3, padding=1),
             nn.Tanh())
 
     def forward(self, input_tuple) -> nn.Module:
@@ -69,7 +73,10 @@ class BitToContextDecoder(nn.Module):
         self.ups = nn.Sequential(
             upconv(128, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
-            upconv(512, 512, bilinear=False))
+            upconv(512, 512, bilinear=False),
+            outconv(512, 512),
+            nn.Tanh(),
+        )
 
     def forward(self, input_tuple) -> nn.Module:
         x, context_vec = input_tuple
@@ -85,11 +92,13 @@ class ContextToFlowDecoder(nn.Module):
         self.flow = nn.Sequential(
             upconv(512, 128, bilinear=False),
             outconv(128, 2),
-            nn.Tanh())
+            nn.Tanh(),
+        )
         self.residual = nn.Sequential(
             upconv(512, 128, bilinear=False),
             outconv(128, channels_out),
-            nn.Tanh())
+            nn.Tanh(),
+        )
 
     def forward(self, x) -> nn.Module:
         r = self.residual(x)

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 
 class double_conv(nn.Module):
-    '''(conv => BN => ReLU) * 2'''
+    '''(conv => BN => ELU) * 2'''
 
     def __init__(self, in_ch, out_ch, downsample=False, norm="group"):
         super().__init__()
@@ -16,12 +16,12 @@ class double_conv(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1),
             nn.BatchNorm2d(
-                out_ch) if norm == "batch" else nn.GroupNorm(2, out_ch),
-            nn.ReLU(inplace=True),
+                out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
+            nn.ELU(inplace=True),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(
-                out_ch) if norm == "batch" else nn.GroupNorm(2, out_ch),
-            nn.ReLU(inplace=True)
+                out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
+            nn.ELU(inplace=True)
         )
 
     def forward(self, x):
