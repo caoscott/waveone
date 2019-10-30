@@ -108,10 +108,9 @@ def train():
                 batch_size = frame1.shape[0]
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
                 encoder_input = torch.cat([frame1, frame2], dim=1)
-                compressed = encoder(encoder_input, context_vec)
-                flows, residuals, add_to_context = decoder(
-                    (compressed, context_vec))
-                context_vec += add_to_context
+                flows, residuals, new_context_vec = decoder(
+                    (encoder(encoder_input, context_vec), context_vec))
+                context_vec = new_context_vec
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = flow_frame2 + residuals
                 baseline_msssim_score += msssim_fn(frame1, frame2) * batch_size
@@ -169,9 +168,8 @@ def train():
             solver.zero_grad()
 
             encoder_input = torch.cat([frame1, frame2], dim=1)
-            compressed = encoder(encoder_input, context_vec)
             flows, residuals, new_context_vec = decoder(
-                (compressed, context_vec))
+                (encoder(encoder_input, context_vec), context_vec))
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
