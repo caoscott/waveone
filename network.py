@@ -11,30 +11,27 @@ from network_parts import double_conv, down, inconv, outconv, up, upconv
 class Encoder(nn.Module):
     def __init__(self, channels_in: int, use_context: bool):
         super().__init__()
-        # self.encode_frame1 = nn.Sequential(
-        #     inconv(channels_in // 2, 64),
-        #     down(64, 128),
-        # )
-        # self.encode_frame2 = nn.Sequential(
-        #     inconv(channels_in // 2, 64),
-        #     down(64, 128),
-        # )
-        self.encode_frames = nn.Sequential(
-            inconv(channels_in, 64),
-            down(64, 128),
+        self.encode_frame1 = nn.Sequential(
+            inconv(channels_in // 2, 128),
+            down(128, 256),
         )
-        self.encode_context = inconv(128, 128)
+        self.encode_frame2 = nn.Sequential(
+            inconv(channels_in // 2, 128),
+            down(128, 256),
+        )
+        self.encode_context = inconv(512, 512)
         self.encode = nn.Sequential(
-            down(128, 512),
+            down(512, 512),
             down(512, 512),
             down(512, 128),
             nn.Tanh())
         self.use_context = use_context
 
-    def forward(self, x: nn.Module, context_vec: torch.Tensor) -> nn.Module:
-        x = self.encode_frames(x) + (
-            self.encode_context(context_vec) if self.use_context else 0.)
-        return self.encode(x)
+    def forward(self, frame1, frame2, context_vec: torch.Tensor) -> nn.Module:
+        frames_x = torch.cat(
+            (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
+        context_x = self.encode_context(context_vec) if self.use_context else 0.
+        return self.encode(frames_x + context_x)
 
 
 class BitToFlowDecoder(nn.Module):
@@ -43,16 +40,16 @@ class BitToFlowDecoder(nn.Module):
     def __init__(self, channels_out: int):
         super().__init__()
         self.ups = nn.Sequential(
-            upconv(128, 128, bilinear=False),
-            upconv(128, 128, bilinear=False),
-            upconv(128, 128, bilinear=False))
+            upconv(128, 512, bilinear=False),
+            upconv(512, 512, bilinear=False),
+            upconv(512, 512, bilinear=False))
         self.flow = nn.Sequential(
-            upconv(128, 64, bilinear=False),
-            outconv(64, 2),
+            upconv(512, 128, bilinear=False),
+            outconv(128, 2),
             nn.Tanh())
         self.residual = nn.Sequential(
-            upconv(128, 64, bilinear=False),
-            outconv(64, channels_out),
+            upconv(512, 128, bilinear=False),
+            outconv(128, channels_out),
             nn.Tanh())
 
     def forward(self, input_tuple) -> nn.Module:
@@ -70,9 +67,9 @@ class BitToContextDecoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.ups = nn.Sequential(
-            upconv(128, 128, bilinear=False),
-            upconv(128, 128, bilinear=False),
-            upconv(128, 128, bilinear=False))
+            upconv(128, 512, bilinear=False),
+            upconv(512, 512, bilinear=False),
+            upconv(512, 512, bilinear=False))
 
     def forward(self, input_tuple) -> nn.Module:
         x, context_vec = input_tuple
@@ -86,12 +83,12 @@ class ContextToFlowDecoder(nn.Module):
     def __init__(self, channels_out: int):
         super().__init__()
         self.flow = nn.Sequential(
-            upconv(128, 64, bilinear=False),
-            outconv(64, 2),
+            upconv(512, 128, bilinear=False),
+            outconv(128, 2),
             nn.Tanh())
         self.residual = nn.Sequential(
-            upconv(128, 64, bilinear=False),
-            outconv(64, channels_out),
+            upconv(512, 128, bilinear=False),
+            outconv(128, channels_out),
             nn.Tanh())
 
     def forward(self, x) -> nn.Module:

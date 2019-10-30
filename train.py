@@ -108,9 +108,9 @@ def train():
             for frame1, frame2, _, _ in eval_loader:
                 batch_size = frame1.shape[0]
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
-                encoder_input = torch.cat([frame1, frame2], dim=1)
+                # encoder_input = torch.cat([frame1, frame2], dim=1)
                 flows, residuals, new_context_vec = decoder(
-                    (encoder(encoder_input, context_vec), context_vec))
+                    (encoder(frame1, frame2, context_vec), context_vec))
                 context_vec = new_context_vec
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = flow_frame2 + residuals
@@ -168,9 +168,9 @@ def train():
             decoder.train()
             solver.zero_grad()
 
-            encoder_input = torch.cat([frame1, frame2], dim=1)
+            # encoder_input = torch.cat([frame1, frame2], dim=1)
             flows, residuals, new_context_vec = decoder(
-                (encoder(encoder_input, context_vec), context_vec))
+                (encoder(frame1, frame2, context_vec), context_vec))
 
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
