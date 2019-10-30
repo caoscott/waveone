@@ -49,14 +49,14 @@ class BitToFlowDecoder(nn.Module):
             nn.Tanh())
 
     def forward(self, input_tuple) -> nn.Module:
-        x, _ = input_tuple
+        x, context_vec = input_tuple
         x = self.ups(x)
         r = self.residual(x)
         identity_theta = torch.tensor(
             BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
         f = self.flow(x).permute(0, 2, 3, 1) + \
             F.affine_grid(identity_theta, r.shape)
-        return f, r, 0.
+        return f, r, context_vec
 
 
 class BitToContextDecoder(nn.Module):
