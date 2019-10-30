@@ -178,9 +178,9 @@ def train():
                 + charbonnier_loss_fn(frame2, flow_frame2)
 
             loss.backward()
-            for net in nets:
-                if net is not None:
-                    torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
+            # for net in nets:
+            # if net is not None:
+            # torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
 
             solver.step()
             scheduler.step()
@@ -188,6 +188,9 @@ def train():
             context_vec = new_context_vec.detach()
 
             writer.add_scalar("training_loss", loss.item(), train_iter)
+            writer.add_scalar("context_vec_norm",
+                              context_vec.norm().item(), train_iter)
+            writer.add_scalar("output_flow", flows.norm().item(), train_iter)
 
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)

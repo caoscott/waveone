@@ -199,7 +199,7 @@ class ImageFolder(data.Dataset):
         #         assert False, 'not implemented.'
 
         for filename in sorted(glob.iglob(self.root + '/*png')):
-            img_idx = int(filename[:-4].split('_')[-1])
+            # img_idx = int(filename[:-4].split('_')[-1])
 
             # if self.args.v_compress:
             #     if all(os.path.isfile(fn) for fn in
