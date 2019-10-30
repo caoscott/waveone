@@ -75,13 +75,12 @@ class BitToContextDecoder(nn.Module):
             upconv(512, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
             outconv(512, 512),
-            nn.Tanh(),
         )
 
     def forward(self, input_tuple) -> nn.Module:
         x, context_vec = input_tuple
         add_to_context = self.ups(x)
-        return context_vec + add_to_context
+        return (context_vec + add_to_context).clamp(-1., 1.)
 
 
 class ContextToFlowDecoder(nn.Module):
