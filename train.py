@@ -40,7 +40,7 @@ def train():
     writer = SummaryWriter()
 
     ############### Model ###############
-    context_vec_shape = (args.batch_size, 128,
+    context_vec_shape = (args.batch_size, 512,
                          args.patch or 144, args.patch or 176)
     encoder = Encoder(6, use_context=True).cuda()
     decoder = nn.Sequential(BitToContextDecoder(),
