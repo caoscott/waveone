@@ -32,11 +32,8 @@ class Encoder(nn.Module):
         self.use_context = use_context
 
     def forward(self, x: nn.Module, context_vec: torch.Tensor) -> nn.Module:
-        x = self.encode_frames(x)
-        # + (
-        # self.encode_context(context_vec) if self.use_context else 0.)
-        if self.use_context:
-            x += self.encode_context(context_vec)
+        x = self.encode_frames(x) + (
+            self.encode_context(context_vec) if self.use_context else 0.)
         return self.encode(x)
 
 
