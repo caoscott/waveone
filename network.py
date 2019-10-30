@@ -23,9 +23,9 @@ class Encoder(nn.Module):
             inconv(channels_in, 64),
             down(64, 128),
         )
-        self.encode_context = inconv(256, 256)
+        self.encode_context = inconv(128, 128)
         self.encode = nn.Sequential(
-            down(256, 512),
+            down(128, 512),
             down(512, 512),
             down(512, 128),
             nn.Tanh())
