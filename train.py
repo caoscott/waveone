@@ -154,50 +154,54 @@ def train():
         scheduler.last_epoch = train_iter - 1
         just_resumed = True
 
+    def train_loop(frames):
+        encoder.train()
+        decoder.train()
+        solver.zero_grad()
+
+        frames = [frame.cuda() for frame in frames]
+        loss = 0
+        context_vec = torch.zeros(
+            context_vec_train_shape, requires_grad=False).cuda()
+
+        for frame1, frame2 in zip(frames[:-1], frames[1:]):
+            flows, residuals, context_vec = decoder(
+                (encoder(frame1, frame2, context_vec), context_vec))
+
+            flow_frame2 = F.grid_sample(frame1, flows)
+            reconstructed_frame2 = flow_frame2 + residuals
+            loss += -msssim_fn(frame2, reconstructed_frame2) \
+                + l1_loss_fn(frame2, flow_frame2)
+
+            flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
+            writer.add_scalar("mean_context_vec_norm",
+                              context_vec.mean().item(), train_iter)
+            writer.add_scalar(
+                "output_flow_x", flows_mean[0].item(), train_iter)
+            writer.add_scalar(
+                "output_flow_y", flows_mean[1].item(), train_iter)
+        # + charbonnier_loss_fn(frame2, flow_frame2)
+
+        loss.backward()
+        # for net in nets:
+        # if net is not None:
+        # torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
+
+        solver.step()
+        scheduler.step()
+
+        # context_vec = new_context_vec.detach()
+
+        writer.add_scalar("training_loss", loss.item() /
+                          len(frames), train_iter)
+
     while True:
         for frames in train_loader:
             train_iter += 1
             if train_iter > args.max_train_iters:
                 break
-            encoder.train()
-            decoder.train()
-            solver.zero_grad()
 
-            frames = [frame.cuda() for frame in frames]
-            loss = 0
-            context_vec = torch.zeros(
-                context_vec_train_shape, requires_grad=False).cuda()
-
-            for frame1, frame2 in zip(frames[:-1], frames[1:]):
-                flows, residuals, context_vec = decoder(
-                    (encoder(frame1, frame2, context_vec), context_vec))
-
-                flow_frame2 = F.grid_sample(frame1, flows)
-                reconstructed_frame2 = flow_frame2 + residuals
-                loss += -msssim_fn(frame2, reconstructed_frame2) \
-                    + l1_loss_fn(frame2, flow_frame2)
-
-                flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-                writer.add_scalar("mean_context_vec_norm",
-                                  context_vec.mean().item(), train_iter)
-                writer.add_scalar(
-                    "output_flow_x", flows_mean[0].item(), train_iter)
-                writer.add_scalar(
-                    "output_flow_y", flows_mean[1].item(), train_iter)
-            # + charbonnier_loss_fn(frame2, flow_frame2)
-
-            loss.backward()
-            # for net in nets:
-            # if net is not None:
-            # torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
-
-            solver.step()
-            scheduler.step()
-
-            # context_vec = new_context_vec.detach()
-
-            writer.add_scalar("training_loss", loss.item() /
-                              len(frames), train_iter)
+            train_loop(frames)
 
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)
