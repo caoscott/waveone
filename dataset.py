@@ -245,9 +245,10 @@ class ImageFolder(data.Dataset):
         return img, filename
 
     def __getitem__(self, index):
+        imgs = self.imgs[index: index+self.frame_len]
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
-            imgs = flip_cv2(self.imgs[index: index+self.frame_len])
+            imgs = flip_cv2(imgs)
 
         # CV2 cropping in CPU is faster.
         if self.patch and self.is_train:
@@ -255,7 +256,6 @@ class ImageFolder(data.Dataset):
             imgs = [crop_cv2(img, self.patch) for img in imgs]
 
         data = [np_to_torch(img / 255.0) for img in imgs]
-
         return data
 
     def __len__(self):

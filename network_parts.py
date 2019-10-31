@@ -10,7 +10,7 @@ import torch.nn.functional as F
 class double_conv(nn.Module):
     '''(conv => BN => ELU) * 2'''
 
-    def __init__(self, in_ch, out_ch, downsample=False, norm="group"):
+    def __init__(self, in_ch, out_ch, downsample=False, norm="batch"):
         super().__init__()
         stride = 2 if downsample else 1
         self.conv = nn.Sequential(
