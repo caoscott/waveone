@@ -22,26 +22,25 @@ def train():
     print(args)
 
     ############### Data ###############
-    def get_eval_loaders() -> Dict[str, data.DataLoader]:
-        # We can extend this dict to evaluate on multiple datasets.
-        eval_loaders = {
-            'TVL': get_loader(
-                is_train=False,
-                root=args.eval, mv_dir=args.eval_mv,
-                args=args),
-        }
-        return eval_loaders
 
     train_loader = get_loader(
         is_train=True,
         root=args.train, mv_dir=args.train_mv,
         args=args
     )
+    eval_loaders = {
+        'TVL': get_loader(
+            is_train=False,
+            root=args.eval, mv_dir=args.eval_mv,
+            args=args),
+    }
     writer = SummaryWriter()
 
     ############### Model ###############
-    context_vec_shape = (args.batch_size, 512,
-                         args.patch or 144, args.patch or 176)
+    context_vec_train_shape = (args.batch_size, 512,
+                               args.patch or 144, args.patch or 176)
+    context_vec_test_shape = (args.eval_batch_size, 512,
+                              144, 176)
     encoder = Encoder(6, use_context=True).cuda()
     decoder = nn.Sequential(BitToContextDecoder(),
                             ContextToFlowDecoder(3)).cuda()
@@ -64,6 +63,7 @@ def train():
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     charbonnier_loss_fn = CharbonnierLoss().cuda()
+    l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
 
     if not os.path.exists(args.model_dir):
         print("Creating directory %s." % args.model_dir)
@@ -103,12 +103,11 @@ def train():
             baseline_msssim_score = 0
             reconstructed_msssim_score = 0
             flow_msssim_score = 0
-            context_vec = torch.zeros(context_vec_shape).cuda()
+            context_vec = torch.zeros(context_vec_test_shape).cuda()
 
             for frame1, frame2, _, _ in eval_loader:
                 batch_size = frame1.shape[0]
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
-                # encoder_input = torch.cat([frame1, frame2], dim=1)
                 flows, residuals, new_context_vec = decoder(
                     (encoder(frame1, frame2, context_vec), context_vec))
                 context_vec = new_context_vec
@@ -156,7 +155,8 @@ def train():
         just_resumed = True
 
     while True:
-        context_vec = torch.zeros(context_vec_shape, requires_grad=False).cuda()
+        context_vec = torch.zeros(
+            context_vec_train_shape, requires_grad=False).cuda()
         for frame1, frame2, _, _ in train_loader:
             frame1, frame2 = frame1.cuda(), frame2.cuda()
             train_iter += 1
@@ -175,7 +175,8 @@ def train():
             flow_frame2 = F.grid_sample(frame1, flows)
             reconstructed_frame2 = flow_frame2 + residuals
             loss = -msssim_fn(frame2, reconstructed_frame2) \
-                + charbonnier_loss_fn(frame2, flow_frame2)
+                + l1_loss_fn(frame2, flow_frame2)
+            # + charbonnier_loss_fn(frame2, flow_frame2)
 
             loss.backward()
             # for net in nets:
@@ -188,22 +189,24 @@ def train():
             context_vec = new_context_vec.detach()
 
             mean_context_vec_norm = context_vec.norm().item()
-            for dim in context_vec_shape:
+            for dim in context_vec_train_shape:
                 mean_context_vec_norm /= dim
-            mean_flow_offset_norm = flows.norm().item()
+            mean_flow_offset_norms = flows.norm(dim=-1)
             for dim in flows.shape:
-                mean_flow_offset_norm /= dim
+                mean_flow_offset_norms /= dim
 
             writer.add_scalar("training_loss", loss.item(), train_iter)
             writer.add_scalar("mean_context_vec_norm",
                               mean_context_vec_norm, train_iter)
-            writer.add_scalar("output_flow", mean_flow_offset_norm, train_iter)
+            writer.add_scalar(
+                "output_flow_x", mean_flow_offset_norms[0].item(), train_iter)
+            writer.add_scalar(
+                "output_flow_y", mean_flow_offset_norms[1].item(), train_iter)
 
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)
 
             if just_resumed or train_iter % args.eval_iters == 0:
-                eval_loaders = get_eval_loaders()
                 for eval_name, eval_loader in eval_loaders.items():
                     run_eval(eval_name, eval_loader)
                 just_resumed = False
