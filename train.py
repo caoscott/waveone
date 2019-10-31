@@ -187,21 +187,15 @@ def train():
             scheduler.step()
 
             context_vec = new_context_vec.detach()
-
-            mean_context_vec_norm = context_vec.norm().item()
-            for dim in context_vec_train_shape:
-                mean_context_vec_norm /= dim
-            mean_flow_offset_norms = flows.norm(dim=-1)
-            for dim in flows.shape:
-                mean_flow_offset_norms /= dim
+            flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
 
             writer.add_scalar("training_loss", loss.item(), train_iter)
             writer.add_scalar("mean_context_vec_norm",
-                              mean_context_vec_norm, train_iter)
+                              context_vec.mean().item(), train_iter)
             writer.add_scalar(
-                "output_flow_x", mean_flow_offset_norms[0].item(), train_iter)
+                "output_flow_x", flows_mean[0].item(), train_iter)
             writer.add_scalar(
-                "output_flow_y", mean_flow_offset_norms[1].item(), train_iter)
+                "output_flow_y", flows_mean[1].item(), train_iter)
 
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)
