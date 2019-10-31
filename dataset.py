@@ -166,7 +166,7 @@ def np_to_torch(img):
 class ImageFolder(data.Dataset):
     """ ImageFolder can be used to load images where there are no labels."""
 
-    def __init__(self, is_train: bool, root: str, mv_dir: str, args, frame_len: int = 5):
+    def __init__(self, is_train: bool, root: str, mv_dir: str, args, frame_len: int = 4):
 
         self.is_train = is_train
         self.root = root
