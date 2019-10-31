@@ -246,7 +246,8 @@ class ImageFolder(data.Dataset):
 
         # CV2 cropping in CPU is faster.
         if self.is_train and self.patch:
-            img = crop_cv2(img, self.patch)
+            img[:3] = crop_cv2(img[:3], self.patch)
+            img[3:] = crop_cv2(img[3:], self.patch)
 
         img /= 255.0
         img = np_to_torch(img)
