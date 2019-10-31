@@ -39,8 +39,7 @@ def train():
     ############### Model ###############
     context_vec_train_shape = (args.batch_size, 512,
                                args.patch or 144, args.patch or 176)
-    context_vec_test_shape = (args.eval_batch_size, 512,
-                              144, 176)
+    context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
     encoder = Encoder(6, use_context=True).cuda()
     decoder = nn.Sequential(BitToContextDecoder(),
                             ContextToFlowDecoder(3)).cuda()

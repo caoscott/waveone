@@ -250,7 +250,7 @@ class ImageFolder(data.Dataset):
             imgs = flip_cv2(self.imgs[index: index+self.frame_len])
 
         # CV2 cropping in CPU is faster.
-        if self.patch:
+        if self.patch and self.is_train:
             imgs = multi_crop_cv2(imgs, self.patch + 1)
             imgs = [crop_cv2(img, self.patch) for img in imgs]
 
