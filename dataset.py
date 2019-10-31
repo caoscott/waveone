@@ -22,7 +22,7 @@ def get_loader(is_train: bool, root: str, mv_dir: str, args) -> data.DataLoader:
     loader = data.DataLoader(
         dataset=dset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
-        shuffle=False,
+        shuffle=is_train,
         num_workers=1,
         drop_last=is_train,
     )
@@ -104,15 +104,15 @@ def crop_cv2(img, patch):
     return img[start_x: start_x + patch, start_y: start_y + patch]
 
 
-def flip_cv2(img):
+def flip_cv2(imgs):
     if random.random() < 0.5:
-        img = img[::-1].copy()
+        imgs = [img[::-1].copy() for img in imgs]
 
         # assert img.shape[2] == 13, img.shape
         # height first, and then width. but BMV is (width, height)... sorry..
         # img[:, :, 9] = img[:, :, 9] * (-1.0)
         # img[:, :, 11] = img[:, :, 11] * (-1.0)
-    return img
+    return imgs
 
 
 # (Close, far)
@@ -166,7 +166,7 @@ def np_to_torch(img):
 class ImageFolder(data.Dataset):
     """ ImageFolder can be used to load images where there are no labels."""
 
-    def __init__(self, is_train: bool, root: str, mv_dir: str, args):
+    def __init__(self, is_train: bool, root: str, mv_dir: str, args, frame_len: int = 5):
 
         self.is_train = is_train
         self.root = root
@@ -178,6 +178,8 @@ class ImageFolder(data.Dataset):
         self.v_compress = args.v_compress
         self._num_crops = args.num_crops
 
+        self.frame_len = frame_len
+
         self.identity_grid = None
 
         self._load_image_list()
@@ -186,6 +188,7 @@ class ImageFolder(data.Dataset):
 
     def _load_image_list(self):
         self.imgs = []
+        self.fns = []
         # dist1, dist2 = self.args.distance1, self.args.distance2
 
         # if self.v_compress:
@@ -210,8 +213,8 @@ class ImageFolder(data.Dataset):
             #     if (img_idx % 12) != 1:
             #         continue
             if os.path.isfile(filename):
-                self.imgs.append(
-                    (self.loader(filename).astype(np.float64), filename))
+                self.imgs.append(self.loader(filename).astype(np.float64))
+                self.fns.append(filename)
 
         print('%d images loaded.' % len(self.imgs))
 
@@ -235,26 +238,17 @@ class ImageFolder(data.Dataset):
         return img, filename
 
     def __getitem__(self, index):
-        img1, fn1 = self.imgs[index]
-        img2, fn2 = self.imgs[index + 1]
-        img = np.concatenate((img1, img2), axis=2).astype(np.float64)
-
-        assert img.shape[2] == 6
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
-            img = flip_cv2(img)
+            imgs = flip_cv2(self.imgs[index: index+self.frame_len])
 
         # CV2 cropping in CPU is faster.
         if self.is_train and self.patch:
-            img[:3] = crop_cv2(img[:3], self.patch)
-            img[3:] = crop_cv2(img[3:], self.patch)
+            imgs = [crop_cv2(img, self.patch) for img in imgs]
 
-        img /= 255.0
-        img = np_to_torch(img)
+        data = [np_to_torch(img / 255.0) for img in imgs]
 
-        frame1, frame2 = img[:3], img[3:]
-
-        return frame1, frame2, fn1, fn2
+        return data
 
     def __len__(self):
-        return 0 if len(self.imgs) == 0 else len(self.imgs) - 1
+        return 0 if len(self.imgs) < self.frame_len else len(self.imgs) - self.frame_len + 1

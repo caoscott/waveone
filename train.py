@@ -62,7 +62,7 @@ def train():
     milestones = [int(s) for s in args.schedule.split(',')]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
-    charbonnier_loss_fn = CharbonnierLoss().cuda()
+    # charbonnier_loss_fn = CharbonnierLoss().cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
 
     if not os.path.exists(args.model_dir):
@@ -155,27 +155,35 @@ def train():
         just_resumed = True
 
     while True:
-        context_vec = torch.zeros(
-            context_vec_train_shape, requires_grad=False).cuda()
-        for frame1, frame2, _, _ in train_loader:
-            frame1, frame2 = frame1.cuda(), frame2.cuda()
+        for frames in train_loader:
             train_iter += 1
-
             if train_iter > args.max_train_iters:
                 break
-
             encoder.train()
             decoder.train()
             solver.zero_grad()
 
-            # encoder_input = torch.cat([frame1, frame2], dim=1)
-            flows, residuals, new_context_vec = decoder(
-                (encoder(frame1, frame2, context_vec), context_vec))
+            frames = [frame.cuda() for frame in frames]
+            loss = 0
+            context_vec = torch.zeros(
+                context_vec_train_shape, requires_grad=False).cuda()
 
-            flow_frame2 = F.grid_sample(frame1, flows)
-            reconstructed_frame2 = flow_frame2 + residuals
-            loss = -msssim_fn(frame2, reconstructed_frame2) \
-                + l1_loss_fn(frame2, flow_frame2)
+            for frame1, frame2 in zip(frames[:-1], frames[1:]):
+                flows, residuals, context_vec = decoder(
+                    (encoder(frame1, frame2, context_vec), context_vec))
+
+                flow_frame2 = F.grid_sample(frame1, flows)
+                reconstructed_frame2 = flow_frame2 + residuals
+                loss += -msssim_fn(frame2, reconstructed_frame2) \
+                    + l1_loss_fn(frame2, flow_frame2)
+
+                flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
+                writer.add_scalar("mean_context_vec_norm",
+                                  context_vec.mean().item(), train_iter)
+                writer.add_scalar(
+                    "output_flow_x", flows_mean[0].item(), train_iter)
+                writer.add_scalar(
+                    "output_flow_y", flows_mean[1].item(), train_iter)
             # + charbonnier_loss_fn(frame2, flow_frame2)
 
             loss.backward()
@@ -186,16 +194,10 @@ def train():
             solver.step()
             scheduler.step()
 
-            context_vec = new_context_vec.detach()
-            flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
+            # context_vec = new_context_vec.detach()
 
-            writer.add_scalar("training_loss", loss.item(), train_iter)
-            writer.add_scalar("mean_context_vec_norm",
-                              context_vec.mean().item(), train_iter)
-            writer.add_scalar(
-                "output_flow_x", flows_mean[0].item(), train_iter)
-            writer.add_scalar(
-                "output_flow_y", flows_mean[1].item(), train_iter)
+            writer.add_scalar("training_loss", loss.item() /
+                              len(frames), train_iter)
 
             if train_iter % args.checkpoint_iters == 0:
                 save(train_iter)
