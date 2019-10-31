@@ -97,11 +97,18 @@ def get_bmv(img, fns):
 
 
 def crop_cv2(img, patch):
-    height, width, c = img.shape
+    height, width, _ = img.shape
     start_x = random.randint(0, height - patch)
     start_y = random.randint(0, width - patch)
-
     return img[start_x: start_x + patch, start_y: start_y + patch]
+
+
+def multi_crop_cv2(imgs, patch):
+    height, width, _ = imgs[0].shape
+    start_x = random.randint(0, height - patch)
+    start_y = random.randint(0, width - patch)
+    return [img[start_x: start_x + patch, start_y: start_y + patch]
+            for img in imgs]
 
 
 def flip_cv2(imgs):
@@ -243,7 +250,8 @@ class ImageFolder(data.Dataset):
             imgs = flip_cv2(self.imgs[index: index+self.frame_len])
 
         # CV2 cropping in CPU is faster.
-        if self.is_train and self.patch:
+        if self.patch:
+            imgs = multi_crop_cv2(imgs, self.patch + 1)
             imgs = [crop_cv2(img, self.patch) for img in imgs]
 
         data = [np_to_torch(img / 255.0) for img in imgs]
