@@ -104,7 +104,7 @@ def train():
             flow_msssim_score = 0
             context_vec = torch.zeros(context_vec_test_shape).cuda()
 
-            for frame1, frame2, _, _ in eval_loader:
+            for frame1, frame2 in eval_loader:
                 batch_size = frame1.shape[0]
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
                 flows, residuals, new_context_vec = decoder(
