@@ -111,7 +111,7 @@ def train():
                     (encoder(frame1, frame2, context_vec), context_vec))
                 context_vec = new_context_vec
                 flow_frame2 = F.grid_sample(frame1, flows)
-                reconstructed_frame2 = flow_frame2 + residuals
+                reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
                 baseline_msssim_score += msssim_fn(frame1, frame2) * batch_size
                 reconstructed_msssim_score += msssim_fn(
                     frame2, reconstructed_frame2) * batch_size
@@ -168,7 +168,7 @@ def train():
                 (encoder(frame1, frame2, context_vec), context_vec))
 
             flow_frame2 = F.grid_sample(frame1, flows)
-            reconstructed_frame2 = flow_frame2 + residuals
+            reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
             loss += -msssim_fn(frame2, reconstructed_frame2) \
                 + l1_loss_fn(frame2, flow_frame2)
 
