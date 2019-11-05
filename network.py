@@ -71,7 +71,7 @@ class BitToContextDecoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.ups = nn.Sequential(
-            upconv(128, 512, bilinear=False),
+            upconv(512, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
             outconv(512, 512),
