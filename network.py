@@ -30,8 +30,10 @@ class Encoder(nn.Module):
         self.use_context = use_context
 
     def forward(self, frame1, frame2, context_vec: torch.Tensor) -> nn.Module:
+        # frames_x = torch.cat(
+            # (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
         frames_x = torch.cat(
-            (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
+            (self.encode_frame1(frame2-frame1), self.encode_frame2(frame2-frame1)), dim=1)
         context_x = self.encode_context(context_vec) if self.use_context else 0.
         return self.encode(frames_x + context_x)
 
@@ -103,6 +105,7 @@ class ContextToFlowDecoder(nn.Module):
         r = self.residual(x)
         identity_theta = torch.tensor(
             ContextToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
-        f = self.flow(x).permute(0, 2, 3, 1) + \
-            F.affine_grid(identity_theta, r.shape)
+        # f = self.flow(x).permute(0, 2, 3, 1) + \
+        # F.affine_grid(identity_theta, r.shape)
+        f = F.affine_grid(identity_theta, r.shape)
         return f, r, x
