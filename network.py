@@ -92,7 +92,7 @@ class ContextToFlowDecoder(nn.Module):
     def __init__(self, channels_out: int):
         super().__init__()
         self.flow = nn.Sequential(
-            upconv(512, 128, bilinear=False),
+            upconv(1024, 128, bilinear=False),
             outconv(128, 2),
             nn.Tanh(),
         )
