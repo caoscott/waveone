@@ -82,7 +82,8 @@ class BitToContextDecoder(nn.Module):
     def forward(self, input_tuple) -> nn.Module:
         x, context_vec = input_tuple
         add_to_context = self.ups(x)
-        return (context_vec + add_to_context).clamp(-1., 1.)
+        return x, (context_vec + add_to_context).clamp(-1., 1.)
+        # TODO: Feed in both x and context_vec
 
 
 class ContextToFlowDecoder(nn.Module):
@@ -96,12 +97,13 @@ class ContextToFlowDecoder(nn.Module):
             nn.Tanh(),
         )
         self.residual = nn.Sequential(
-            upconv(512, 128, bilinear=False),
+            upconv(1024, 128, bilinear=False),
             outconv(128, channels_out),
             nn.Tanh(),
         )
 
-    def forward(self, x) -> nn.Module:
+    def forward(self, input_tuple) -> nn.Module:
+        x = torch.cat(input_tuple, dim=1)
         r = self.residual(x)
         identity_theta = torch.tensor(
             ContextToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
