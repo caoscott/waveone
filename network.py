@@ -103,6 +103,7 @@ class ContextToFlowDecoder(nn.Module):
         )
 
     def forward(self, input_tuple) -> nn.Module:
+        x, context = input_tuple
         x = torch.cat(input_tuple, dim=1)
         r = self.residual(x)
         identity_theta = torch.tensor(
@@ -110,4 +111,4 @@ class ContextToFlowDecoder(nn.Module):
         # f = self.flow(x).permute(0, 2, 3, 1) + \
         # F.affine_grid(identity_theta, r.shape)
         f = F.affine_grid(identity_theta, r.shape)
-        return f, r, x
+        return f, r, context
