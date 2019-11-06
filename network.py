@@ -82,7 +82,7 @@ class BitToContextDecoder(nn.Module):
     def forward(self, input_tuple) -> nn.Module:
         x, context_vec = input_tuple
         add_to_context = self.ups(x)
-        return x, (context_vec + add_to_context).clamp(-1., 1.)
+        return add_to_context, (context_vec + add_to_context).clamp(-1., 1.)
         # TODO: Feed in both x and context_vec
 
 
