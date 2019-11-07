@@ -103,7 +103,7 @@ class ContextToFlowDecoder(nn.Module):
         )
 
     def forward(self, input_tuple) -> nn.Module:
-        x, context = input_tuple
+        _, context = input_tuple
         x = torch.cat(input_tuple, dim=1)
         r = self.residual(x)
         identity_theta = torch.tensor(

@@ -1,5 +1,5 @@
 import os
-import time
+# import time
 from typing import Dict
 
 import torch
@@ -94,6 +94,24 @@ def train():
                     names[net_idx], index))
 
     ############### Eval ###################
+    def eval_scores(frames1, frames2):
+        assert len(frames1) == len(frames2)
+        frame_len = len(frames1)
+        msssim = 0.
+        l1 = 0.
+        for frame1, frame2 in zip(frames1, frames2):
+            l1 += l1_loss_fn(frame1, frame2)
+            msssim += msssim_fn(frame1, frame2)
+        return l1/frame_len, msssim/frame_len
+
+    def plot_scores(writer, prefix, l1, msssim):
+        writer.add_scalar(
+            f"{prefix}_l1", l1, train_iter
+        )
+        writer.add_scalar(
+            f"{prefix}_msssim", msssim, train_iter
+        )
+
     def run_eval(eval_name: str, eval_loader: data.DataLoader):
         encoder.eval()
         decoder.eval()
@@ -159,28 +177,49 @@ def train():
         solver.zero_grad()
 
         frames = [frame.cuda() for frame in frames]
-        loss = 0
         context_vec = torch.zeros(
             context_vec_train_shape, requires_grad=False).cuda()
+        flow_frames = []
+        reconstructed_frames = []
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
             flows, residuals, context_vec = decoder(
                 (encoder(frame1, frame2, context_vec), context_vec))
 
             flow_frame2 = F.grid_sample(frame1, flows)
+            flow_frames.append(flow_frame2)
+
             reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
-            loss += -msssim_fn(frame2, reconstructed_frame2) \
-                + l1_loss_fn(frame2, flow_frame2)
+            reconstructed_frames.append(reconstructed_frame2)
 
             flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
+            flows_max = flows.max(dim=0).max(dim=0).max(dim=0)
+            flows_min = flows.min(dim=0).min(dim=0).min(dim=0)
             writer.add_scalar("mean_context_vec_norm",
                               context_vec.mean().item(), train_iter)
+            writer.add_scalar("max_context_vec_norm",
+                              context_vec.max().item(), train_iter)
+            writer.add_scalar("min_context_vec_norm",
+                              context_vec.min().item(), train_iter)
             writer.add_scalar(
-                "output_flow_x", flows_mean[0].item(), train_iter)
+                "mean_flow_x", flows_mean[0].item(), train_iter)
             writer.add_scalar(
-                "output_flow_y", flows_mean[1].item(), train_iter)
-        # + charbonnier_loss_fn(frame2, flow_frame2)
+                "mean_flow_y", flows_mean[1].item(), train_iter)
+            writer.add_scalar(
+                "max_flow_x", flows_max[0].item(), train_iter)
+            writer.add_scalar(
+                "max_flow_y", flows_max[1].item(), train_iter)
+            writer.add_scalar(
+                "min_flow_x", flows_min[0].item(), train_iter)
+            writer.add_scalar(
+                "min_flow_y", flows_min[1].item(), train_iter)
 
+        flow_l1, flow_msssim = eval_scores(frames[1:], flow_frames)
+        reconstructed_l1, reconstructed_msssim = eval_scores(
+            frames[1:], reconstructed_frames)
+
+        loss = -reconstructed_msssim + flow_l1
+        # + charbonnier_loss_fn(frame2, flow_frame2)
         loss.backward()
         # for net in nets:
         # if net is not None:
@@ -191,8 +230,11 @@ def train():
 
         # context_vec = new_context_vec.detach()
 
-        writer.add_scalar("training_loss", loss.item() /
-                          len(frames), train_iter)
+        writer.add_scalar(
+            "training_loss", loss.item()/(len(frames)-1), train_iter
+        )
+        plot_scores(writer, "flow", flow_l1, flow_msssim)
+        plot_scores(writer, "msssim", reconstructed_l1, reconstructed_msssim)
 
     while True:
         for frames in train_loader:
