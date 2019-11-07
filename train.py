@@ -206,9 +206,11 @@ def train():
 
             log_flow_and_context(writer, flows, context_vec)
 
-        scores = eval_scores(frames[:-1], frames[1:], "baseline").update(
-            eval_scores(frames[1:], flow_frames, "flow")).update(
-            eval_scores(frames[1:], reconstructed_frames, "reconstructed"))
+        scores = {
+            **eval_scores(frames[:-1], frames[1:], "baseline"),
+            **eval_scores(frames[1:], flow_frames, "flow"),
+            **eval_scores(frames[1:], reconstructed_frames, "reconstructed"),
+        }
 
         loss = -scores["reconstructed_msssim"] + scores["flow_l1"]
         # + charbonnier_loss_fn(frame2, flow_frame2)
