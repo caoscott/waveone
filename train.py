@@ -158,11 +158,12 @@ def train():
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
 
-                scores = eval_scores([frame1], [frame2], "baseline") \
-                    + eval_scores([frame2], [flow_frame2], "flow") \
-                    + eval_scores([frame2], [reconstructed_frame2],
-                                  "reconstructed")
-                total_scores = add_dict(total_scores, scores)
+                total_scores = add_dict(total_scores, eval_scores(
+                    [frame1], [frame2], "baseline"))
+                total_scores = add_dict(total_scores, eval_scores(
+                    [frame2], [flow_frame2], "flow"))
+                total_scores = add_dict(total_scores, eval_scores(
+                    [frame2], [reconstructed_frame2], "reconstructed"))
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
@@ -205,10 +206,9 @@ def train():
 
             log_flow_and_context(writer, flows, context_vec)
 
-        scores = \
-            eval_scores(frames[:-1], frames[1:], "baseline") + \
-            eval_scores(frames[1:], flow_frames, "flow") + \
-            eval_scores(frames[1:], reconstructed_frames, "reconstructed")
+        scores = eval_scores(frames[:-1], frames[1:], "baseline").update(
+            eval_scores(frames[1:], flow_frames, "flow")).update(
+            eval_scores(frames[1:], reconstructed_frames, "reconstructed"))
 
         loss = -scores["reconstructed_msssim"] + scores["flow_l1"]
         # + charbonnier_loss_fn(frame2, flow_frame2)
