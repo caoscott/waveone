@@ -40,10 +40,10 @@ def train():
     context_vec_train_shape = (args.batch_size, 512,
                                args.patch // 2 or 144, args.patch // 2 or 176)
     context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
-    encoder = Encoder(6, use_context=True).cuda()
-    decoder = nn.Sequential(BitToContextDecoder(),
-                            ContextToFlowDecoder(3)).cuda()
-    # decoder = BitToFlowDecoder(3).cuda()
+    encoder = Encoder(6, use_context=False).cuda()
+    # decoder = nn.Sequential(BitToContextDecoder(),
+    #                         ContextToFlowDecoder(3)).cuda()
+    decoder = BitToFlowDecoder(3).cuda()
     nets = [encoder, decoder]
 
     gpus = [int(gpu) for gpu in args.gpus.split(',')]
