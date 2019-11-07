@@ -1,5 +1,6 @@
 import os
 # import time
+from collections import defaultdict
 from typing import Dict
 
 import torch
@@ -94,7 +95,7 @@ def train():
                     names[net_idx], index))
 
     ############### Eval ###################
-    def eval_scores(frames1, frames2):
+    def eval_scores(frames1, frames2, prefix):
         assert len(frames1) == len(frames2)
         frame_len = len(frames1)
         msssim = 0.
@@ -102,61 +103,71 @@ def train():
         for frame1, frame2 in zip(frames1, frames2):
             l1 += l1_loss_fn(frame1, frame2)
             msssim += msssim_fn(frame1, frame2)
-        return l1/frame_len, msssim/frame_len
+        return {f"{prefix}_l1": l1/frame_len,
+                f"{prefix}_msssim": msssim/frame_len}
 
-    def plot_scores(writer, prefix, l1, msssim):
+    def plot_scores(writer, scores, train_iter):
+        for key, value in scores.items():
+            writer.add_scalar(key, value, train_iter)
+
+    def print_scores(scores):
+        for key, value in scores.items():
+            print(f"{key}: {value.item(): .6f}")
+        print()
+
+    def add_dict(dict_a, dict_b):
+        for key, value_b in dict_b.items():
+            dict_a[key] += value_b
+        return dict_a
+
+    def log_flow_and_context(writer, flows, context_vec):
+        flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
+        flows_max = flows.max(dim=0).max(dim=0).max(dim=0)
+        flows_min = flows.min(dim=0).min(dim=0).min(dim=0)
+        writer.add_scalar("mean_context_vec_norm",
+                          context_vec.mean().item(), train_iter)
+        writer.add_scalar("max_context_vec_norm",
+                          context_vec.max().item(), train_iter)
+        writer.add_scalar("min_context_vec_norm",
+                          context_vec.min().item(), train_iter)
         writer.add_scalar(
-            f"{prefix}_l1", l1, train_iter
-        )
+            "mean_flow_x", flows_mean[0].item(), train_iter)
         writer.add_scalar(
-            f"{prefix}_msssim", msssim, train_iter
-        )
+            "mean_flow_y", flows_mean[1].item(), train_iter)
+        writer.add_scalar(
+            "max_flow_x", flows_max[0].item(), train_iter)
+        writer.add_scalar(
+            "max_flow_y", flows_max[1].item(), train_iter)
+        writer.add_scalar(
+            "min_flow_x", flows_min[0].item(), train_iter)
+        writer.add_scalar(
+            "min_flow_y", flows_min[1].item(), train_iter)
 
     def run_eval(eval_name: str, eval_loader: data.DataLoader):
         encoder.eval()
         decoder.eval()
 
         with torch.no_grad():
-            baseline_msssim_score = 0
-            reconstructed_msssim_score = 0
-            flow_msssim_score = 0
             context_vec = torch.zeros(context_vec_test_shape).cuda()
+            total_scores = defaultdict(float)
 
             for frame1, frame2 in eval_loader:
-                batch_size = frame1.shape[0]
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
-                flows, residuals, new_context_vec = decoder(
+                flows, residuals, context_vec = decoder(
                     (encoder(frame1, frame2, context_vec), context_vec))
-                context_vec = new_context_vec
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
-                baseline_msssim_score += msssim_fn(frame1, frame2) * batch_size
-                reconstructed_msssim_score += msssim_fn(
-                    frame2, reconstructed_frame2) * batch_size
-                flow_msssim_score += msssim_fn(frame2,
-                                               flow_frame2) * batch_size
 
-            baseline_msssim_score /= len(eval_loader.dataset)
-            # baseline_msssim_score_ctx /= len(eval_loader.dataset)
-            reconstructed_msssim_score /= len(eval_loader.dataset)
-            flow_msssim_score /= len(eval_loader.dataset)
+                scores = eval_scores([frame1], [frame2], "baseline") \
+                    + eval_scores([frame2], [flow_frame2], "flow") \
+                    + eval_scores([frame2], [reconstructed_frame2],
+                                  "reconstructed")
+                total_scores = add_dict(total_scores, scores)
 
-            print(
-                f"{eval_name} \t"
-                f"Base MS-SSIM: {baseline_msssim_score: .6f} \t"
-                # f"Base MS-SSIM CTX: {baseline_msssim_score_ctx: .6f} \t"
-                f"Flow MS-SSIM: {flow_msssim_score: .6f} \t"
-                f"Reconstructed MS-SSIM: {reconstructed_msssim_score: .6f}")
-
-            writer.add_scalar(
-                "base_msssim", baseline_msssim_score.item(), train_iter
-            )
-            writer.add_scalar(
-                "flow_msssim", flow_msssim_score.item(), train_iter,
-            )
-            writer.add_scalar(
-                "reconstructed_msssim", reconstructed_msssim_score.item(), train_iter
-            )
+            total_scores = {k: v/len(eval_loader.dataset)
+                            for k, v in total_scores.items()}
+            print(f"{eval_name}:")
+            print_scores(total_scores)
 
     ############### Training ###############
 
@@ -192,33 +203,14 @@ def train():
             reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
             reconstructed_frames.append(reconstructed_frame2)
 
-            flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-            flows_max = flows.max(dim=0).max(dim=0).max(dim=0)
-            flows_min = flows.min(dim=0).min(dim=0).min(dim=0)
-            writer.add_scalar("mean_context_vec_norm",
-                              context_vec.mean().item(), train_iter)
-            writer.add_scalar("max_context_vec_norm",
-                              context_vec.max().item(), train_iter)
-            writer.add_scalar("min_context_vec_norm",
-                              context_vec.min().item(), train_iter)
-            writer.add_scalar(
-                "mean_flow_x", flows_mean[0].item(), train_iter)
-            writer.add_scalar(
-                "mean_flow_y", flows_mean[1].item(), train_iter)
-            writer.add_scalar(
-                "max_flow_x", flows_max[0].item(), train_iter)
-            writer.add_scalar(
-                "max_flow_y", flows_max[1].item(), train_iter)
-            writer.add_scalar(
-                "min_flow_x", flows_min[0].item(), train_iter)
-            writer.add_scalar(
-                "min_flow_y", flows_min[1].item(), train_iter)
+            log_flow_and_context(writer, flows, context_vec)
 
-        flow_l1, flow_msssim = eval_scores(frames[1:], flow_frames)
-        reconstructed_l1, reconstructed_msssim = eval_scores(
-            frames[1:], reconstructed_frames)
+        scores = \
+            eval_scores(frames[:-1], frames[1:], "baseline") + \
+            eval_scores(frames[1:], flow_frames, "flow") + \
+            eval_scores(frames[1:], reconstructed_frames, "reconstructed")
 
-        loss = -reconstructed_msssim + flow_l1
+        loss = -scores["reconstructed_msssim"] + scores["flow_l1"]
         # + charbonnier_loss_fn(frame2, flow_frame2)
         loss.backward()
         # for net in nets:
@@ -230,11 +222,8 @@ def train():
 
         # context_vec = new_context_vec.detach()
 
-        writer.add_scalar(
-            "training_loss", loss.item()/(len(frames)-1), train_iter
-        )
-        plot_scores(writer, "flow", flow_l1, flow_msssim)
-        plot_scores(writer, "msssim", reconstructed_l1, reconstructed_msssim)
+        writer.add_scalar("training_loss", loss.item(), train_iter)
+        plot_scores(writer, scores, train_iter)
 
     while True:
         for frames in train_loader:
