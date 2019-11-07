@@ -122,8 +122,8 @@ def train():
 
     def log_flow_and_context(writer, flows, context_vec):
         flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-        flows_max = flows.max(dim=0).max(dim=0).max(dim=0)
-        flows_min = flows.min(dim=0).min(dim=0).min(dim=0)
+        flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0)
+        flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0)
         writer.add_scalar("mean_context_vec_norm",
                           context_vec.mean().item(), train_iter)
         writer.add_scalar("max_context_vec_norm",
