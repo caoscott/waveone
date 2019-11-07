@@ -112,7 +112,7 @@ def train():
 
     def print_scores(scores):
         for key, value in scores.items():
-            print(f"{key}: {value.item(): .6f}")
+            print(f"{key}: {value.item(): .6f}", end='\t')
         print()
 
     def add_dict(dict_a, dict_b):
@@ -167,7 +167,7 @@ def train():
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
-            print(f"{eval_name}:")
+            print(f"{eval_name}:", end='\t')
             print_scores(total_scores)
             plot_scores(writer, total_scores, train_iter)
 

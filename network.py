@@ -24,7 +24,7 @@ class Encoder(nn.Module):
             down(512, 512),
             down(512, 512),
             down(512, 512),
-            nn.Conv2d(512, 256, kernel_size=3, padding=1),
+            nn.Conv2d(512, 128, kernel_size=3, padding=1),
             nn.Tanh(),
         )
         self.use_context = use_context
@@ -44,7 +44,7 @@ class BitToFlowDecoder(nn.Module):
     def __init__(self, channels_out: int):
         super().__init__()
         self.ups = nn.Sequential(
-            upconv(256, 512, bilinear=False),
+            upconv(128, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
             upconv(512, 512, bilinear=False))
         self.flow = nn.Sequential(
