@@ -169,6 +169,7 @@ def train():
                             for k, v in total_scores.items()}
             print(f"{eval_name}:")
             print_scores(total_scores)
+            plot_scores(writer, total_scores, train_iter)
 
     ############### Training ###############
 
