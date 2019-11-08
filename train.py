@@ -162,7 +162,7 @@ def train():
 
             for frame2, in eval_loader:
                 frame2 = frame2.cuda()
-                if not frame1:
+                if frame1 is None:
                     frame1 = torch.zeros_like(frame2).cuda()
                 codes = binarizer(encoder(frame1, frame2, context_vec))
                 flows, residuals, context_vec = decoder((codes, context_vec))
