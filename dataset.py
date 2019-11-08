@@ -17,6 +17,7 @@ def get_loader(is_train: bool, root: str, mv_dir: str, frame_len: int, args) -> 
         root=root,
         mv_dir=mv_dir,
         args=args,
+        random_sample=is_train,
         frame_len=frame_len,
     )
 
