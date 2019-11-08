@@ -239,7 +239,8 @@ class ImageFolder(data.Dataset):
     def __getitem__(self, index):
         imgs = []
         if self.sampling_range:
-            offsets = np.random.permutation(self.sampling_range)
+            offsets = np.random.permutation(
+                self.sampling_range)[:self.frame_len]
             imgs = [self.imgs[index + offset] for offset in offsets]
         else:
             imgs = self.imgs[index: index+self.frame_len]
@@ -253,7 +254,8 @@ class ImageFolder(data.Dataset):
             imgs = multi_crop_cv2(imgs, self.patch + 1)
             imgs = [crop_cv2(img, self.patch) for img in imgs]
 
-        return tuple(np_to_torch(img / 255.0) for img in imgs)
+        imgs = tuple(np_to_torch(img / 255.0) for img in imgs)
+        assert len(imgs) == self.frame_len
 
     def __len__(self):
         length = self.sampling_range or self.frame_len
