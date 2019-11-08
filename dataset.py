@@ -251,7 +251,7 @@ class ImageFolder(data.Dataset):
         indices = []
         for _ in range(times):
             indices.append(index % length)
-            index /= length
+            index //= length
         return tuple(indices)
 
     def __getitem__(self, index):
