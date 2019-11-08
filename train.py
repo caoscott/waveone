@@ -242,25 +242,21 @@ def train():
         writer.add_scalar("training_loss", loss.item(), train_iter)
         plot_scores(writer, scores, train_iter)
 
-    while True:
+    for epoch in range(args.max_train_epochs):
         for frames in train_loader:
             train_iter += 1
-            if train_iter > args.max_train_iters:
-                break
 
             train_loop(frames)
 
-            if train_iter % args.checkpoint_iters == 0:
-                save(train_iter)
+        if epoch % args.checkpoint_epochs == 0:
+            save(train_iter)
 
-            if just_resumed or train_iter % args.eval_iters == 0:
-                for eval_name, eval_loader in eval_loaders.items():
-                    run_eval(eval_name, eval_loader)
-                just_resumed = False
+        if just_resumed or epoch % args.eval_epochs == 0:
+            for eval_name, eval_loader in eval_loaders.items():
+                run_eval(eval_name, eval_loader)
+            just_resumed = False
 
-        if train_iter > args.max_train_iters:
-            print('Training done.')
-            break
+    print('Training done.')
 
 
 with torch.autograd.set_detect_anomaly(True):

@@ -45,8 +45,8 @@ parser.add_argument('--stack', action='store_true',
                     help='Whether to stack context frames as encoder input.')
 
 ######## Learning ########
-parser.add_argument('--max-train-iters', type=int, default=100000,
-                    help='Max training iterations.')
+parser.add_argument('--max-train-epochs', type=int, default=400,
+                    help='Max training epochs.')
 parser.add_argument('--lr', type=float, default=0.00025,
                     help='Learning rate.')
 parser.add_argument('--clip', type=float, default=0.5,
@@ -86,7 +86,7 @@ parser.add_argument('--save-codes', action='store_true',
                     help='If true, write compressed codes during eval.')
 parser.add_argument('--save-out-img', action='store_true',
                     help='If true, save output images during eval.')
-parser.add_argument('--checkpoint-iters', type=int, default=100,
+parser.add_argument('--checkpoint-epochs', type=int, default=100,
                     help='Model checkpoint period.')
-parser.add_argument('--eval-iters', type=int, default=4500,
+parser.add_argument('--eval-epochs', type=int, default=5,
                     help='Evaluation period.')
