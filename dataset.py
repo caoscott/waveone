@@ -17,7 +17,7 @@ def get_loader(is_train: bool, root: str, mv_dir: str, args) -> data.DataLoader:
         root=root,
         mv_dir=mv_dir,
         args=args,
-        frame_len=5 if is_train else 2
+        frame_len=2 if is_train else 2
     )
 
     loader = data.DataLoader(
