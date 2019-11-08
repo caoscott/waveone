@@ -178,6 +178,9 @@ def train():
                 total_scores = add_dict(total_scores, eval_scores(
                     [frame2], [reconstructed_frame2], "eval_reconstructed"))
 
+                # Update frame1.
+                frame1 = frame2
+
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
             print(f"{eval_name}:", end='\t')
