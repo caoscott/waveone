@@ -179,7 +179,7 @@ def train():
                     [frame2], [reconstructed_frame2], "eval_reconstructed"))
 
                 # Update frame1.
-                frame1 = frame2
+                frame1 = reconstructed_frame2
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
