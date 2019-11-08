@@ -28,7 +28,7 @@ def train():
         is_train=True,
         root=args.train,
         mv_dir=args.train_mv,
-        frame_len=5,
+        frame_len=2,
         args=args
     )
     eval_loaders = {
