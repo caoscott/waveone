@@ -9,7 +9,7 @@ import torch
 import torch.utils.data as data
 
 
-def get_loader(is_train: bool, root: str, mv_dir: str, args) -> data.DataLoader:
+def get_loader(is_train: bool, root: str, mv_dir: str, frame_len: int, args) -> data.DataLoader:
     # print('\nCreating loader for %s...' % root)
 
     dset = ImageFolder(
@@ -17,7 +17,7 @@ def get_loader(is_train: bool, root: str, mv_dir: str, args) -> data.DataLoader:
         root=root,
         mv_dir=mv_dir,
         args=args,
-        frame_len=2 if is_train else 2
+        frame_len=frame_len
     )
 
     loader = data.DataLoader(

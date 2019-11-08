@@ -26,14 +26,19 @@ def train():
 
     train_loader = get_loader(
         is_train=True,
-        root=args.train, mv_dir=args.train_mv,
+        root=args.train,
+        mv_dir=args.train_mv,
+        frame_len=2,
         args=args
     )
     eval_loaders = {
         'TVL': get_loader(
             is_train=False,
-            root=args.eval, mv_dir=args.eval_mv,
-            args=args),
+            root=args.eval,
+            mv_dir=args.eval_mv,
+            frame_len=1,
+            args=args,
+        ),
     }
     writer = SummaryWriter()
 
@@ -41,11 +46,12 @@ def train():
     context_vec_train_shape = (args.batch_size, 512,
                                args.patch // 2 or 144, args.patch // 2 or 176)
     context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
-    encoder = Encoder(6, use_context=False).cuda()
+    compressed_vec_size = 192
+    encoder = Encoder(6, compressed_vec_size, use_context=False).cuda()
     # decoder = nn.Sequential(BitToContextDecoder(),
     #                         ContextToFlowDecoder(3)).cuda()
-    decoder = BitToFlowDecoder(3).cuda()
-    binarizer = Binarizer(128).cuda()
+    decoder = BitToFlowDecoder(compressed_vec_size, 3).cuda()
+    binarizer = Binarizer(compressed_vec_size).cuda()
     nets = [encoder, binarizer, decoder]
 
     # gpus = [int(gpu) for gpu in args.gpus.split(',')]
@@ -151,9 +157,12 @@ def train():
         with torch.no_grad():
             context_vec = torch.zeros(context_vec_test_shape).cuda()
             total_scores = defaultdict(float)
+            frame1 = None
 
-            for frame1, frame2 in eval_loader:
-                frame1, frame2 = frame1.cuda(), frame2.cuda()
+            for frame2, in eval_loader:
+                frame2 = frame2.cuda()
+                if not frame1:
+                    frame1 = torch.zeros_like(frame2).cuda()
                 codes = binarizer(encoder(frame1, frame2, context_vec))
                 flows, residuals, context_vec = decoder((codes, context_vec))
                 flow_frame2 = F.grid_sample(frame1, flows)
