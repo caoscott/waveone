@@ -45,13 +45,13 @@ def train():
     # decoder = nn.Sequential(BitToContextDecoder(),
     #                         ContextToFlowDecoder(3)).cuda()
     decoder = BitToFlowDecoder(3).cuda()
-    binarizer = Binarizer(128)
+    binarizer = Binarizer(128).cuda()
     nets = [encoder, binarizer, decoder]
 
-    gpus = [int(gpu) for gpu in args.gpus.split(',')]
-    if len(gpus) > 1:
-        print("Using GPUs {}.".format(gpus))
-        net = nn.DataParallel(net, device_ids=gpus)
+    # gpus = [int(gpu) for gpu in args.gpus.split(',')]
+    # if len(gpus) > 1:
+    #     print("Using GPUs {}.".format(gpus))
+    #     net = nn.DataParallel(net, device_ids=gpus)
 
     params = [{'params': net.parameters()} for net in nets]
 
