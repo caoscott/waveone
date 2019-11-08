@@ -256,6 +256,7 @@ class ImageFolder(data.Dataset):
 
         imgs = tuple(np_to_torch(img / 255.0) for img in imgs)
         assert len(imgs) == self.frame_len
+        return imgs
 
     def __len__(self):
         length = self.sampling_range or self.frame_len
