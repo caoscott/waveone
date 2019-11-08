@@ -9,7 +9,8 @@ import torch
 import torch.utils.data as data
 
 
-def get_loader(is_train: bool, root: str, mv_dir: str, frame_len: int, args) -> data.DataLoader:
+def get_loader(is_train: bool, root: str, mv_dir: str, frame_len: int, sampling_range: int,
+               args) -> data.DataLoader:
     # print('\nCreating loader for %s...' % root)
 
     dset = ImageFolder(
@@ -17,7 +18,7 @@ def get_loader(is_train: bool, root: str, mv_dir: str, frame_len: int, args) -> 
         root=root,
         mv_dir=mv_dir,
         args=args,
-        random_sample=is_train,
+        sampling_range=sampling_range,
         frame_len=frame_len,
     )
 
@@ -176,8 +177,7 @@ class ImageFolder(data.Dataset):
     """ ImageFolder can be used to load images where there are no labels."""
 
     def __init__(self, is_train: bool, root: str, mv_dir: str, args,
-                 random_sample: bool, frame_len: int = 4):
-
+                 frame_len: int = 5, sampling_range: int = 0):
         self.is_train = is_train
         self.root = root
         self.args = args
@@ -188,8 +188,11 @@ class ImageFolder(data.Dataset):
         self.v_compress = args.v_compress
         self._num_crops = args.num_crops
 
+        assert frame_len > 0
+        assert sampling_range >= frame_len
+
         self.frame_len = frame_len
-        self.random_sample = random_sample
+        self.sampling_range = sampling_range
         self.identity_grid = None
 
         self._load_image_list()
@@ -199,29 +202,8 @@ class ImageFolder(data.Dataset):
     def _load_image_list(self):
         self.imgs = []
         self.fns = []
-        # dist1, dist2 = self.args.distance1, self.args.distance2
-
-        # if self.v_compress:
-        #     if dist1 == 6 and dist2 == 6:
-        #         positions = [7]
-        #     elif dist1 == 3 and dist2 == 3:
-        #         positions = [4, 10]
-        #     elif dist1 == 1 and dist2 == 2:
-        #         positions = [2, 3, 5, 6, 8, 9, 11, 0]
-        #     else:
-        #         assert False, 'not implemented.'
 
         for filename in sorted(glob.iglob(self.root + '/*png')):
-            # img_idx = int(filename[:-4].split('_')[-1])
-
-            # if self.args.v_compress:
-            #     if all(os.path.isfile(fn) for fn in
-            #            get_group_filenames(
-            #             filename, img_idx, dist1, dist2)):
-            #         self.imgs.append(filename)
-            # else:
-            #     if (img_idx % 12) != 1:
-            #         continue
             if os.path.isfile(filename):
                 self.imgs.append(self.loader(filename).astype(np.float64))
                 self.fns.append(filename)
@@ -247,19 +229,18 @@ class ImageFolder(data.Dataset):
         img = self.loader(filename)
         return img, filename
 
-    def _generate_indices(self, index: int, length: int, times: int):
-        indices = []
-        for _ in range(times):
-            indices.append(index % length)
-            index //= length
-        return tuple(indices)
+    # def _generate_indices(self, index: int, length: int, times: int):
+    #     indices = []
+    #     for _ in range(times):
+    #         indices.append(index % length)
+    #         index //= length
+    #     return tuple(indices)
 
     def __getitem__(self, index):
         imgs = []
-        if self.random_sample:
-            img_indices = self._generate_indices(
-                index, len(self.imgs), self.frame_len)
-            imgs = [self.imgs[img_index] for img_index in img_indices]
+        if self.sampling_range:
+            offsets = np.random.permutation(self.sampling_range)
+            imgs = [self.imgs[index + offset] for offset in offsets]
         else:
             imgs = self.imgs[index: index+self.frame_len]
 
@@ -275,9 +256,6 @@ class ImageFolder(data.Dataset):
         return tuple(np_to_torch(img / 255.0) for img in imgs)
 
     def __len__(self):
-        if self.random_sample:
-            return len(self.imgs) ** self.frame_len
-        return (0
-                if len(self.imgs) < self.frame_len
-                else len(self.imgs) - self.frame_len + 1
-                )
+        length = self.sampling_range or self.frame_len
+        return (0 if len(self.imgs) < length
+                else len(self.imgs) - length + 1)

@@ -29,6 +29,7 @@ def train():
         root=args.train,
         mv_dir=args.train_mv,
         frame_len=2,
+        sampling_range=12,
         args=args
     )
     eval_loaders = {
@@ -37,6 +38,7 @@ def train():
             root=args.eval,
             mv_dir=args.eval_mv,
             frame_len=1,
+            sampling_range=1,
             args=args,
         ),
     }
