@@ -73,7 +73,7 @@ def train():
    ############### Checkpoints ###############
 
     def resume(index: int) -> None:
-        names = ["encoder", "decoder"]
+        names = ["encoder", "binarizer", "decoder"]
 
         for net_idx, net in enumerate(nets):
             if net is not None:
@@ -86,7 +86,7 @@ def train():
                 net.load_state_dict(torch.load(checkpoint_path))
 
     def save(index: int) -> None:
-        names = ["encoder", "decoder"]
+        names = ["encoder", "binarizer", "decoder"]
 
         for net_idx, net in enumerate(nets):
             if net is not None:
