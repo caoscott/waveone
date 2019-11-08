@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from network_parts import double_conv, down, inconv, outconv, up, upconv
+from network_parts import Sign, double_conv, down, inconv, outconv, up, upconv
 
 
 class Encoder(nn.Module):
@@ -25,7 +25,6 @@ class Encoder(nn.Module):
             down(512, 512),
             down(512, 512),
             nn.Conv2d(512, 128, kernel_size=3, padding=1),
-            nn.Tanh(),
         )
         self.use_context = use_context
 
@@ -113,3 +112,20 @@ class ContextToFlowDecoder(nn.Module):
         # F.affine_grid(identity_theta, r.shape)
         f = F.affine_grid(identity_theta, r.shape)
         return f, r, context
+
+
+class Binarizer(nn.Module):
+    def __init__(self, bits, use_binarizer=True):
+        super().__init__()
+        self.conv = nn.Conv2d(128, bits, kernel_size=1, bias=False)
+        self.sign = Sign()
+        self.tanh = nn.Tanh()
+        self.use_binarizer = use_binarizer
+
+    def forward(self, x):
+        if self.use_binarizer:
+            x = self.conv(x)
+            x = self.tanh(x)
+            return self.sign(x)
+        else:
+            return x

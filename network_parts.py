@@ -5,6 +5,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Function
 
 
 class double_conv(nn.Module):
@@ -97,3 +98,33 @@ class outconv(nn.Module):
     def forward(self, x):
         x = self.conv(x)
         return x
+
+
+class SignFunction(Function):
+    """
+    Variable Rate Image Compression with Recurrent Neural Networks
+    https://arxiv.org/abs/1511.06085
+    """
+
+    @staticmethod
+    def forward(ctx, x, is_training=True):
+        # Apply quantization noise while only training
+        if is_training:
+            prob = x.new(x.size()).uniform_()
+            x = x.clone()
+            x[(1 - x) / 2 <= prob] = 1
+            x[(1 - x) / 2 > prob] = -1
+            return x
+        else:
+            return x.sign()
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # TODO (cywu): consider passing 0 for tanh(x) > 1 or tanh(x) < -1?
+        # See https://arxiv.org/pdf/1712.05087.pdf.
+        return grad_output, None
+
+
+class Sign(nn.Module):
+    def forward(self, x):
+        return SignFunction.apply(x, self.training)

@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from dataset import get_loader
 from losses import MSSSIM, CharbonnierLoss
-from network import (BitToContextDecoder, BitToFlowDecoder,
+from network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
                      ContextToFlowDecoder, Encoder)
 from train_options import parser
 
@@ -45,7 +45,8 @@ def train():
     # decoder = nn.Sequential(BitToContextDecoder(),
     #                         ContextToFlowDecoder(3)).cuda()
     decoder = BitToFlowDecoder(3).cuda()
-    nets = [encoder, decoder]
+    binarizer = Binarizer(128)
+    nets = [encoder, binarizer, decoder]
 
     gpus = [int(gpu) for gpu in args.gpus.split(',')]
     if len(gpus) > 1:
@@ -144,8 +145,8 @@ def train():
             "min_flow_y", flows_min[1].item(), train_iter)
 
     def run_eval(eval_name: str, eval_loader: data.DataLoader):
-        encoder.eval()
-        decoder.eval()
+        for net in nets:
+            net.eval()
 
         with torch.no_grad():
             context_vec = torch.zeros(context_vec_test_shape).cuda()
@@ -153,8 +154,8 @@ def train():
 
             for frame1, frame2 in eval_loader:
                 frame1, frame2 = frame1.cuda(), frame2.cuda()
-                flows, residuals, context_vec = decoder(
-                    (encoder(frame1, frame2, context_vec), context_vec))
+                codes = binarizer(encoder(frame1, frame2, context_vec))
+                flows, residuals, context_vec = decoder((codes, context_vec))
                 flow_frame2 = F.grid_sample(frame1, flows)
                 reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
 
@@ -185,8 +186,8 @@ def train():
         just_resumed = True
 
     def train_loop(frames):
-        encoder.train()
-        decoder.train()
+        for net in nets:
+            net.train()
         solver.zero_grad()
 
         frames = [frame.cuda() for frame in frames]
@@ -196,8 +197,8 @@ def train():
         reconstructed_frames = []
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
-            flows, residuals, context_vec = decoder(
-                (encoder(frame1, frame2, context_vec), context_vec))
+            codes = binarizer(encoder(frame1, frame2, context_vec))
+            flows, residuals, context_vec = decoder((codes, context_vec))
 
             flow_frame2 = F.grid_sample(frame1, flows)
             flow_frames.append(flow_frame2)
@@ -210,7 +211,8 @@ def train():
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
             **eval_scores(frames[1:], flow_frames, "train_flow"),
-            **eval_scores(frames[1:], reconstructed_frames, "train_reconstructed"),
+            **eval_scores(frames[1:], reconstructed_frames,
+                          "train_reconstructed"),
         }
 
         loss = -scores["train_reconstructed_msssim"] + scores["train_flow_l1"]
