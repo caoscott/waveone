@@ -115,9 +115,9 @@ class ContextToFlowDecoder(nn.Module):
 
 
 class Binarizer(nn.Module):
-    def __init__(self, bits, use_binarizer=True):
+    def __init__(self, channels_in, bits, use_binarizer=True):
         super().__init__()
-        self.conv = nn.Conv2d(128, bits, kernel_size=1, bias=False)
+        self.conv = nn.Conv2d(channels_in, bits, kernel_size=1, bias=False)
         self.sign = Sign()
         self.tanh = nn.Tanh()
         self.use_binarizer = use_binarizer
