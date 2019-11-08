@@ -259,7 +259,7 @@ class ImageFolder(data.Dataset):
         if self.random_sample:
             img_indices = self._generate_indices(
                 index, self.__len__(), self.frame_len)
-            imgs = [self.imgs[index] for index in img_indices]
+            imgs = [self.imgs[img_index] for img_index in img_indices]
         else:
             imgs = self.imgs[index: index+self.frame_len]
 
