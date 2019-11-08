@@ -17,7 +17,7 @@ def get_loader(is_train: bool, root: str, mv_dir: str, frame_len: int, args) -> 
         root=root,
         mv_dir=mv_dir,
         args=args,
-        frame_len=frame_len
+        frame_len=frame_len,
     )
 
     loader = data.DataLoader(
@@ -174,7 +174,8 @@ def np_to_torch(img):
 class ImageFolder(data.Dataset):
     """ ImageFolder can be used to load images where there are no labels."""
 
-    def __init__(self, is_train: bool, root: str, mv_dir: str, args, frame_len: int = 4):
+    def __init__(self, is_train: bool, root: str, mv_dir: str, args,
+                 random_sample: bool, frame_len: int = 4):
 
         self.is_train = is_train
         self.root = root
@@ -187,7 +188,7 @@ class ImageFolder(data.Dataset):
         self._num_crops = args.num_crops
 
         self.frame_len = frame_len
-
+        self.random_sample = random_sample
         self.identity_grid = None
 
         self._load_image_list()
@@ -245,8 +246,22 @@ class ImageFolder(data.Dataset):
         img = self.loader(filename)
         return img, filename
 
+    def _generate_indices(self, index: int, length: int, times: int):
+        indices = []
+        for _ in range(times):
+            indices.append(index % length)
+            index /= length
+        return tuple(indices)
+
     def __getitem__(self, index):
-        imgs = self.imgs[index: index+self.frame_len]
+        imgs = []
+        if self.random_sample:
+            img_indices = self._generate_indices(
+                index, self.__len__(), self.frame_len)
+            imgs = [self.imgs[index] for index in img_indices]
+        else:
+            imgs = self.imgs[index: index+self.frame_len]
+
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
             imgs = flip_cv2(imgs)
@@ -256,8 +271,12 @@ class ImageFolder(data.Dataset):
             imgs = multi_crop_cv2(imgs, self.patch + 1)
             imgs = [crop_cv2(img, self.patch) for img in imgs]
 
-        data = [np_to_torch(img / 255.0) for img in imgs]
-        return data
+        return tuple(np_to_torch(img / 255.0) for img in imgs)
 
     def __len__(self):
-        return 0 if len(self.imgs) < self.frame_len else len(self.imgs) - self.frame_len + 1
+        if self.random_sample:
+            return len(self.imgs) ** self.frame_len
+        return (0
+                if len(self.imgs) < self.frame_len
+                else len(self.imgs) - self.frame_len + 1
+                )
