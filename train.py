@@ -230,7 +230,7 @@ def train():
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
             if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
                 # with 50% chance recycle old frame.
-                frame1 = reconstructed_frame2
+                frame1 = reconstructed_frame2.detach()
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
