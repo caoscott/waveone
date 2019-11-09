@@ -29,7 +29,7 @@ def train():
         is_train=True,
         root=args.train,
         mv_dir=args.train_mv,
-        frame_len=3,
+        frame_len=4,
         sampling_range=12,
         args=args
     )
@@ -121,7 +121,8 @@ def train():
         for key, value in scores.items():
             writer.add_scalar(key, value, train_iter)
 
-    def plot_score_diffs(writer, scores, train_iter, prefixes, prefix_type):
+    def get_score_diffs(writer, scores, train_iter, prefixes, prefix_type):
+        score_diffs = {}
         for score_type in ("msssim", "l1"):
             for prefix in prefixes:
                 baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
@@ -249,7 +250,8 @@ def train():
                           "train_reconstructed"),
         }
 
-        loss = -scores["train_reconstructed_msssim"] + scores["train_flow_l1"]
+        # + scores["train_flow_l1"]
+        loss = -scores["train_reconstructed_msssim"]
         # + charbonnier_loss_fn(frame2, flow_frame2)
         loss.backward()
         # for net in nets:
