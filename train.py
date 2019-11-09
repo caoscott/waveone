@@ -128,7 +128,7 @@ def train():
                 baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
                 prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
                 score_diffs[f"{prefix_type}_{prefix}_{score_type}_diff"
-                            ] = prefix_score - baseline_score,
+                            ] = prefix_score - baseline_score
         return score_diffs
 
     def print_scores(scores):
