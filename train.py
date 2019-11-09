@@ -121,6 +121,17 @@ def train():
         for key, value in scores.items():
             writer.add_scalar(key, value, train_iter)
 
+    def plot_score_diffs(writer, scores, train_iter, prefixes, prefix_type):
+        for score_type in ("msssim", "l1"):
+            for prefix in prefixes:
+                baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
+                prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
+                writer.add_scalar(
+                    f"{prefix_type}_{prefix}_diff_{score_type}",
+                    prefix_score - baseline_score,
+                    train_iter
+                )
+
     def print_scores(scores):
         for key, value in scores.items():
             print(f"{key}: {value.item(): .6f}")
@@ -187,6 +198,8 @@ def train():
             print(f"{eval_name} epoch {epoch}:")
             print_scores(total_scores)
             plot_scores(writer, total_scores, train_iter)
+            plot_score_diffs(writer, total_scores, train_iter,
+                             ("flow", "reconstructed"), "eval")
 
     ############### Training ###############
 
@@ -250,6 +263,8 @@ def train():
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         plot_scores(writer, scores, train_iter)
+        plot_score_diffs(writer, scores, train_iter,
+                         ("flow", "reconstructed"), "train")
 
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
