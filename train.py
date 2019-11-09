@@ -235,7 +235,7 @@ def train():
             flow_frame2 = F.grid_sample(frame1, flows)
             flow_frames.append(flow_frame2)
 
-            reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
+            reconstructed_frame2 = (flow_frame2 + residuals).clamp(-0.5, 0.5)
             reconstructed_frames.append(reconstructed_frame2)
 
             log_flow_and_context(writer, flows, context_vec)
