@@ -88,5 +88,5 @@ parser.add_argument('--save-out-img', action='store_true',
                     help='If true, save output images during eval.')
 parser.add_argument('--checkpoint-epochs', type=int, default=100,
                     help='Model checkpoint period.')
-parser.add_argument('--eval-epochs', type=int, default=5,
+parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')

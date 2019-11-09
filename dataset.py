@@ -251,10 +251,11 @@ class ImageFolder(data.Dataset):
 
         # CV2 cropping in CPU is faster.
         if self.patch and self.is_train:
-            imgs = multi_crop_cv2(imgs, self.patch + 1)
-            imgs = [crop_cv2(img, self.patch) for img in imgs]
+            # imgs = multi_crop_cv2(imgs, self.patch + 1)
+            # imgs = [crop_cv2(img, self.patch) for img in imgs]
+            imgs = multi_crop_cv2(imgs, self.patch)
 
-        imgs = tuple(np_to_torch(img / 255.0) for img in imgs)
+        imgs = tuple(np_to_torch(img / 255.0 - 0.5) for img in imgs)
         assert len(imgs) == self.frame_len
         return imgs
 
