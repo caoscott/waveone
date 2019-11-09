@@ -141,7 +141,11 @@ def train() -> None:
             dict_a[key] += value_b
         return dict_a
 
-    def log_flow_and_context(writer, flows, context_vec):
+    def log_flow_and_context(
+        writer: SummaryWriter,
+        flows: torch.Tensor,
+        context_vec: torch.Tensor
+    ) -> None:
         flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
         flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values
         flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values
@@ -164,13 +168,13 @@ def train() -> None:
         writer.add_scalar(
             "min_flow_y", flows_min[1].item(), train_iter)
 
-    def run_eval(eval_name: str, eval_loader: data.DataLoader):
+    def run_eval(eval_name: str, eval_loader: data.DataLoader) -> None:
         for net in nets:
             net.eval()
 
         with torch.no_grad():
             context_vec = torch.zeros(context_vec_test_shape).cuda()
-            total_scores = defaultdict(float)
+            total_scores: Dict[str, float] = defaultdict(float)
             frame1 = None
 
             for frame2, in eval_loader:

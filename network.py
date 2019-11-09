@@ -9,7 +9,7 @@ from network_parts import Sign, double_conv, down, inconv, outconv, up, upconv
 
 
 class Encoder(nn.Module):
-    def __init__(self, channels_in: int, channels_out: int, use_context: bool):
+    def __init__(self, channels_in: int, channels_out: int, use_context: bool) -> None:
         super().__init__()
         self.encode_frame1 = nn.Sequential(
             inconv(channels_in // 2, 128),
@@ -38,14 +38,14 @@ class Encoder(nn.Module):
 
 
 class ResNetEncoder(nn.Module):
-    def __init__(self, channels_int: int, channels_out: int, use_context: bool):
+    def __init__(self, channels_int: int, channels_out: int, use_context: bool) -> None:
         super().__init__()
 
 
 class BitToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
-    def __init__(self, channels_in: int, channels_out: int):
+    def __init__(self, channels_in: int, channels_out: int) -> None:
         super().__init__()
         self.ups = nn.Sequential(
             upconv(channels_in, 512, bilinear=False),
@@ -76,7 +76,7 @@ class BitToFlowDecoder(nn.Module):
 
 
 class BitToContextDecoder(nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.ups = nn.Sequential(
             upconv(512, 512, bilinear=False),
@@ -95,7 +95,7 @@ class BitToContextDecoder(nn.Module):
 class ContextToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
-    def __init__(self, channels_out: int):
+    def __init__(self, channels_out: int) -> None:
         super().__init__()
         self.flow = nn.Sequential(
             upconv(1024, 128, bilinear=False),
@@ -121,7 +121,7 @@ class ContextToFlowDecoder(nn.Module):
 
 
 class Binarizer(nn.Module):
-    def __init__(self, channels_in, bits, use_binarizer=True):
+    def __init__(self, channels_in, bits, use_binarizer=True) -> None:
         super().__init__()
         self.conv = nn.Conv2d(channels_in, bits, kernel_size=1, bias=False)
         self.sign = Sign()
