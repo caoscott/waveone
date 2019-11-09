@@ -183,7 +183,6 @@ class ImageFolder(data.Dataset):
 
         self.patch = args.patch
         self.loader = default_loader
-        self.v_compress = args.v_compress
         self._num_crops = args.num_crops
 
         assert frame_len > 0
