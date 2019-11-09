@@ -45,17 +45,18 @@ class BitToFlowDecoder(nn.Module):
         self.ups = nn.Sequential(
             upconv(channels_in, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
-            upconv(512, 512, bilinear=False))
+            upconv(512, 512, bilinear=False),
+        )
         self.flow = nn.Sequential(
             upconv(512, 128, bilinear=False),
             outconv(128, 2),
             # nn.Conv2d(128, 2, kernel_size=3, padding=1),
-            nn.Tanh())
+        )
         self.residual = nn.Sequential(
             upconv(512, 128, bilinear=False),
             outconv(128, channels_out),
             # nn.Conv2d(128, channels_out, kernel_size=3, padding=1),
-            nn.Tanh())
+        )
 
     def forward(self, input_tuple) -> nn.Module:
         x, context_vec = input_tuple
