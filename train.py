@@ -252,7 +252,7 @@ def train() -> None:
 
         # loss = -scores["train_reconstructed_msssim"] + scores["train_flow_l1"]
         # + charbonnier_loss_fn(frame2, flow_frame2)
-        loss = -scores["train_reconstructed_l1"]
+        loss = scores["train_reconstructed_l1"]
         loss.backward()
         # for net in nets:
         # if net is not None:
