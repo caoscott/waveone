@@ -183,7 +183,6 @@ class ImageFolder(data.Dataset):
 
         self.patch = args.patch
         self.loader = default_loader
-        self._num_crops = args.num_crops
 
         assert frame_len > 0
         assert sampling_range >= frame_len
