@@ -1,4 +1,5 @@
 import os
+import random
 # import time
 from collections import defaultdict
 from typing import Dict
@@ -28,7 +29,7 @@ def train():
         is_train=True,
         root=args.train,
         mv_dir=args.train_mv,
-        frame_len=2,
+        frame_len=3,
         sampling_range=12,
         args=args
     )
@@ -122,7 +123,7 @@ def train():
 
     def print_scores(scores):
         for key, value in scores.items():
-            print(f"{key}: {value.item(): .6f}", end='\t')
+            print(f"{key}: {value.item(): .6f}")
         print()
 
     def add_dict(dict_a, dict_b):
@@ -183,7 +184,7 @@ def train():
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
-            print(f"{eval_name}:", end='\t')
+            print(f"{eval_name} epoch {epoch}:")
             print_scores(total_scores)
             plot_scores(writer, total_scores, train_iter)
 
@@ -210,8 +211,13 @@ def train():
             context_vec_train_shape, requires_grad=False).cuda()
         flow_frames = []
         reconstructed_frames = []
+        reconstructed_frame2 = None
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
+            if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
+                # with 50% chance recycle old frame.
+                frame1 = reconstructed_frame2
+
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
 
