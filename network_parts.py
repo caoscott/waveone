@@ -128,3 +128,8 @@ class SignFunction(Function):
 class Sign(nn.Module):
     def forward(self, x):
         return SignFunction.apply(x, self.training)
+
+
+class Pass(nn.Module):
+    def forward(self, x):
+        return x

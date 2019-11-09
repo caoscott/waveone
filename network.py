@@ -37,6 +37,11 @@ class Encoder(nn.Module):
         return self.encode(frames_x + context_x)
 
 
+class ResNetEncoder(nn.Module):
+    def __init__(self, channels_int: int, channels_out: int, use_context: bool):
+        super().__init__()
+
+
 class BitToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
