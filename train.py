@@ -1,6 +1,5 @@
 import os
 import random
-# import time
 from collections import defaultdict
 from typing import Dict
 
@@ -19,7 +18,7 @@ from network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
 from train_options import parser
 
 
-def train():
+def train() -> None:
     args = parser.parse_args()
     print(args)
 
@@ -103,7 +102,11 @@ def train():
                     names[net_idx], index))
 
     ############### Eval ###################
-    def eval_scores(frames1, frames2, prefix):
+    def eval_scores(
+        frames1: torch.Tensor,
+        frames2: torch.Tensor,
+        prefix: str
+    ) -> Dict[str, torch.Tensor]:
         assert len(frames1) == len(frames2)
         frame_len = len(frames1)
         msssim = 0.
