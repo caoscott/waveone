@@ -50,12 +50,11 @@ def train():
                                args.patch // 2 or 144, args.patch // 2 or 176)
     context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
     latent_vec_size = 512
-    compressed_vec_size = 192
     encoder = Encoder(6, latent_vec_size, use_context=False).cuda()
     # decoder = nn.Sequential(BitToContextDecoder(),
     #                         ContextToFlowDecoder(3)).cuda()
-    decoder = BitToFlowDecoder(compressed_vec_size, 3).cuda()
-    binarizer = Binarizer(latent_vec_size, compressed_vec_size).cuda()
+    decoder = BitToFlowDecoder(args.bits, 3).cuda()
+    binarizer = Binarizer(latent_vec_size, args.bits).cuda()
     nets = [encoder, binarizer, decoder]
 
     # gpus = [int(gpu) for gpu in args.gpus.split(',')]
