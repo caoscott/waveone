@@ -28,7 +28,6 @@ def train():
     train_loader = get_loader(
         is_train=True,
         root=args.train,
-        mv_dir=args.train_mv,
         frame_len=4,
         sampling_range=12,
         args=args
@@ -37,7 +36,6 @@ def train():
         'TVL': get_loader(
             is_train=False,
             root=args.eval,
-            mv_dir=args.eval_mv,
             frame_len=1,
             sampling_range=1,
             args=args,
@@ -179,7 +177,8 @@ def train():
                 codes = binarizer(encoder(frame1, frame2, context_vec))
                 flows, residuals, context_vec = decoder((codes, context_vec))
                 flow_frame2 = F.grid_sample(frame1, flows)
-                reconstructed_frame2 = (flow_frame2 + residuals).clamp(0., 1.)
+                reconstructed_frame2 = (
+                    flow_frame2 + residuals).clamp(-0.5, 0.5)
 
                 total_scores = add_dict(total_scores, eval_scores(
                     [frame1], [frame2], "eval_baseline"))

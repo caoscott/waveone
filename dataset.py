@@ -9,14 +9,13 @@ import torch
 import torch.utils.data as data
 
 
-def get_loader(is_train: bool, root: str, mv_dir: str, frame_len: int, sampling_range: int,
+def get_loader(is_train: bool, root: str, frame_len: int, sampling_range: int,
                args) -> data.DataLoader:
     # print('\nCreating loader for %s...' % root)
 
     dset = ImageFolder(
         is_train=is_train,
         root=root,
-        mv_dir=mv_dir,
         args=args,
         sampling_range=sampling_range,
         frame_len=frame_len,
@@ -176,12 +175,11 @@ def np_to_torch(img):
 class ImageFolder(data.Dataset):
     """ ImageFolder can be used to load images where there are no labels."""
 
-    def __init__(self, is_train: bool, root: str, mv_dir: str, args,
+    def __init__(self, is_train: bool, root: str, args,
                  frame_len: int = 5, sampling_range: int = 0):
         self.is_train = is_train
         self.root = root
         self.args = args
-        self.mv_dir = mv_dir
 
         self.patch = args.patch
         self.loader = default_loader
