@@ -121,17 +121,15 @@ def train():
         for key, value in scores.items():
             writer.add_scalar(key, value, train_iter)
 
-    def get_score_diffs(writer, scores, train_iter, prefixes, prefix_type):
+    def get_score_diffs(scores, prefixes, prefix_type):
         score_diffs = {}
         for score_type in ("msssim", "l1"):
             for prefix in prefixes:
                 baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
                 prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
-                writer.add_scalar(
-                    f"{prefix_type}_{prefix}_diff_{score_type}",
-                    prefix_score - baseline_score,
-                    train_iter
-                )
+                score_diffs[f"{prefix_type}_{prefix}_{score_type}_diff"
+                            ] = prefix_score - baseline_score,
+        return score_diffs
 
     def print_scores(scores):
         for key, value in scores.items():
@@ -197,10 +195,11 @@ def train():
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
             print(f"{eval_name} epoch {epoch}:")
-            print_scores(total_scores)
             plot_scores(writer, total_scores, train_iter)
-            plot_score_diffs(writer, total_scores, train_iter,
-                             ("flow", "reconstructed"), "eval")
+            score_diffs = get_score_diffs(
+                total_scores, ("flow", "reconstructed"), "eval")
+            print_scores(score_diffs)
+            plot_scores(writer, score_diffs, train_iter)
 
     ############### Training ###############
 
@@ -265,8 +264,9 @@ def train():
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         plot_scores(writer, scores, train_iter)
-        plot_score_diffs(writer, scores, train_iter,
-                         ("flow", "reconstructed"), "train")
+        score_diffs = get_score_diffs(
+            scores, ("flow", "reconstructed"), "train")
+        plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
