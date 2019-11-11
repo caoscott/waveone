@@ -19,7 +19,6 @@ from waveone.train_options import parser
 
 
 def train(args) -> List[nn.Module]:
-
     ############### Data ###############
 
     train_loader = get_loader(
@@ -234,7 +233,10 @@ def train(args) -> List[nn.Module]:
             frame2 = frame2.cuda()
             # with 50% chance recycle old frame.
             # if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
-            frame1 = reconstructed_frame2.detach()
+            if reconstructed_frame2 is None:
+                frame1 = frame1.cuda()
+            else:
+                frame1 = reconstructed_frame2.detach()
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
