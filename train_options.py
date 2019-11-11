@@ -13,6 +13,8 @@ parser.add_argument('--eval', required=True, type=str,
 ######## Model ########
 parser.add_argument('--bits', default=256, type=int,
                     help='Bottle neck size.')
+parser.add_argument('--binarize-off', action='store_true',
+                    help='Turn off binarizer')
 parser.add_argument('--patch', default=64, type=int,
                     help='Patch size.')
 

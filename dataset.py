@@ -51,53 +51,6 @@ def default_loader(path: str):
     return cv2_img
 
 
-def read_bmv(fn):
-    a = cv2.imread(fn, 0)
-    if a is not None:
-        width, height = a.shape
-        if width % 16 != 0 or height % 16 != 0:
-            a = a[:(width//16)*16, :(height//16)*16]
-
-        return a[:, :, np.newaxis].astype(float) - 128.0
-    else:
-        print('no bmv found (it\'s okay if not too often)', fn)
-        return None
-
-
-def get_bmv(img, fns):
-    before_x, before_y, after_x, after_y = fns
-
-    bmvs = [read_bmv(before_x),
-            read_bmv(before_y),
-            read_bmv(after_x),
-            read_bmv(after_y)]
-
-    if bmvs[0] is None or bmvs[1] is None:
-        if 'ultra_video_group' in before_x:
-            # We need HW to be (16n1, 16n2).
-            bmvs[0] = np.zeros((1072, 1920, 1))
-            bmvs[1] = np.zeros((1072, 1920, 1))
-        else:
-            bmvs[0] = np.zeros((288, 352, 1))
-            bmvs[1] = np.zeros((288, 352, 1))
-    else:
-        bmvs[0] = bmvs[0] * (-2.0)
-        bmvs[1] = bmvs[1] * (-2.0)
-
-    if bmvs[2] is None or bmvs[3] is None:
-        if 'ultra_video_group' in before_x:
-            bmvs[2] = np.zeros((1072, 1920, 1))
-            bmvs[3] = np.zeros((1072, 1920, 1))
-        else:
-            bmvs[2] = np.zeros((288, 352, 1))
-            bmvs[3] = np.zeros((288, 352, 1))
-    else:
-        bmvs[2] = bmvs[2] * (-2.0)
-        bmvs[3] = bmvs[3] * (-2.0)
-
-    return bmvs
-
-
 def crop_cv2(img, patch):
     height, width, _ = img.shape
     start_x = random.randint(0, height - patch)
@@ -122,48 +75,6 @@ def flip_cv2(imgs):
         # img[:, :, 9] = img[:, :, 9] * (-1.0)
         # img[:, :, 11] = img[:, :, 11] * (-1.0)
     return imgs
-
-
-# (Close, far)
-def get_group_filenames(filename, img_idx, distance1, distance2):
-    dtype = filename[-3:]
-    assert filename[-4] == '.'
-    code = filename[:-4].split('_')[-1]
-
-    # I 2 3 D 5 6 D 8 9 B 11 12 I
-    if img_idx % 12 in [3, 6, 9, 0]:
-        delta_close = distance1
-        delta_far = distance2 * (-1)
-    else:
-        delta_close = distance1 * (-1)
-        delta_far = distance2
-
-    filenames = [filename[:-4 - len(code)] + str(img_idx + delta_close).zfill(len(code)) + '.%s' % dtype,
-                 filename[:-4 - len(code)] +
-                 str(img_idx).zfill(len(code)) + '.%s' % dtype,
-                 filename[:-4 - len(code)] + str(img_idx + delta_far).zfill(len(code)) + '.%s' % dtype]
-
-    return filenames
-
-
-def get_bmv_filenames(mv_dir, main_fn):
-
-    fn = main_fn.split('/')[-1][:-4]
-
-    return (os.path.join(mv_dir, fn + '_before_flow_x_0001.jpg'),
-            os.path.join(mv_dir, fn + '_before_flow_y_0001.jpg'),
-            os.path.join(mv_dir, fn + '_after_flow_x_0001.jpg'),
-            os.path.join(mv_dir, fn + '_after_flow_y_0001.jpg'))
-
-
-def get_identity_grid(shape):
-    width, height = shape
-    grid = np.zeros((width, height, 2))
-    for i in range(width):
-        for j in range(height):
-            grid[i, j, 0] = float(j) * (2.0 / (height - 1.0)) - 1.0
-            grid[i, j, 1] = float(i) * (2.0 / (width - 1.0)) - 1.0
-    return grid
 
 
 def np_to_torch(img):
@@ -206,31 +117,9 @@ class ImageFolder(data.Dataset):
 
         print('%d images loaded.' % len(self.imgs))
 
-    def get_group_data(self, filename):
-        img_idx = int(filename[:-4].split('_')[-1])
-
-        filenames = get_group_filenames(
-            filename, img_idx,
-            self.args.distance1,
-            self.args.distance2)
-        assert all(os.path.isfile(fn) for fn in filenames), filenames
-        assert len(filenames) == 3
-
-        imgs_ = [self.loader(fn).astype(np.float64) for fn in filenames]
-
-        main_fn = filenames[1]
-        return np.concatenate(imgs_, axis=2), main_fn
-
     def get_frame_data(self, filename):
         img = self.loader(filename)
         return img, filename
-
-    # def _generate_indices(self, index: int, length: int, times: int):
-    #     indices = []
-    #     for _ in range(times):
-    #         indices.append(index % length)
-    #         index //= length
-    #     return tuple(indices)
 
     def __getitem__(self, index):
         imgs = []

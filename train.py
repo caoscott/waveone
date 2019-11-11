@@ -51,7 +51,8 @@ def train() -> None:
     # decoder = nn.Sequential(BitToContextDecoder(),
     #                         ContextToFlowDecoder(3)).cuda()
     decoder = BitToFlowDecoder(args.bits, 3).cuda()
-    binarizer = Binarizer(latent_vec_size, args.bits).cuda()
+    binarizer = Binarizer(latent_vec_size, args.bits,
+                          not args.binarize_off).cuda()
     nets = [encoder, binarizer, decoder]
 
     # gpus = [int(gpu) for gpu in args.gpus.split(',')]
