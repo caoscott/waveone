@@ -19,7 +19,7 @@ parser.add_argument('--patch', default=64, type=int,
                     help='Patch size.')
 
 ######## Learning ########
-parser.add_argument('--max-train-epochs', type=int, default=400,
+parser.add_argument('--max-train-epochs', type=int, default=20,
                     help='Max training epochs.')
 parser.add_argument('--lr', type=float, default=0.00025,
                     help='Learning rate.')

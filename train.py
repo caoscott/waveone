@@ -230,10 +230,11 @@ def train(args) -> List[nn.Module]:
         reconstructed_frame2 = None
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
-            frame1, frame2 = frame1.cuda(), frame2.cuda()
+            # frame1, frame2 = frame1.cuda(), frame2.cuda()
+            frame2 = frame2.cuda()
             # with 50% chance recycle old frame.
-            if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
-                frame1 = reconstructed_frame2.detach()
+            # if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
+            frame1 = reconstructed_frame2.detach()
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
