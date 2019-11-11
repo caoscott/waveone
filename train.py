@@ -232,13 +232,10 @@ def train() -> None:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
-        for frame1, frame2 in zip(frames[:, :-1], frames[:, 1:]):
-
-            assert frame1.shape[0] == frame2.shape[0] == frames.shape[0]
-
-            if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
-                # with 50% chance recycle old frame.
-                frame1 = reconstructed_frame2.detach()
+        for frame1, frame2 in zip(frames[:-1], frames[1:]):
+            # if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
+            # with 50% chance recycle old frame.
+            # frame1 = reconstructed_frame2.detach()
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
@@ -252,9 +249,9 @@ def train() -> None:
             log_flow_and_context(writer, flows, context_vec)
 
         scores = {
-            **eval_scores(frames[:, :-1], frames[:, 1:], "train_baseline"),
-            **eval_scores(frames[:, 1:], flow_frames, "train_flow"),
-            **eval_scores(frames[:, 1:], reconstructed_frames,
+            **eval_scores(frames[:-1], frames[1:], "train_baseline"),
+            **eval_scores(frames[1:], flow_frames, "train_flow"),
+            **eval_scores(frames[1:], reconstructed_frames,
                           "train_reconstructed"),
         }
 
