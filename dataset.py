@@ -93,18 +93,14 @@ class ImageFolder(data.Dataset):
         self.args = args
 
         self.patch = args.patch
-        self.loader = default_loader
 
         assert frame_len > 0
         assert sampling_range >= frame_len
 
         self.frame_len = frame_len
         self.sampling_range = sampling_range
-        self.identity_grid = None
 
         self._load_image_list()
-
-        # print('\tdistance=%d/%d' % (args.distance1, args.distance2))
 
     def _load_image_list(self):
         self.imgs = []
@@ -112,14 +108,10 @@ class ImageFolder(data.Dataset):
 
         for filename in sorted(glob.iglob(self.root + '/*png')):
             if os.path.isfile(filename):
-                self.imgs.append(self.loader(filename).astype(np.float64))
+                self.imgs.append(default_loader(filename).astype(np.float64))
                 self.fns.append(filename)
 
         print('%d images loaded.' % len(self.imgs))
-
-    def get_frame_data(self, filename):
-        img = self.loader(filename)
-        return img, filename
 
     def __getitem__(self, index):
         imgs = []

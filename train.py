@@ -27,8 +27,8 @@ def train() -> None:
     train_loader = get_loader(
         is_train=True,
         root=args.train,
-        frame_len=4,
-        sampling_range=12,
+        frame_len=3,
+        sampling_range=0,
         args=args
     )
     eval_loaders = {
@@ -36,7 +36,7 @@ def train() -> None:
             is_train=False,
             root=args.eval,
             frame_len=1,
-            sampling_range=1,
+            sampling_range=0,
             args=args,
         ),
     }
@@ -232,7 +232,10 @@ def train() -> None:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
-        for frame1, frame2 in zip(frames[:-1], frames[1:]):
+        for frame1, frame2 in zip(frames[:, :-1], frames[:, 1:]):
+
+            assert frame1.shape[0] == frame2.shape[0] == frames.shape[0]
+
             if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
                 # with 50% chance recycle old frame.
                 frame1 = reconstructed_frame2.detach()
@@ -249,9 +252,9 @@ def train() -> None:
             log_flow_and_context(writer, flows, context_vec)
 
         scores = {
-            **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:], flow_frames, "train_flow"),
-            **eval_scores(frames[1:], reconstructed_frames,
+            **eval_scores(frames[:, :-1], frames[:, 1:], "train_baseline"),
+            **eval_scores(frames[:, 1:], flow_frames, "train_flow"),
+            **eval_scores(frames[:, 1:], reconstructed_frames,
                           "train_reconstructed"),
         }
 
