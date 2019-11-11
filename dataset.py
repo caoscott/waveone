@@ -95,7 +95,7 @@ class ImageFolder(data.Dataset):
         self.patch = args.patch
 
         assert frame_len > 0
-        assert sampling_range >= frame_len
+        assert sampling_range == 0 or sampling_range >= frame_len
 
         self.frame_len = frame_len
         self.sampling_range = sampling_range
