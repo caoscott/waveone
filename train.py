@@ -1,7 +1,7 @@
 import os
 import random
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
@@ -18,9 +18,7 @@ from network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
 from train_options import parser
 
 
-def train() -> None:
-    args = parser.parse_args()
-    print(args)
+def train(args) -> List[nn.Module]:
 
     ############### Data ###############
 
@@ -225,7 +223,6 @@ def train() -> None:
             net.train()
         solver.zero_grad()
 
-        frames = [frame.cuda() for frame in frames]
         context_vec = torch.zeros(
             context_vec_train_shape, requires_grad=False).cuda()
         flow_frames = []
@@ -233,9 +230,10 @@ def train() -> None:
         reconstructed_frame2 = None
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
-            # if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
+            frame1, frame2 = frame1.cuda(), frame2.cuda()
             # with 50% chance recycle old frame.
-            # frame1 = reconstructed_frame2.detach()
+            if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
+                frame1 = reconstructed_frame2.detach()
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
@@ -289,7 +287,10 @@ def train() -> None:
             just_resumed = False
 
     print('Training done.')
+    return nets
 
 
-with torch.autograd.set_detect_anomaly(True):
-    train()
+if __name__ == '__main__':
+    args = parser.parse_args()
+    print(args)
+    train(args)
