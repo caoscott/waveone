@@ -121,6 +121,12 @@ class ImageFolder(data.Dataset):
             imgs = [self.imgs[index + offset] for offset in offsets]
         else:
             imgs = self.imgs[index: index+self.frame_len]
+        # if self.frame_len > 1:
+        #     index1 = index // self.frame_len
+        #     index2 = index % self.frame_len
+        #     return [self.imgs[index1], self.imgs[index2]]
+        # else:
+        #     imgs = [self.imgs[index], self.imgs[index + 1]]
 
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
@@ -137,6 +143,8 @@ class ImageFolder(data.Dataset):
         return imgs
 
     def __len__(self):
+        # return len(self.imgs) * (len(self.imgs) - 1) // 2 \
+        #     if self.frame_len > 1 else len(self.imgs) - 1
         length = self.sampling_range or self.frame_len
         return (0 if len(self.imgs) < length
                 else len(self.imgs) - length + 1)
