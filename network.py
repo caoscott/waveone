@@ -182,9 +182,9 @@ class Binarizer(nn.Module):
         self.use_binarizer = use_binarizer
 
     def forward(self, x):
+        x = self.conv(x)
+        x = self.tanh(x)
         if self.use_binarizer:
-            x = self.conv(x)
-            x = self.tanh(x)
             return self.sign(x)
         else:
             return x
