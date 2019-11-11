@@ -281,7 +281,7 @@ def train(args) -> List[nn.Module]:
 
             train_loop(frames)
 
-        if epoch % args.checkpoint_epochs == 0:
+        if epoch + 1 % args.checkpoint_epochs == 0:
             save(train_iter)
 
         if just_resumed or epoch % args.eval_epochs == 0:
