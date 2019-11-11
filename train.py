@@ -228,8 +228,6 @@ def train(args) -> List[nn.Module]:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
-        print(frames)
-
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
             # frame1, frame2 = frame1.cuda(), frame2.cuda()
             frame2 = frame2.cuda()
