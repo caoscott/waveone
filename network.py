@@ -6,7 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
-from network_parts import Sign, double_conv, down, inconv, outconv, up, upconv
+from waveone.network_parts import (Sign, double_conv, down, inconv, outconv,
+                                   up, upconv)
 
 
 class Encoder(nn.Module):

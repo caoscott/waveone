@@ -11,11 +11,11 @@ import torch.optim.lr_scheduler as LS
 import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 
-from dataset import get_loader
-from losses import MSSSIM, CharbonnierLoss
-from network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
-                     ContextToFlowDecoder, Encoder)
-from train_options import parser
+from waveone.dataset import get_loader
+from waveone.losses import MSSSIM, CharbonnierLoss
+from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
+                             ContextToFlowDecoder, Encoder)
+from waveone.train_options import parser
 
 
 def train(args) -> List[nn.Module]:
