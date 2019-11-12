@@ -25,7 +25,7 @@ def train(args) -> List[nn.Module]:
     train_loader = get_loader(
         is_train=True,
         root=args.train,
-        frame_len=3,
+        frame_len=2,
         sampling_range=0,
         args=args
     )
@@ -249,10 +249,11 @@ def train(args) -> List[nn.Module]:
         loss = 0.
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
-            if reconstructed_frame2 is None:
-                frame1 = frame1.cuda()
-            else:
-                frame1 = reconstructed_frame2.detach()
+            # if reconstructed_frame2 is None:
+                # frame1 = frame1.cuda()
+            # else:
+                # frame1 = reconstructed_frame2.detach()
+            frame1 = frame1.cuda()
             del reconstructed_frame2
 
             # frame1, frame2 = frame1.cuda(), frame2.cuda()
@@ -262,14 +263,33 @@ def train(args) -> List[nn.Module]:
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
-
-            loss += l1_loss_fn(residuals, frame2 - frame2)
-
             flow_frame2 = F.grid_sample(frame1, flows)
             flow_frames.append(flow_frame2.cpu())
 
             reconstructed_frame2 = (flow_frame2 + residuals).clamp(-0.5, 0.5)
             reconstructed_frames.append(reconstructed_frame2.cpu())
+
+            batch_l1 = torch.abs(frame2-frame2-residuals).mean(
+                dim=-1).mean(dim=-1).mean(dim=-1)
+            batch_l1_cpu = batch_l1.cpu()
+            max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu)
+            min_batch_l1, min_batch_l1_idx = torch.min(batch_l1_cpu)
+            if max_epoch_l1 < max_batch_l1:
+                max_epoch_l1 = max_batch_l1
+                max_epoch_l1_frames = (
+                    frame1[max_batch_l1_idx].cpu(),
+                    frame2[max_batch_l1_idx].cpu(), 
+                    reconstructed_frame2[max_batch_l1_idx].cpu(),
+                )
+            if min_epoch_l1 > min_batch_l1:
+                min_epoch_l1 = min_batch_l1
+                min_epoch_l1_frames = (
+                    frame1[min_batch_l1_idx].cpu(),
+                    frame2[min_batch_l1_idx].cpu(),
+                    reconstructed_frame2[min_batch_l1_idx].cpu(),
+                )
+
+            loss += batch_l1.mean()
 
             log_flow_context_residuals(writer, flows, context_vec, torch.abs(frame2 - frame1))
 
@@ -302,9 +322,30 @@ def train(args) -> List[nn.Module]:
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
+        max_epoch_l1 = 0.
+        min_epoch_l1 = 0.
+        max_epoch_l1_frames = (None, None, None)
+        min_epoch_l1_frames = (None, None, None)
+
         for frames in train_loader:
             train_iter += 1
             train_loop(frames)
+
+        if args.save_out_img:
+            for name, epoch_l1_frames in (
+                ("max_l1", max_epoch_l1_frames),
+                ("min_l1", min_epoch_l1_frames),
+            ):
+                save_image(
+                    epoch_l1_frames[0] + 0.5, f"images/{epoch}_{name}_frame1.png"
+                )
+                save_image(
+                    epoch_l1_frames[1] + 0.5, f"images/{epoch}_{name}_frame2.png"
+                )
+                save_image(
+                    epoch_l1_frames[2] +
+                    0.5, f"images/{epoch}_{name}_reconstructed_frame2.png"
+                )
 
         if epoch + 1 % args.checkpoint_epochs == 0:
             save(train_iter)

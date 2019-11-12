@@ -19,6 +19,8 @@ parser.add_argument('--patch', default=64, type=int,
                     help='Patch size.')
 parser.add_argument('--flow-off', action='store_true',
                     help='Turn off flow')
+parser.add_argument('--normalization', default='batch', type=str,
+                    help='Set normalization in networks.')
 
 ######## Learning ########
 parser.add_argument('--max-train-epochs', type=int, default=20,

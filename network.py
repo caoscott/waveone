@@ -11,7 +11,7 @@ from waveone.network_parts import (Sign, double_conv, down, inconv, outconv,
 
 
 class Encoder(nn.Module):
-    def __init__(self, channels_in: int, channels_out: int, use_context: bool) -> None:
+    def __init__(self, channels_in: int, channels_out: int, use_context: bool, args) -> None:
         super().__init__()
         self.encode_frame1 = nn.Sequential(
             inconv(channels_in // 2, 128),
@@ -29,6 +29,7 @@ class Encoder(nn.Module):
             nn.Conv2d(512, channels_out, kernel_size=3, padding=1),
         )
         self.use_context = use_context
+        self.args = args
 
     def forward(
         self,
