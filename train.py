@@ -256,7 +256,7 @@ def train(args) -> List[nn.Module]:
 
             log_flow_and_context(writer, flows, context_vec)
 
-            del flows, residuals, flow_frame2, reconstructed_frame2
+            del flows, residuals, flow_frame2
 
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
