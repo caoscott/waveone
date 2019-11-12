@@ -195,10 +195,10 @@ def train(args) -> List[nn.Module]:
                     [frame2], [reconstructed_frame2], "eval_reconstructed"))
 
                 if args.save_out_img:
-                    save_image(frame1, f"{eval_iter}_frame1")
-                    save_image(frame2, f"{eval_iter}_frame2")
+                    save_image(frame1, f"{eval_iter}_frame1.png")
+                    save_image(frame2, f"{eval_iter}_frame2.png")
                     save_image(reconstructed_frame2,
-                               f"{eval_iter}_reconstructed_frame2")
+                               f"{eval_iter}_reconstructed_frame2.png")
 
                 # Update frame1.
                 frame1 = reconstructed_frame2
@@ -294,13 +294,12 @@ def train(args) -> List[nn.Module]:
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
             train_iter += 1
-
             train_loop(frames)
 
         if epoch + 1 % args.checkpoint_epochs == 0:
             save(train_iter)
 
-        if just_resumed or epoch + 1 % args.eval_epochs == 0:
+        if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             for eval_name, eval_loader in eval_loaders.items():
                 run_eval(eval_name, eval_loader)
             just_resumed = False
