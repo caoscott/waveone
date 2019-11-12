@@ -228,6 +228,8 @@ def train(args) -> List[nn.Module]:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
+        loss = 0.
+
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
             # frame1, frame2 = frame1.cuda(), frame2.cuda()
             frame2 = frame2.cuda()
@@ -240,6 +242,8 @@ def train(args) -> List[nn.Module]:
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
+
+            loss += l1_loss_fn(residuals, frame2 - frame2)
 
             flow_frame2 = F.grid_sample(frame1, flows)
             flow_frames.append(flow_frame2.cpu())
@@ -258,7 +262,7 @@ def train(args) -> List[nn.Module]:
 
         # loss = -scores["train_reconstructed_msssim"] + scores["train_flow_l1"]
         # + charbonnier_loss_fn(frame2, flow_frame2)
-        loss = scores["train_reconstructed_l1"]
+        # loss = scores["train_reconstructed_l1"]
         loss.backward()
         # for net in nets:
         # if net is not None:
