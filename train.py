@@ -239,11 +239,6 @@ def train(args) -> List[nn.Module]:
         scheduler.last_epoch = train_iter - 1
         just_resumed = True
 
-    max_epoch_l1 = 0.
-    min_epoch_l1 = 0.
-    max_epoch_l1_frames = (None, None, None)
-    min_epoch_l1_frames = (None, None, None)
-
     def train_loop(frames):
         for net in nets:
             net.train()
@@ -283,20 +278,20 @@ def train(args) -> List[nn.Module]:
             batch_l1_cpu = batch_l1.detach().cpu()
             max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu, dim=0)
             min_batch_l1, min_batch_l1_idx = torch.min(batch_l1_cpu, dim=0)
-            if max_epoch_l1 < max_batch_l1:
-                max_epoch_l1 = max_batch_l1.item()
-                max_epoch_l1_frames = (
-                    frame1[max_batch_l1_idx].cpu(),
-                    frame2[max_batch_l1_idx].cpu(),
-                    reconstructed_frame2[max_batch_l1_idx].detach().cpu(),
-                )
-            if min_epoch_l1 > min_batch_l1:
-                min_epoch_l1 = min_batch_l1.item
-                min_epoch_l1_frames = (
-                    frame1[min_batch_l1_idx].cpu(),
-                    frame2[min_batch_l1_idx].cpu(),
-                    reconstructed_frame2[min_batch_l1_idx].detach().cpu(),
-                )
+            max_batch_l1_frames = (
+                frame1[max_batch_l1_idx].cpu(),
+                frame2[max_batch_l1_idx].cpu(),
+                reconstructed_frame2[max_batch_l1_idx].detach().cpu(),
+            )
+            min_batch_l1_frames = (
+                frame1[min_batch_l1_idx].cpu(),
+                frame2[min_batch_l1_idx].cpu(),
+                reconstructed_frame2[min_batch_l1_idx].detach().cpu(),
+            )
+            yield (
+                max_batch_l1.item(), max_batch_l1_frames, 
+                min_batch_l1.item(), min_batch_l1_frames,
+            )
 
             loss += batch_l1.mean()
 
@@ -338,7 +333,15 @@ def train(args) -> List[nn.Module]:
 
         for frames in train_loader:
             train_iter += 1
-            train_loop(frames)
+            for (max_batch_l1, max_batch_l1_frames, 
+                 min_batch_l1, min_batch_l1_frames) in train_loop(frames):
+                if max_epoch_l1 < max_batch_l1:
+                    max_epoch_l1 = max_batch_l1
+                    max_epoch_l1_frames = max_batch_l1_frames
+                if min_epoch_l1 > min_batch_l1:
+                    min_epoch_l1 = min_batch_l1
+                    min_epoch_l1_frames = min_batch_l1_frames
+
 
         if args.save_out_img:
             for name, epoch_l1_frames, epoch_l1 in (
