@@ -20,6 +20,10 @@ from waveone.train_options import parser
 
 
 def train(args) -> List[nn.Module]:
+    if not os.path.exists(args.out_dir):
+        print("Creating directory %s." % args.out_dir)
+        os.makedirs(args.out_dir)
+
     ############### Data ###############
 
     train_loader = get_loader(
@@ -216,11 +220,11 @@ def train(args) -> List[nn.Module]:
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
             print(f"{eval_name} epoch {epoch}:")
-            plot_scores(writer, total_scores, train_iter)
+            plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
                 total_scores, ("flow", "reconstructed"), "eval")
             print_scores(score_diffs)
-            plot_scores(writer, score_diffs, train_iter)
+            plot_scores(writer, score_diffs, epoch)
 
     ############### Training ###############
 
@@ -351,7 +355,7 @@ def train(args) -> List[nn.Module]:
                 )
 
         if epoch + 1 % args.checkpoint_epochs == 0:
-            save(train_iter)
+            save(epoch)
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             for eval_name, eval_loader in eval_loaders.items():
