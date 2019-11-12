@@ -239,6 +239,11 @@ def train(args) -> List[nn.Module]:
         scheduler.last_epoch = train_iter - 1
         just_resumed = True
 
+    max_epoch_l1 = 0.
+    min_epoch_l1 = 0.
+    max_epoch_l1_frames = (None, None, None)
+    min_epoch_l1_frames = (None, None, None)
+
     def train_loop(frames):
         for net in nets:
             net.train()
