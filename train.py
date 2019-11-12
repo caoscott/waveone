@@ -276,7 +276,7 @@ def train(args) -> List[nn.Module]:
             batch_l1 = torch.abs(frame2-frame2-residuals).mean(
                 dim=-1).mean(dim=-1).mean(dim=-1)
             print(batch_l1.shape)
-            batch_l1_cpu = batch_l1.cpu()
+            batch_l1_cpu = batch_l1.detach().cpu()
             max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu)
             min_batch_l1, min_batch_l1_idx = torch.min(batch_l1_cpu)
             if max_epoch_l1 < max_batch_l1:
@@ -284,14 +284,14 @@ def train(args) -> List[nn.Module]:
                 max_epoch_l1_frames = (
                     frame1[max_batch_l1_idx].cpu(),
                     frame2[max_batch_l1_idx].cpu(), 
-                    reconstructed_frame2[max_batch_l1_idx].cpu(),
+                    reconstructed_frame2[max_batch_l1_idx].detach().cpu(),
                 )
             if min_epoch_l1 > min_batch_l1:
                 min_epoch_l1 = min_batch_l1.item
                 min_epoch_l1_frames = (
                     frame1[min_batch_l1_idx].cpu(),
                     frame2[min_batch_l1_idx].cpu(),
-                    reconstructed_frame2[min_batch_l1_idx].cpu(),
+                    reconstructed_frame2[min_batch_l1_idx].detach().cpu(),
                 )
 
             loss += batch_l1.mean()
