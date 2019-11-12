@@ -204,11 +204,11 @@ def train(args) -> List[nn.Module]:
 
                 if args.save_out_img:
                     save_image(
-                        frame1 + 0.5, f"images/{epoch}_{eval_iter}_frame1.png")
+                        frame1 + 0.5, f"{args.out_dir}/{epoch}_{eval_iter}_frame1.png")
                     save_image(
-                        frame2 + 0.5, f"images/{epoch}_{eval_iter}_frame2.png")
+                        frame2 + 0.5, f"{args.out_dir}/{epoch}_{eval_iter}_frame2.png")
                     save_image(reconstructed_frame2 + 0.5,
-                               f"images/{epoch}_{eval_iter}_reconstructed_frame2.png")
+                               f"{args.out_dir}/{epoch}_{eval_iter}_reconstructed_frame2.png")
 
                 # Update frame1.
                 frame1 = reconstructed_frame2
@@ -337,14 +337,14 @@ def train(args) -> List[nn.Module]:
                 ("min_l1", min_epoch_l1_frames),
             ):
                 save_image(
-                    epoch_l1_frames[0] + 0.5, f"images/{epoch}_{name}_frame1.png"
+                    epoch_l1_frames[0] + 0.5, f"{args.out_dir}/{epoch}_{name}_frame1.png"
                 )
                 save_image(
-                    epoch_l1_frames[1] + 0.5, f"images/{epoch}_{name}_frame2.png"
+                    epoch_l1_frames[1] + 0.5, f"{args.out_dir}/{epoch}_{name}_frame2.png"
                 )
                 save_image(
                     epoch_l1_frames[2] +
-                    0.5, f"images/{epoch}_{name}_reconstructed_frame2.png"
+                    0.5, f"{args.out_dir}/{epoch}_{name}_reconstructed_frame2.png"
                 )
 
         if epoch + 1 % args.checkpoint_epochs == 0:
