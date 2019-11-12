@@ -85,13 +85,14 @@ class BitToFlowDecoder(nn.Module):
         self.residual = nn.Sequential(
             upconv(512, 128, bilinear=False),
             outconv(128, channels_out),
+            nn.Tanh(),
             # nn.Conv2d(128, channels_out, kernel_size=3, padding=1),
         )
 
     def forward(self, input_tuple) -> nn.Module:
         x, context_vec = input_tuple
         x = self.ups(x)
-        r = self.residual(x)
+        r = self.residual(x)  # .clamp(-1., 1.)
         identity_theta = torch.tensor(
             BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
         # f = self.flow(x).permute(0, 2, 3, 1) + \
