@@ -195,10 +195,12 @@ def train(args) -> List[nn.Module]:
                     [frame2], [reconstructed_frame2], "eval_reconstructed"))
 
                 if args.save_out_img:
-                    save_image(frame1, f"images/{eval_iter}_frame1.png")
-                    save_image(frame2, f"images/{eval_iter}_frame2.png")
-                    save_image(reconstructed_frame2,
-                               f"images/{eval_iter}_reconstructed_frame2.png")
+                    save_image(
+                        frame1 + 0.5, f"images/{epoch}_{eval_iter}_frame1.png")
+                    save_image(
+                        frame2 + 0.5, f"images/{epoch}_{eval_iter}_frame2.png")
+                    save_image(reconstructed_frame2 + 0.5,
+                               f"images/{epoch}_{eval_iter}_reconstructed_frame2.png")
 
                 # Update frame1.
                 frame1 = reconstructed_frame2
