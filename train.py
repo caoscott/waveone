@@ -178,7 +178,8 @@ def train(args) -> List[nn.Module]:
             for frame2, in eval_loader:
                 frame2 = frame2.cuda()
                 if frame1 is None:
-                    frame1 = torch.zeros_like(frame2).cuda()
+                    frame1 = frame2
+                    continue
                 codes = binarizer(encoder(frame1, frame2, context_vec))
                 flows, residuals, context_vec = decoder((codes, context_vec))
                 flow_frame2 = F.grid_sample(frame1, flows)
