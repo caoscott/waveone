@@ -275,14 +275,14 @@ def train(args) -> List[nn.Module]:
             max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu)
             min_batch_l1, min_batch_l1_idx = torch.min(batch_l1_cpu)
             if max_epoch_l1 < max_batch_l1:
-                max_epoch_l1 = max_batch_l1
+                max_epoch_l1 = max_batch_l1.item()
                 max_epoch_l1_frames = (
                     frame1[max_batch_l1_idx].cpu(),
                     frame2[max_batch_l1_idx].cpu(), 
                     reconstructed_frame2[max_batch_l1_idx].cpu(),
                 )
             if min_epoch_l1 > min_batch_l1:
-                min_epoch_l1 = min_batch_l1
+                min_epoch_l1 = min_batch_l1.item()
                 min_epoch_l1_frames = (
                     frame1[min_batch_l1_idx].cpu(),
                     frame2[min_batch_l1_idx].cpu(),
@@ -332,19 +332,21 @@ def train(args) -> List[nn.Module]:
             train_loop(frames)
 
         if args.save_out_img:
-            for name, epoch_l1_frames in (
-                ("max_l1", max_epoch_l1_frames),
-                ("min_l1", min_epoch_l1_frames),
+            for name, epoch_l1_frames, epoch_l1 in (
+                ("max_l1", max_epoch_l1_frames, max_epoch_l1),
+                ("min_l1", min_epoch_l1_frames, min_epoch_l1),
             ):
                 save_image(
-                    epoch_l1_frames[0] + 0.5, f"{args.out_dir}/{epoch}_{name}_frame1.png"
+                    epoch_l1_frames[0] + 0.5, 
+                    f"{args.out_dir}/{epoch_l1: .6f}_{epoch}_{name}_frame1.png"
                 )
                 save_image(
-                    epoch_l1_frames[1] + 0.5, f"{args.out_dir}/{epoch}_{name}_frame2.png"
+                    epoch_l1_frames[1] + 0.5, 
+                    f"{args.out_dir}/{epoch_l1}_{epoch}_{name}_frame2.png"
                 )
                 save_image(
-                    epoch_l1_frames[2] +
-                    0.5, f"{args.out_dir}/{epoch}_{name}_reconstructed_frame2.png"
+                    epoch_l1_frames[2] + 0.5, 
+                    f"{args.out_dir}/{epoch_l1}_{epoch}_{name}_reconstructed_frame2.png"
                 )
 
         if epoch + 1 % args.checkpoint_epochs == 0:
