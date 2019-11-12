@@ -289,7 +289,7 @@ def train(args) -> List[nn.Module]:
                 reconstructed_frame2[min_batch_l1_idx].detach().cpu(),
             )
             yield (
-                max_batch_l1.item(), max_batch_l1_frames, 
+                max_batch_l1.item(), max_batch_l1_frames,
                 min_batch_l1.item(), min_batch_l1_frames,
             )
 
@@ -327,13 +327,13 @@ def train(args) -> List[nn.Module]:
 
     for epoch in range(args.max_train_epochs):
         max_epoch_l1 = 0.
-        min_epoch_l1 = 0.
+        min_epoch_l1 = float("inf")
         max_epoch_l1_frames = (None, None, None)
         min_epoch_l1_frames = (None, None, None)
 
         for frames in train_loader:
             train_iter += 1
-            for (max_batch_l1, max_batch_l1_frames, 
+            for (max_batch_l1, max_batch_l1_frames,
                  min_batch_l1, min_batch_l1_frames) in train_loop(frames):
                 if max_epoch_l1 < max_batch_l1:
                     max_epoch_l1 = max_batch_l1
