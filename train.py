@@ -346,11 +346,11 @@ def train(args) -> List[nn.Module]:
                 )
                 save_image(
                     epoch_l1_frames[1] + 0.5, 
-                    f"{args.out_dir}/{epoch_l1}_{epoch}_{name}_frame2.png"
+                    f"{args.out_dir}/{epoch_l1: .6f}_{epoch}_{name}_frame2.png"
                 )
                 save_image(
                     epoch_l1_frames[2] + 0.5, 
-                    f"{args.out_dir}/{epoch_l1}_{epoch}_{name}_reconstructed_frame2.png"
+                    f"{args.out_dir}/{epoch_l1: .6f}_{epoch}_{name}_reconstructed_frame2.png"
                 )
 
         if epoch + 1 % args.checkpoint_epochs == 0:
