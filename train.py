@@ -280,6 +280,7 @@ def train(args) -> List[nn.Module]:
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         plot_scores(writer, scores, train_iter)
+        print_scores(scores)
         score_diffs = get_score_diffs(
             scores, ("flow", "reconstructed"), "train")
         plot_scores(writer, score_diffs, train_iter)
