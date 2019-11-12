@@ -236,6 +236,8 @@ def train(args) -> List[nn.Module]:
         just_resumed = True
 
     def train_loop(frames):
+        global max_epoch_l1, max_epoch_l1_frames, min_epoch_l1, min_epoch_l1_frames
+
         for net in nets:
             net.train()
         solver.zero_grad()
@@ -282,7 +284,7 @@ def train(args) -> List[nn.Module]:
                     reconstructed_frame2[max_batch_l1_idx].cpu(),
                 )
             if min_epoch_l1 > min_batch_l1:
-                min_epoch_l1 = min_batch_l1.item()
+                min_epoch_l1 = min_batch_l1.item
                 min_epoch_l1_frames = (
                     frame1[min_batch_l1_idx].cpu(),
                     frame2[min_batch_l1_idx].cpu(),
