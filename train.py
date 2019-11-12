@@ -171,7 +171,7 @@ def train(args) -> List[nn.Module]:
             net.eval()
 
         with torch.no_grad():
-            context_vec = torch.zeros(context_vec_test_shape).cuda()
+            context_vec = torch.zeros(context_vec_test_shape)  # .cuda()
             total_scores: Dict[str, float] = defaultdict(float)
             frame1 = None
 
@@ -224,7 +224,7 @@ def train(args) -> List[nn.Module]:
         solver.zero_grad()
 
         context_vec = torch.zeros(
-            context_vec_train_shape, requires_grad=False).cuda()
+            context_vec_train_shape, requires_grad=False)  # .cuda()
         flow_frames = []
         reconstructed_frames = []
         reconstructed_frame2 = None
@@ -232,14 +232,16 @@ def train(args) -> List[nn.Module]:
         loss = 0.
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
-            # frame1, frame2 = frame1.cuda(), frame2.cuda()
-            frame2 = frame2.cuda()
-            # with 50% chance recycle old frame.
-            # if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
             if reconstructed_frame2 is None:
                 frame1 = frame1.cuda()
             else:
                 frame1 = reconstructed_frame2.detach()
+            del reconstructed_frame2
+
+            # frame1, frame2 = frame1.cuda(), frame2.cuda()
+            frame2 = frame2.cuda()
+            # with 50% chance recycle old frame.
+            # if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
 
             codes = binarizer(encoder(frame1, frame2, context_vec))
             flows, residuals, context_vec = decoder((codes, context_vec))
@@ -253,6 +255,8 @@ def train(args) -> List[nn.Module]:
             reconstructed_frames.append(reconstructed_frame2.cpu())
 
             log_flow_and_context(writer, flows, context_vec)
+
+            del flows, residuals, flow_frame2, reconstructed_frame2
 
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
