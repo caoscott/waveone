@@ -236,8 +236,6 @@ def train(args) -> List[nn.Module]:
         just_resumed = True
 
     def train_loop(frames):
-        global max_epoch_l1, max_epoch_l1_frames, min_epoch_l1, min_epoch_l1_frames
-
         for net in nets:
             net.train()
         solver.zero_grad()
@@ -273,6 +271,7 @@ def train(args) -> List[nn.Module]:
 
             batch_l1 = torch.abs(frame2-frame2-residuals).mean(
                 dim=-1).mean(dim=-1).mean(dim=-1)
+            print(batch_l1.shape)
             batch_l1_cpu = batch_l1.cpu()
             max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu)
             min_batch_l1, min_batch_l1_idx = torch.min(batch_l1_cpu)
