@@ -275,8 +275,8 @@ def train(args) -> List[nn.Module]:
 
             batch_l1 = torch.abs(frame2-frame2-residuals).mean(
                 dim=-1).mean(dim=-1).mean(dim=-1)
-            print(batch_l1)
             batch_l1_cpu = batch_l1.detach().cpu()
+            print(batch_l1_cpu)
             max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu)
             min_batch_l1, min_batch_l1_idx = torch.min(batch_l1_cpu)
             if max_epoch_l1 < max_batch_l1:
