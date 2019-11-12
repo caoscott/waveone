@@ -44,29 +44,6 @@ class Encoder(nn.Module):
         return self.encode(frames_x + context_x)
 
 
-# class ResNetEncoder(nn.Module):
-#     def __init__(
-#         self,
-#         channels_in: int,
-#         channels_out: int,
-#         use_context: bool
-#     ) -> None:
-#         super().__init__()
-#         assert not use_context
-#         resnet18 = models.resnet18()
-#         self.model = nn.Sequential(*list(resnet18.children())[:-2])
-#         self.conv = outconv(512, channels_out)
-
-#     def forward(
-#         self,
-#         frame1: torch.Tensor,
-#         frame2: torch.Tensor,
-#         context_vec: torch.Tensor
-#     ) -> torch.Tensor:
-#         x = frame2 - frame1
-#         return self.conv(self.model(x))
-
-
 class BitToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
@@ -99,35 +76,6 @@ class BitToFlowDecoder(nn.Module):
         # F.affine_grid(identity_theta, r.shape)
         f = F.affine_grid(identity_theta, r.shape)
         return f, r, context_vec
-
-
-# class BitToFlowResNetDecoder(nn.Module):
-#     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
-
-#     def __init__(self, channels_in: int, channels_out: int) -> None:
-#         super().__init__()
-
-#         self.flow = nn.Sequential(
-#             upconv(512, 128, bilinear=False),
-#             outconv(128, 2),
-#             # nn.Conv2d(128, 2, kernel_size=3, padding=1),
-#         )
-#         self.residual = nn.Sequential(
-#             upconv(512, 128, bilinear=False),
-#             outconv(128, channels_out),
-#             # nn.Conv2d(128, channels_out, kernel_size=3, padding=1),
-#         )
-
-#     def forward(self, input_tuple) -> nn.Module:
-#         x, context_vec = input_tuple
-#         x = self.ups(x)
-#         r = self.residual(x)
-#         identity_theta = torch.tensor(
-#             BitToFlowResNetDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
-#         # f = self.flow(x).permute(0, 2, 3, 1) + \
-#         # F.affine_grid(identity_theta, r.shape)
-#         f = F.affine_grid(identity_theta, r.shape)
-#         return f, r, context_vec
 
 
 class BitToContextDecoder(nn.Module):

@@ -47,7 +47,7 @@ def train(args) -> List[nn.Module]:
     latent_vec_size = 512
     encoder = Encoder(6, latent_vec_size, use_context=False).cuda()
     # decoder = nn.Sequential(BitToContextDecoder(),
-    #                         ContextToFlowDecoder(3)).cuda()
+                            # ContextToFlowDecoder(3)).cuda()
     decoder = BitToFlowDecoder(args.bits, 3).cuda()
     binarizer = Binarizer(latent_vec_size, args.bits,
                           not args.binarize_off).cuda()
@@ -140,14 +140,16 @@ def train(args) -> List[nn.Module]:
             dict_a[key] += value_b
         return dict_a
 
-    def log_flow_and_context(
+    def log_flow_context_residuals(
         writer: SummaryWriter,
         flows: torch.Tensor,
-        context_vec: torch.Tensor
+        context_vec: torch.Tensor,
+        residuals: torch.Tensor,
     ) -> None:
         flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
         flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values
         flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values
+
         writer.add_scalar("mean_context_vec_norm",
                           context_vec.mean().item(), train_iter)
         writer.add_scalar("max_context_vec_norm",
@@ -166,6 +168,12 @@ def train(args) -> List[nn.Module]:
             "min_flow_x", flows_min[0].item(), train_iter)
         writer.add_scalar(
             "min_flow_y", flows_min[1].item(), train_iter)
+        writer.add_scalar("mean_input_residuals",
+                          residuals.mean().item(), train_iter)
+        writer.add_scalar("max_input_residuals",
+                          residuals.max().item(), train_iter)
+        writer.add_scalar("min_input_residuals",
+                          residuals.min().item(), train_iter)
 
     def run_eval(eval_name: str, eval_loader: data.DataLoader) -> None:
         for net in nets:
@@ -263,7 +271,7 @@ def train(args) -> List[nn.Module]:
             reconstructed_frame2 = (flow_frame2 + residuals).clamp(-0.5, 0.5)
             reconstructed_frames.append(reconstructed_frame2.cpu())
 
-            log_flow_and_context(writer, flows, context_vec)
+            log_flow_context_residuals(writer, flows, context_vec, torch.abs(frame2 - frame1))
 
             del flows, residuals, flow_frame2
 
