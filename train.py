@@ -10,6 +10,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as LS
 import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
+from torchvision.utils import save_image
 
 from waveone.dataset import get_loader
 from waveone.losses import MSSSIM, CharbonnierLoss
@@ -175,7 +176,7 @@ def train(args) -> List[nn.Module]:
             total_scores: Dict[str, float] = defaultdict(float)
             frame1 = None
 
-            for frame2, in eval_loader:
+            for eval_iter, (frame2,) in enumerate(eval_loader):
                 frame2 = frame2.cuda()
                 if frame1 is None:
                     frame1 = frame2
@@ -192,6 +193,12 @@ def train(args) -> List[nn.Module]:
                     [frame2], [flow_frame2], "eval_flow"))
                 total_scores = add_dict(total_scores, eval_scores(
                     [frame2], [reconstructed_frame2], "eval_reconstructed"))
+
+                if args.save_out_img:
+                    save_image(frame1, f"{eval_iter}_frame1")
+                    save_image(frame2, f"{eval_iter}_frame2")
+                    save_image(reconstructed_frame2,
+                               f"{eval_iter}_reconstructed_frame2")
 
                 # Update frame1.
                 frame1 = reconstructed_frame2
