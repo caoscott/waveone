@@ -258,10 +258,10 @@ def train(args) -> List[nn.Module]:
     just_resumed = False
     if args.load_model_name:
         print('Loading %s@iter %d' % (args.load_model_name,
-                                      args.load_iter))
+                                      args.load_epoch))
 
-        resume(args.load_iter)
-        train_iter = args.load_iter
+        resume(args.load_epoch)
+        train_iter = args.load_epoch
         scheduler.last_epoch = train_iter - 1
         just_resumed = True
 
