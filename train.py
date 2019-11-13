@@ -96,7 +96,7 @@ def train(args) -> List[nn.Module]:
                 checkpoint_path = os.path.join(
                     args.model_dir, 
                     args.load_model_name, 
-                    f"{name}_{index: 08d}.pth",
+                    f"{name}_{index :08d}.pth",
                 )
 
                 print('Loading %s from %s...' % (name, checkpoint_path))
@@ -107,7 +107,7 @@ def train(args) -> List[nn.Module]:
             if net is not None:
                 checkpoint_path = os.path.join(
                     model_name_dir,
-                    f'{name}_{index: 08d}.pth',
+                    f'{name}_{index :08d}.pth',
                 )
                 torch.save(net.state_dict(), checkpoint_path)
 
@@ -146,7 +146,7 @@ def train(args) -> List[nn.Module]:
 
     def print_scores(scores):
         for key, value in scores.items():
-            print(f"{key}: {value.item(): .6f}")
+            print(f"{key}: {value.item() :.6f}")
         print()
 
     def add_dict(dict_a, dict_b):
@@ -375,15 +375,15 @@ def train(args) -> List[nn.Module]:
             ):
                 save_tensor_as_img(
                     epoch_l1_frames[0],
-                    f"{epoch_l1: .6f}_{epoch}_{name}_frame1"
+                    f"{epoch_l1 :.6f}_{epoch}_{name}_frame1"
                 )
                 save_tensor_as_img(
                     epoch_l1_frames[1],
-                    f"{epoch_l1: .6f}_{epoch}_{name}_frame2"
+                    f"{epoch_l1 :.6f}_{epoch}_{name}_frame2"
                 )
                 save_tensor_as_img(
                     epoch_l1_frames[2],
-                    f"{epoch_l1: .6f}_{epoch}_{name}_reconstructed_frame2"
+                    f"{epoch_l1 :.6f}_{epoch}_{name}_reconstructed_frame2"
                 )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
