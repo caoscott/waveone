@@ -179,7 +179,11 @@ def train(args) -> List[nn.Module]:
         writer.add_scalar("min_input_residuals",
                           residuals.min().item(), train_iter)
 
-    def run_eval(eval_name: str, eval_loader: data.DataLoader) -> None:
+    def run_eval(
+        eval_name: str, 
+        eval_loader: data.DataLoader, 
+        reuse_reconstructed: bool = True,
+    ) -> None:
         for net in nets:
             net.eval()
 
@@ -212,14 +216,18 @@ def train(args) -> List[nn.Module]:
                     save_image(
                         frame2 + 0.5, f"{args.out_dir}/{epoch}_{eval_iter}_frame2.png")
                     save_image(reconstructed_frame2 + 0.5,
-                               f"{args.out_dir}/{epoch}_{eval_iter}_reconstructed_frame2.png")
+                        f"{args.out_dir}/{epoch}_{eval_iter}_reconstructed_frame2.png")
 
                 # Update frame1.
-                frame1 = reconstructed_frame2
+                if reuse_reconstructed:
+                    frame1 = reconstructed_frame2
+                else:
+                    frame1 = frame2
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
-            print(f"{eval_name} epoch {epoch}:")
+            print(f"{eval_name} epoch {epoch},", end="")
+            print("reconstructed-frame2:" if reuse_reconstructed else "frame1-frame2:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
                 total_scores, ("flow", "reconstructed"), "eval")
@@ -345,8 +353,8 @@ def train(args) -> List[nn.Module]:
 
         if args.save_out_img:
             for name, epoch_l1_frames, epoch_l1 in (
-                ("max_l1", max_epoch_l1_frames, max_epoch_l1),
-                ("min_l1", min_epoch_l1_frames, min_epoch_l1),
+                    ("max_l1", max_epoch_l1_frames, max_epoch_l1),
+                    ("min_l1", min_epoch_l1_frames, min_epoch_l1),
             ):
                 save_image(
                     epoch_l1_frames[0] + 0.5, 
@@ -366,7 +374,7 @@ def train(args) -> List[nn.Module]:
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             for eval_name, eval_loader in eval_loaders.items():
-                run_eval(eval_name, eval_loader)
+                run_eval(eval_name, eval_loader, reuse_reconstructed=True)
             just_resumed = False
 
     print('Training done.')
