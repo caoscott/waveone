@@ -213,25 +213,26 @@ def train(args) -> List[nn.Module]:
                 reconstructed_frame2 = (
                     flow_frame2 + residuals).clamp(-0.5, 0.5)
 
+                prefix = "" if reuse_reconstructed else "vcii_"
                 total_scores = add_dict(total_scores, eval_scores(
                     [frame1], [frame2], 
-                    "eval_baseline" + ("" if reuse_reconstructed else "_vcii"),
+                    prefix + "eval_baseline",
                 ))
                 total_scores = add_dict(total_scores, eval_scores(
                     [frame2], [flow_frame2], 
-                    "eval_flow" + ("" if reuse_reconstructed else "_vcii"),
+                    prefix + "eval_flow",
                 ))
                 total_scores = add_dict(total_scores, eval_scores(
                     [frame2], [reconstructed_frame2], 
-                    "eval_reconstructed" + ("" if reuse_reconstructed else "_vcii"),
+                    prefix + "eval_reconstructed",
                 ))
 
                 if args.save_out_img:
-                    save_tensor_as_img(frame1, f"{epoch}_{eval_iter}_frame1")
-                    save_tensor_as_img(frame2, f"{epoch}_{eval_iter}_frame2")
+                    save_tensor_as_img(frame1, f"{prefix}{epoch}_{eval_iter}_frame1")
+                    save_tensor_as_img(frame2, f"{prefix}{epoch}_{eval_iter}_frame2")
                     save_tensor_as_img(
                         reconstructed_frame2, 
-                        f"{epoch}_{eval_iter}_reconstructed_frame2"
+                        f"{prefix}{epoch}_{eval_iter}_reconstructed_frame2"
                     )
 
                 # Update frame1.
@@ -243,10 +244,9 @@ def train(args) -> List[nn.Module]:
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
             print(f"{eval_name} epoch {epoch},", end="")
-            print("reconstructed-frame2:" if reuse_reconstructed else "frame1-frame2:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
-                total_scores, ("flow", "reconstructed"), "eval")
+                total_scores, ("flow", "reconstructed"), prefix + "eval")
             print_scores(score_diffs)
             plot_scores(writer, score_diffs, epoch)
 
