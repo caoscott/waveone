@@ -214,11 +214,17 @@ def train(args) -> List[nn.Module]:
                     flow_frame2 + residuals).clamp(-0.5, 0.5)
 
                 total_scores = add_dict(total_scores, eval_scores(
-                    [frame1], [frame2], "eval_baseline"))
+                    [frame1], [frame2], 
+                    "eval_baseline" + ("" if reuse_reconstructed else "_vcii"),
+                ))
                 total_scores = add_dict(total_scores, eval_scores(
-                    [frame2], [flow_frame2], "eval_flow"))
+                    [frame2], [flow_frame2], 
+                    "eval_flow" + ("" if reuse_reconstructed else "_vcii"),
+                ))
                 total_scores = add_dict(total_scores, eval_scores(
-                    [frame2], [reconstructed_frame2], "eval_reconstructed"))
+                    [frame2], [reconstructed_frame2], 
+                    "eval_reconstructed" + ("" if reuse_reconstructed else "_vcii"),
+                ))
 
                 if args.save_out_img:
                     save_tensor_as_img(frame1, f"{epoch}_{eval_iter}_frame1")
