@@ -80,10 +80,10 @@ def train(args) -> List[nn.Module]:
     solver = optim.Adam(
         params,
         lr=args.lr,
-        weight_decay=args.weight_decay)
-
+        weight_decay=args.weight_decay
+    )
     milestones = [int(s) for s in args.schedule.split(',')]
-    scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
+    # scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     # charbonnier_loss_fn = CharbonnierLoss().cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
@@ -107,7 +107,7 @@ def train(args) -> List[nn.Module]:
             if net is not None:
                 checkpoint_path = os.path.join(
                     model_name_dir,
-                    f'{name}_{index :08d}.pth',
+                    f'{name}_{index: 08d}.pth',
                 )
                 torch.save(net.state_dict(), checkpoint_path)
 
@@ -253,8 +253,8 @@ def train(args) -> List[nn.Module]:
                                       args.load_epoch))
 
         resume(args.load_epoch)
-        train_iter = args.load_epoch
-        scheduler.last_epoch = train_iter - 1
+        # train_iter = args.load_epoch
+        # scheduler.last_epoch = train_iter - 1
         just_resumed = True
 
     def train_loop(frames):
@@ -334,7 +334,7 @@ def train(args) -> List[nn.Module]:
         # torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
 
         solver.step()
-        scheduler.step()
+        # scheduler.step()
 
         # context_vec = new_context_vec.detach()
 
