@@ -1,5 +1,4 @@
 import os
-import random
 import sys
 from collections import defaultdict
 from typing import Dict, List
@@ -69,6 +68,7 @@ def train(args) -> List[nn.Module]:
     binarizer = Binarizer(latent_vec_size, args.bits,
                           not args.binarize_off).cuda()
     nets = [encoder, binarizer, decoder]
+    names = ["encoder", "binarizer", "decoder"]
 
     # gpus = [int(gpu) for gpu in args.gpus.split(',')]
     # if len(gpus) > 1:
@@ -91,11 +91,8 @@ def train(args) -> List[nn.Module]:
    ############### Checkpoints ###############
 
     def resume(index: int) -> None:
-        names = ["encoder", "binarizer", "decoder"]
-
-        for net_idx, net in enumerate(nets):
+        for name, net in zip(names, nets):
             if net is not None:
-                name = names[net_idx]
                 checkpoint_path = os.path.join(
                     args.model_dir, 
                     args.load_model_name, 
@@ -106,18 +103,13 @@ def train(args) -> List[nn.Module]:
                 net.load_state_dict(torch.load(checkpoint_path))
 
     def save(index: int) -> None:
-        names = ["encoder", "binarizer", "decoder"]
-
-        for net_idx, net in enumerate(nets):
+        for name, net in zip(names, nets):
             if net is not None:
-                
-                torch.save(
-                    encoder.state_dict(),
-                    os.path.join(
-                        model_name_dir, 
-                        '{}_{:08d}.pth'.format(names[net_idx], index)
-                    )
+                checkpoint_path = os.path.join(
+                    model_name_dir,
+                    f'{name}_{index :08d}.pth',
                 )
+                torch.save(net.state_dict(), checkpoint_path)
 
     def save_tensor_as_img(t: torch.Tensor, name: str, extension: str = "png") -> None:
         save_image(t + 0.5, os.path.join(out_model_dir, f"{name}.{extension}"))
