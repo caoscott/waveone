@@ -64,3 +64,5 @@ parser.add_argument('--checkpoint-epochs', type=int, default=10,
                     help='Model checkpoint period.')
 parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
+parser.add_argument('--log-dir', type=str, default="logs",
+                    help="Name of logs directory.")

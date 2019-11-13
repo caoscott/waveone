@@ -1,5 +1,6 @@
 import os
 import random
+import sys
 from collections import defaultdict
 from typing import Dict, List
 
@@ -19,16 +20,22 @@ from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
 from waveone.train_options import parser
 
 
+def create_directories(dir_names):
+    for dir_name in dir_names:
+        if not os.path.exists(dir_name):
+            print("Creating directory %s." % dir_name)
+            os.makedirs(dir_name)
+
+
 def train(args) -> List[nn.Module]:
     out_model_dir = os.path.join(args.out_dir, args.save_model_name)
-    if not os.path.exists(out_model_dir):
-        print("Creating directory %s." % out_model_dir)
-        os.makedirs(out_model_dir)
-
     model_name_dir = os.path.join(args.model_dir, args.save_model_name)
-    if not os.path.exists(model_name_dir):
-        print("Creating directory %s." % model_name_dir)
-        os.makedirs(model_name_dir)
+    logs_model_dir = os.path.join(args.log_dir, args.save_model_name)
+
+    create_directories((out_model_dir, model_name_dir, logs_model_dir))
+
+    sys.stdout = open(os.path.join(logs_model_dir, "out"), "w")
+    sys.stderr = open(os.path.join(logs_model_dir, "err"), "w")
 
     ############### Data ###############
 
@@ -387,6 +394,7 @@ def train(args) -> List[nn.Module]:
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             for eval_name, eval_loader in eval_loaders.items():
                 run_eval(eval_name, eval_loader, reuse_reconstructed=True)
+                run_eval(eval_name, eval_loader, reuse_reconstructed=False)
             just_resumed = False
 
     print('Training done.')
