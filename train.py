@@ -20,9 +20,15 @@ from waveone.train_options import parser
 
 
 def train(args) -> List[nn.Module]:
-    if not os.path.exists(args.out_dir):
-        print("Creating directory %s." % args.out_dir)
-        os.makedirs(args.out_dir)
+    out_model_dir = os.path.join(args.out_dir, args.save_model_name)
+    if not os.path.exists(out_model_dir):
+        print("Creating directory %s." % out_model_dir)
+        os.makedirs(out_model_dir)
+
+    model_name_dir = os.path.join(args.model_dir, args.save_model_name)
+    if not os.path.exists(model_name_dir):
+        print("Creating directory %s." % model_name_dir)
+        os.makedirs(model_name_dir)
 
     ############### Data ###############
 
@@ -75,10 +81,6 @@ def train(args) -> List[nn.Module]:
     # charbonnier_loss_fn = CharbonnierLoss().cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
 
-    if not os.path.exists(args.model_dir):
-        print("Creating directory %s." % args.model_dir)
-        os.makedirs(args.model_dir)
-
    ############### Checkpoints ###############
 
     def resume(index: int) -> None:
@@ -87,9 +89,11 @@ def train(args) -> List[nn.Module]:
         for net_idx, net in enumerate(nets):
             if net is not None:
                 name = names[net_idx]
-                checkpoint_path = '{}/{}_{}_{:08d}.pth'.format(
-                    args.model_dir, args.save_model_name,
-                    name, index)
+                checkpoint_path = os.path.join(
+                    args.model_dir, 
+                    args.load_model_name, 
+                    f"{name}_{index: 08d}.pth",
+                )
 
                 print('Loading %s from %s...' % (name, checkpoint_path))
                 net.load_state_dict(torch.load(checkpoint_path))
@@ -99,10 +103,17 @@ def train(args) -> List[nn.Module]:
 
         for net_idx, net in enumerate(nets):
             if net is not None:
-                torch.save(encoder.state_dict(),
-                           '{}/{}_{}_{:08d}.pth'.format(
-                    args.model_dir, args.save_model_name,
-                    names[net_idx], index))
+                
+                torch.save(
+                    encoder.state_dict(),
+                    os.path.join(
+                        model_name_dir, 
+                        '{}_{:08d}.pth'.format(names[net_idx], index)
+                    )
+                )
+
+    def save_tensor_as_img(t: torch.Tensor, name: str, extension: str = "png") -> None:
+        save_image(t + 0.5, os.path.join(out_model_dir, f"{name}.{extension}"))
 
     ############### Eval ###################
     def eval_scores(
@@ -180,8 +191,8 @@ def train(args) -> List[nn.Module]:
                           residuals.min().item(), train_iter)
 
     def run_eval(
-        eval_name: str, 
-        eval_loader: data.DataLoader, 
+        eval_name: str,
+        eval_loader: data.DataLoader,
         reuse_reconstructed: bool = True,
     ) -> None:
         for net in nets:
@@ -211,12 +222,12 @@ def train(args) -> List[nn.Module]:
                     [frame2], [reconstructed_frame2], "eval_reconstructed"))
 
                 if args.save_out_img:
-                    save_image(
-                        frame1 + 0.5, f"{args.out_dir}/{epoch}_{eval_iter}_frame1.png")
-                    save_image(
-                        frame2 + 0.5, f"{args.out_dir}/{epoch}_{eval_iter}_frame2.png")
-                    save_image(reconstructed_frame2 + 0.5,
-                        f"{args.out_dir}/{epoch}_{eval_iter}_reconstructed_frame2.png")
+                    save_tensor_as_img(frame1, f"{epoch}_{eval_iter}_frame1")
+                    save_tensor_as_img(frame2, f"{epoch}_{eval_iter}_frame2")
+                    save_tensor_as_img(
+                        reconstructed_frame2, 
+                        f"{epoch}_{eval_iter}_reconstructed_frame2"
+                    )
 
                 # Update frame1.
                 if reuse_reconstructed:
@@ -303,7 +314,8 @@ def train(args) -> List[nn.Module]:
 
             loss += batch_l1.mean()
 
-            log_flow_context_residuals(writer, flows, context_vec, torch.abs(frame2 - frame1))
+            log_flow_context_residuals(
+                writer, flows, context_vec, torch.abs(frame2 - frame1))
 
             del flows, residuals, flow_frame2
 
@@ -356,20 +368,20 @@ def train(args) -> List[nn.Module]:
                     ("max_l1", max_epoch_l1_frames, max_epoch_l1),
                     ("min_l1", min_epoch_l1_frames, min_epoch_l1),
             ):
-                save_image(
-                    epoch_l1_frames[0] + 0.5, 
-                    f"{args.out_dir}/{epoch_l1: .6f}_{epoch}_{name}_frame1.png"
+                save_tensor_as_img(
+                    epoch_l1_frames[0],
+                    f"{epoch_l1: .6f}_{epoch}_{name}_frame1"
                 )
-                save_image(
-                    epoch_l1_frames[1] + 0.5, 
-                    f"{args.out_dir}/{epoch_l1: .6f}_{epoch}_{name}_frame2.png"
+                save_tensor_as_img(
+                    epoch_l1_frames[1],
+                    f"{epoch_l1: .6f}_{epoch}_{name}_frame2"
                 )
-                save_image(
-                    epoch_l1_frames[2] + 0.5, 
-                    f"{args.out_dir}/{epoch_l1: .6f}_{epoch}_{name}_reconstructed_frame2.png"
+                save_tensor_as_img(
+                    epoch_l1_frames[2],
+                    f"{epoch_l1: .6f}_{epoch}_{name}_reconstructed_frame2"
                 )
 
-        if epoch + 1 % args.checkpoint_epochs == 0:
+        if (epoch + 1) % args.checkpoint_epochs == 0:
             save(epoch)
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
