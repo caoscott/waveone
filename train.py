@@ -32,7 +32,10 @@ def train(args) -> List[nn.Module]:
     model_dir = os.path.join(args.model_dir, args.save_model_name)
     create_directories((output_dir, model_dir, log_dir))
 
-    logging.basicConfig(filename=os.path.join(log_dir, args.save_model_name + ".out"))
+    logging.basicConfig(
+        filename=os.path.join(log_dir, args.save_model_name + ".out"), 
+        filemode="w"
+    )
 
     logging.info(args)
     ############### Data ###############
@@ -398,9 +401,9 @@ def train(args) -> List[nn.Module]:
             just_resumed = False
 
     logging.info('Training done.')
+    logging.shutdown()
     return nets
 
 
 if __name__ == '__main__':
-    args = parser.parse_args()
-    train(args)
+    train(parser.parse_args())
