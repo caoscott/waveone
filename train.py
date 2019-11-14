@@ -1,6 +1,5 @@
 import contextlib
 import os
-import sys
 from collections import defaultdict
 from typing import Dict, List
 
@@ -29,6 +28,10 @@ def create_directories(dir_names):
 
 def train(args) -> List[nn.Module]:
     print(args)
+
+    model_dir = os.path.join(args.out_dir, args.save_model_name)
+    model_name_dir = os.path.join(args.model_dir, args.save_model_name)
+    create_directories((model_dir, model_name_dir))
     ############### Data ###############
 
     train_loader = get_loader(
@@ -89,7 +92,7 @@ def train(args) -> List[nn.Module]:
                 checkpoint_path = os.path.join(
                     args.model_dir, 
                     args.load_model_name, 
-                    f"{name}_{index :08d}.pth",
+                    f"{name}.pth",
                 )
 
                 print('Loading %s from %s...' % (name, checkpoint_path))
@@ -100,12 +103,12 @@ def train(args) -> List[nn.Module]:
             if net is not None:
                 checkpoint_path = os.path.join(
                     model_name_dir,
-                    f'{name}_{index :08d}.pth',
+                    f'{name}.pth',
                 )
                 torch.save(net.state_dict(), checkpoint_path)
 
     def save_tensor_as_img(t: torch.Tensor, name: str, extension: str = "png") -> None:
-        save_image(t + 0.5, os.path.join(out_model_dir, f"{name}.{extension}"))
+        save_image(t + 0.5, os.path.join(model_dir, f"{name}.{extension}"))
 
     ############### Eval ###################
     def eval_scores(
