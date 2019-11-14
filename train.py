@@ -93,7 +93,7 @@ def train(args) -> List[nn.Module]:
 
    ############### Checkpoints ###############
 
-    def resume(index: int) -> None:
+    def resume() -> None:
         for name, net in zip(names, nets):
             if net is not None:
                 checkpoint_path = os.path.join(
@@ -105,7 +105,7 @@ def train(args) -> List[nn.Module]:
                 logging.info('Loading %s from %s...' % (name, checkpoint_path))
                 net.load_state_dict(torch.load(checkpoint_path))
 
-    def save(index: int) -> None:
+    def save() -> None:
         for name, net in zip(names, nets):
             if net is not None:
                 checkpoint_path = os.path.join(
@@ -258,10 +258,8 @@ def train(args) -> List[nn.Module]:
     train_iter = 0
     just_resumed = False
     if args.load_model_name:
-        logging.info('Loading %s@iter %d' % (args.load_model_name,
-                                      args.load_epoch))
-
-        resume(args.load_epoch)
+        logging.info(f'Loading {args.load_model_name}')
+        resume()
         # train_iter = args.load_epoch
         # scheduler.last_epoch = train_iter - 1
         just_resumed = True
@@ -392,7 +390,7 @@ def train(args) -> List[nn.Module]:
                 )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
-            save(epoch)
+            save()
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             for eval_name, eval_loader in eval_loaders.items():
