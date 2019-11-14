@@ -33,9 +33,12 @@ def train(args) -> List[nn.Module]:
 
     create_directories((out_model_dir, model_name_dir, logs_model_dir))
 
+    print(f"Switching to directory {logs_model_dir} for logs.")
+
     sys.stdout = open(os.path.join(logs_model_dir, "out"), "w")
     sys.stderr = open(os.path.join(logs_model_dir, "err"), "w")
 
+    print(args)
     ############### Data ###############
 
     train_loader = get_loader(
@@ -401,5 +404,4 @@ def train(args) -> List[nn.Module]:
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    print(args)
     train(args)
