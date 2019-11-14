@@ -86,6 +86,7 @@ def train(args) -> List[nn.Module]:
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     # charbonnier_loss_fn = CharbonnierLoss().cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
+    # l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
 
    ############### Checkpoints ###############
 
@@ -296,7 +297,8 @@ def train(args) -> List[nn.Module]:
             reconstructed_frame2 = (flow_frame2 + residuals).clamp(-0.5, 0.5)
             reconstructed_frames.append(reconstructed_frame2.cpu())
 
-            batch_l1 = torch.abs(frame2-frame2-residuals).mean(
+            # with torch.no_grad():
+            batch_l1 = torch.abs(frame2-frame1-residuals).mean(
                 dim=-1).mean(dim=-1).mean(dim=-1)
             batch_l1_cpu = batch_l1.detach().cpu()
             max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu, dim=0)
@@ -316,6 +318,7 @@ def train(args) -> List[nn.Module]:
                 min_batch_l1.item(), min_batch_l1_frames,
             )
 
+            # loss += l2_loss_fn(residuals, frame2 - frame1)
             loss += batch_l1.mean()
 
             log_flow_context_residuals(
