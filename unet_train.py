@@ -32,7 +32,7 @@ class LambdaModule(nn.Module):
 def create_directories(dir_names):
     for dir_name in dir_names:
         if not os.path.exists(dir_name):
-            logging.info("Creating directory %s." % dir_name)
+            print("Creating directory %s." % dir_name)
             os.makedirs(dir_name)
 
 
@@ -56,7 +56,7 @@ def train(args) -> List[nn.Module]:
         level=logging.DEBUG,
     )
 
-    logging.info(args)
+    print(args)
     ############### Data ###############
 
     train_loader = get_loader(
@@ -102,7 +102,7 @@ def train(args) -> List[nn.Module]:
                     f"{name}.pth",
                 )
 
-                logging.info('Loading %s from %s...' % (name, checkpoint_path))
+                print('Loading %s from %s...' % (name, checkpoint_path))
                 net.load_state_dict(torch.load(checkpoint_path))
 
     def save() -> None:
@@ -149,8 +149,8 @@ def train(args) -> List[nn.Module]:
 
     def print_scores(scores):
         for key, value in scores.items():
-            logging.info(f"{key}: {value.item() :.6f}")
-        logging.info("")
+            print(f"{key}: {value.item() :.6f}")
+        print("")
 
     def log_flow_context_residuals(
         writer: SummaryWriter,
@@ -209,7 +209,7 @@ def train(args) -> List[nn.Module]:
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
-            logging.info(f"{eval_name} epoch {epoch}:")
+            print(f"{eval_name} epoch {epoch}:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
                 total_scores, ("reconstructed",), prefix + "eval")
@@ -221,7 +221,7 @@ def train(args) -> List[nn.Module]:
     train_iter = 0
     just_resumed = False
     if args.load_model_name:
-        logging.info(f'Loading {args.load_model_name}')
+        print(f'Loading {args.load_model_name}')
         resume()
         just_resumed = True
 
@@ -330,7 +330,7 @@ def train(args) -> List[nn.Module]:
                 run_eval(eval_name, eval_loader, reuse_reconstructed=False)
             just_resumed = False
 
-    logging.info('Training done.')
+    print('Training done.')
     logging.shutdown()
     return nets
 
