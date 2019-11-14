@@ -10,13 +10,23 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as LS
 import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
+from torchvision import models
 from torchvision.utils import save_image
 
 from waveone.dataset import get_loader
 from waveone.losses import MSSSIM, CharbonnierLoss
 from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
-                             ContextToFlowDecoder, Encoder)
+                             ContextToFlowDecoder, Encoder, UNet)
 from waveone.train_options import parser
+
+
+class LambdaModule(nn.Module):
+    def __init__(self, lambd):
+        super.__init__()
+        self.lambd = lambd
+
+    def forward(self, x):
+        return self.lambd(x)
 
 
 def create_directories(dir_names):
@@ -24,6 +34,14 @@ def create_directories(dir_names):
         if not os.path.exists(dir_name):
             logging.info("Creating directory %s." % dir_name)
             os.makedirs(dir_name)
+
+
+def add_dict(
+    dict_a: Dict[str, torch.Tensor], dict_b: Dict[str, torch.Tensor]
+) -> Dict[str, torch.Tensor]:
+    for key, value_b in dict_b.items():
+        dict_a[key] += value_b
+    return dict_a
 
 
 def train(args) -> List[nn.Module]:
@@ -60,35 +78,16 @@ def train(args) -> List[nn.Module]:
     writer = SummaryWriter()
 
     ############### Model ###############
-    context_vec_train_shape = (args.batch_size, 512,
-                               args.patch // 2 or 144, args.patch // 2 or 176)
-    context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
     latent_vec_size = 512
-    encoder = Encoder(6, latent_vec_size, use_context=False).cuda()
-    # decoder = nn.Sequential(BitToContextDecoder(),
-                            # ContextToFlowDecoder(3)).cuda()
-    decoder = BitToFlowDecoder(args.bits, 3).cuda()
-    binarizer = Binarizer(latent_vec_size, args.bits,
-                          not args.binarize_off).cuda()
-    nets = [encoder, binarizer, decoder]
-    names = ["encoder", "binarizer", "decoder"]
-
-    # gpus = [int(gpu) for gpu in args.gpus.split(',')]
-    # if len(gpus) > 1:
-    #     logging.info("Using GPUs {}.".format(gpus))
-    #     net = nn.DataParallel(net, device_ids=gpus)
-
-    params = [{'params': net.parameters()} for net in nets]
-
+    network = UNet(latent_vec_size, shrink=1)
+    nets = [network]
+    names = ["unet"]
     solver = optim.Adam(
-        params,
+        network.parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    # milestones = [int(s) for s in args.schedule.split(',')]
-    # scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
-    # charbonnier_loss_fn = CharbonnierLoss().cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
 
@@ -98,8 +97,8 @@ def train(args) -> List[nn.Module]:
         for name, net in zip(names, nets):
             if net is not None:
                 checkpoint_path = os.path.join(
-                    args.model_dir, 
-                    args.load_model_name, 
+                    args.model_dir,
+                    args.load_model_name,
                     f"{name}.pth",
                 )
 
@@ -122,7 +121,7 @@ def train(args) -> List[nn.Module]:
     def eval_scores(
         frames1: torch.Tensor,
         frames2: torch.Tensor,
-        prefix: str
+        prefix: str,
     ) -> Dict[str, torch.Tensor]:
         assert len(frames1) == len(frames2)
         frame_len = len(frames1)
@@ -153,39 +152,10 @@ def train(args) -> List[nn.Module]:
             logging.info(f"{key}: {value.item() :.6f}")
         logging.info("")
 
-    def add_dict(dict_a, dict_b):
-        for key, value_b in dict_b.items():
-            dict_a[key] += value_b
-        return dict_a
-
     def log_flow_context_residuals(
         writer: SummaryWriter,
-        flows: torch.Tensor,
-        context_vec: torch.Tensor,
         residuals: torch.Tensor,
     ) -> None:
-        flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-        flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values
-        flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values
-
-        writer.add_scalar("mean_context_vec_norm",
-                          context_vec.mean().item(), train_iter)
-        writer.add_scalar("max_context_vec_norm",
-                          context_vec.max().item(), train_iter)
-        writer.add_scalar("min_context_vec_norm",
-                          context_vec.min().item(), train_iter)
-        writer.add_scalar(
-            "mean_flow_x", flows_mean[0].item(), train_iter)
-        writer.add_scalar(
-            "mean_flow_y", flows_mean[1].item(), train_iter)
-        writer.add_scalar(
-            "max_flow_x", flows_max[0].item(), train_iter)
-        writer.add_scalar(
-            "max_flow_y", flows_max[1].item(), train_iter)
-        writer.add_scalar(
-            "min_flow_x", flows_min[0].item(), train_iter)
-        writer.add_scalar(
-            "min_flow_y", flows_min[1].item(), train_iter)
         writer.add_scalar("mean_input_residuals",
                           residuals.mean().item(), train_iter)
         writer.add_scalar("max_input_residuals",
@@ -202,7 +172,6 @@ def train(args) -> List[nn.Module]:
             net.eval()
 
         with torch.no_grad():
-            context_vec = torch.zeros(context_vec_test_shape)  # .cuda()
             total_scores: Dict[str, float] = defaultdict(float)
             frame1 = None
 
@@ -211,31 +180,24 @@ def train(args) -> List[nn.Module]:
                 if frame1 is None:
                     frame1 = frame2
                     continue
-                codes = binarizer(encoder(frame1, frame2, context_vec))
-                flows, residuals, context_vec = decoder((codes, context_vec))
-                flow_frame2 = F.grid_sample(frame1, flows)
-                reconstructed_frame2 = (
-                    flow_frame2 + residuals).clamp(-0.5, 0.5)
+                residuals = network(frame2 - frame1)
+                reconstructed_frame2 = frame2 + residuals
 
-                prefix = "" if reuse_reconstructed else "vcii_"
+                prefix = "" if not reuse_reconstructed else "vcii_"
                 total_scores = add_dict(total_scores, eval_scores(
-                    [frame1], [frame2], 
+                    [frame1], [frame2],
                     prefix + "eval_baseline",
                 ))
                 total_scores = add_dict(total_scores, eval_scores(
-                    [frame2], [flow_frame2], 
-                    prefix + "eval_flow",
-                ))
-                total_scores = add_dict(total_scores, eval_scores(
-                    [frame2], [reconstructed_frame2], 
+                    [frame2], [reconstructed_frame2],
                     prefix + "eval_reconstructed",
                 ))
 
                 if args.save_out_img:
-                    save_tensor_as_img(frame1, f"{prefix}{epoch}_{eval_iter}_frame1")
-                    save_tensor_as_img(frame2, f"{prefix}{epoch}_{eval_iter}_frame2")
                     save_tensor_as_img(
-                        reconstructed_frame2, 
+                        frame2, f"{prefix}{epoch}_{eval_iter}_frame2")
+                    save_tensor_as_img(
+                        reconstructed_frame2,
                         f"{prefix}{epoch}_{eval_iter}_reconstructed_frame2"
                     )
 
@@ -250,7 +212,7 @@ def train(args) -> List[nn.Module]:
             logging.info(f"{eval_name} epoch {epoch}:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
-                total_scores, ("flow", "reconstructed"), prefix + "eval")
+                total_scores, ("reconstructed",), prefix + "eval")
             print_scores(score_diffs)
             plot_scores(writer, score_diffs, epoch)
 
@@ -261,8 +223,6 @@ def train(args) -> List[nn.Module]:
     if args.load_model_name:
         logging.info(f'Loading {args.load_model_name}')
         resume()
-        # train_iter = args.load_epoch
-        # scheduler.last_epoch = train_iter - 1
         just_resumed = True
 
     def train_loop(frames):
@@ -270,9 +230,6 @@ def train(args) -> List[nn.Module]:
             net.train()
         solver.zero_grad()
 
-        context_vec = torch.zeros(
-            context_vec_train_shape, requires_grad=False)  # .cuda()
-        flow_frames = []
         reconstructed_frames = []
         reconstructed_frame2 = None
 
@@ -283,74 +240,50 @@ def train(args) -> List[nn.Module]:
                 frame1 = frame1.cuda()
             else:
                 frame1 = reconstructed_frame2.detach()
-            del reconstructed_frame2
-
-            # frame1, frame2 = frame1.cuda(), frame2.cuda()
             frame2 = frame2.cuda()
-            # with 50% chance recycle old frame.
-            # if reconstructed_frame2 is not None and random.randint(1, 2) == 1:
 
-            codes = binarizer(encoder(frame1, frame2, context_vec))
-            flows, residuals, context_vec = decoder((codes, context_vec))
-            flow_frame2 = F.grid_sample(frame1, flows)
-            flow_frames.append(flow_frame2.cpu())
+            residuals = network(frame2 - frame1)
 
-            reconstructed_frame2 = (flow_frame2 + residuals).clamp(-0.5, 0.5)
+            reconstructed_frame2 = (frame2 + residuals).clamp(-0.5, 0.5)
             reconstructed_frames.append(reconstructed_frame2.cpu())
 
-            # with torch.no_grad():
-            batch_l1 = torch.abs(frame2-frame1-residuals).mean(
-                dim=-1).mean(dim=-1).mean(dim=-1)
-            batch_l1_cpu = batch_l1.detach().cpu()
-            max_batch_l1, max_batch_l1_idx = torch.max(batch_l1_cpu, dim=0)
-            min_batch_l1, min_batch_l1_idx = torch.min(batch_l1_cpu, dim=0)
-            max_batch_l1_frames = (
-                frame1[max_batch_l1_idx].cpu(),
-                frame2[max_batch_l1_idx].cpu(),
-                reconstructed_frame2[max_batch_l1_idx].detach().cpu(),
-            )
-            min_batch_l1_frames = (
-                frame1[min_batch_l1_idx].cpu(),
-                frame2[min_batch_l1_idx].cpu(),
-                reconstructed_frame2[min_batch_l1_idx].detach().cpu(),
-            )
-            yield (
-                max_batch_l1.item(), max_batch_l1_frames,
-                min_batch_l1.item(), min_batch_l1_frames,
-            )
+            with torch.no_grad():
+                batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
+                    dim=-1).mean(dim=-1).mean(dim=-1)
+                batch_l2_cpu = batch_l2.detach().cpu()
+                max_batch_l2, max_batch_l2_idx = torch.max(batch_l2_cpu, dim=0)
+                min_batch_l2, min_batch_l2_idx = torch.min(batch_l2_cpu, dim=0)
+                max_batch_l2_frames = (
+                    frame1[max_batch_l2_idx].cpu(),
+                    frame2[max_batch_l2_idx].cpu(),
+                    reconstructed_frame2[max_batch_l2_idx].detach().cpu(),
+                )
+                min_batch_l2_frames = (
+                    frame1[min_batch_l2_idx].cpu(),
+                    frame2[min_batch_l2_idx].cpu(),
+                    reconstructed_frame2[min_batch_l2_idx].detach().cpu(),
+                )
+                yield (
+                    max_batch_l2.item(), max_batch_l2_frames,
+                    min_batch_l2.item(), min_batch_l2_frames,
+                )
 
             loss += l2_loss_fn(residuals, frame2 - frame1)
-            # loss += batch_l1.mean()
 
-            log_flow_context_residuals(
-                writer, flows, context_vec, torch.abs(frame2 - frame1))
-
-            del flows, residuals, flow_frame2
+            log_flow_context_residuals(writer, torch.abs(frame2 - frame1))
 
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:], flow_frames, "train_flow"),
             **eval_scores(frames[1:], reconstructed_frames,
                           "train_reconstructed"),
         }
 
-        # loss = -scores["train_reconstructed_msssim"] + scores["train_flow_l1"]
-        # + charbonnier_loss_fn(frame2, flow_frame2)
-        # loss = scores["train_reconstructed_l1"]
         loss.backward()
-        # for net in nets:
-        # if net is not None:
-        # torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
-
         solver.step()
-        # scheduler.step()
-
-        # context_vec = new_context_vec.detach()
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         plot_scores(writer, scores, train_iter)
-        score_diffs = get_score_diffs(
-            scores, ("flow", "reconstructed"), "train")
+        score_diffs = get_score_diffs(scores, ("reconstructed",), "train")
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
@@ -361,15 +294,14 @@ def train(args) -> List[nn.Module]:
 
         for frames in train_loader:
             train_iter += 1
-            for (max_batch_l1, max_batch_l1_frames,
-                 min_batch_l1, min_batch_l1_frames) in train_loop(frames):
-                if max_epoch_l1 < max_batch_l1:
-                    max_epoch_l1 = max_batch_l1
-                    max_epoch_l1_frames = max_batch_l1_frames
-                if min_epoch_l1 > min_batch_l1:
-                    min_epoch_l1 = min_batch_l1
-                    min_epoch_l1_frames = min_batch_l1_frames
-
+            for (max_batch_l2, max_batch_l2_frames,
+                 min_batch_l2, min_batch_l2_frames) in train_loop(frames):
+                if max_epoch_l1 < max_batch_l2:
+                    max_epoch_l1 = max_batch_l2
+                    max_epoch_l1_frames = max_batch_l2_frames
+                if min_epoch_l1 > min_batch_l2:
+                    min_epoch_l1 = min_batch_l2
+                    min_epoch_l1_frames = min_batch_l2_frames
 
         if args.save_out_img:
             for name, epoch_l1_frames, epoch_l1 in (
