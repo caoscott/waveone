@@ -60,7 +60,7 @@ parser.add_argument('--save-codes', action='store_true',
                     help='If true, write compressed codes during eval.')
 parser.add_argument('--save-out-img', action='store_true',
                     help='If true, save output images during eval.')
-parser.add_argument('--checkpoint-epochs', type=int, default=10,
+parser.add_argument('--checkpoint-epochs', type=int, default=20,
                     help='Model checkpoint period.')
 parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
