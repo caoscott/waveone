@@ -1,3 +1,4 @@
+import contextlib
 import os
 import sys
 from collections import defaultdict
@@ -27,17 +28,6 @@ def create_directories(dir_names):
 
 
 def train(args) -> List[nn.Module]:
-    out_model_dir = os.path.join(args.out_dir, args.save_model_name)
-    model_name_dir = os.path.join(args.model_dir, args.save_model_name)
-    logs_model_dir = os.path.join(args.log_dir, args.save_model_name)
-
-    create_directories((out_model_dir, model_name_dir, logs_model_dir))
-
-    print(f"Switching to directory {logs_model_dir} for logs.")
-
-    sys.stdout = open(os.path.join(logs_model_dir, "out"), "w")
-    sys.stderr = open(os.path.join(logs_model_dir, "err"), "w")
-
     print(args)
     ############### Data ###############
 
@@ -404,4 +394,12 @@ def train(args) -> List[nn.Module]:
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    train(args)
+    logs_model_dir = os.path.join(args.log_dir, args.save_model_name)
+
+    create_directories((logs_model_dir,))
+    print(f"Switching to directory {logs_model_dir} for logs.")
+
+    with open(os.path.join(logs_model_dir, "out"), "w") as out, \
+        open(os.path.join(logs_model_dir, "err"), "w") as err:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            train(args)
