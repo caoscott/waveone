@@ -1,4 +1,3 @@
-import contextlib
 import os
 from collections import defaultdict
 from typing import Dict, List
@@ -397,12 +396,4 @@ def train(args) -> List[nn.Module]:
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    logs_model_dir = os.path.join(args.log_dir, args.save_model_name)
-
-    create_directories((logs_model_dir,))
-    print(f"Switching to directory {logs_model_dir} for logs.")
-
-    with open(os.path.join(logs_model_dir, "out"), "w") as out, \
-        open(os.path.join(logs_model_dir, "err"), "w") as err:
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            train(args)
+    train(args)
