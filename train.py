@@ -43,8 +43,8 @@ def train(args) -> List[nn.Module]:
     train_loader = get_loader(
         is_train=True,
         root=args.train,
-        frame_len=2,
-        sampling_range=0,
+        frame_len=3,
+        sampling_range=12,
         args=args
     )
     eval_loaders = {
@@ -84,7 +84,7 @@ def train(args) -> List[nn.Module]:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    milestones = [int(s) for s in args.schedule.split(',')]
+    # milestones = [int(s) for s in args.schedule.split(',')]
     # scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     # charbonnier_loss_fn = CharbonnierLoss().cuda()
@@ -278,11 +278,10 @@ def train(args) -> List[nn.Module]:
         loss = 0.
 
         for frame1, frame2 in zip(frames[:-1], frames[1:]):
-            # if reconstructed_frame2 is None:
-                # frame1 = frame1.cuda()
-            # else:
-                # frame1 = reconstructed_frame2.detach()
-            frame1 = frame1.cuda()
+            if reconstructed_frame2 is None:
+                frame1 = frame1.cuda()
+            else:
+                frame1 = reconstructed_frame2.detach()
             del reconstructed_frame2
 
             # frame1, frame2 = frame1.cuda(), frame2.cuda()
