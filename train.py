@@ -34,7 +34,8 @@ def train(args) -> List[nn.Module]:
 
     logging.basicConfig(
         filename=os.path.join(log_dir, args.save_model_name + ".out"), 
-        filemode="w"
+        filemode="w",
+        level=logging.DEBUG,
     )
 
     logging.info(args)
