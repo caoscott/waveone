@@ -1,3 +1,4 @@
+import logging
 import os
 from collections import defaultdict
 from typing import Dict, List
@@ -21,16 +22,19 @@ from waveone.train_options import parser
 def create_directories(dir_names):
     for dir_name in dir_names:
         if not os.path.exists(dir_name):
-            print("Creating directory %s." % dir_name)
+            logging.info("Creating directory %s." % dir_name)
             os.makedirs(dir_name)
 
 
 def train(args) -> List[nn.Module]:
-    print(args)
+    log_dir = os.path.join(args.log_dir, args.save_model_name)
+    output_dir = os.path.join(args.out_dir, args.save_model_name)
+    model_dir = os.path.join(args.model_dir, args.save_model_name)
+    create_directories((output_dir, model_dir, log_dir))
 
-    model_dir = os.path.join(args.out_dir, args.save_model_name)
-    model_name_dir = os.path.join(args.model_dir, args.save_model_name)
-    create_directories((model_dir, model_name_dir))
+    logging.basicConfig(filename=os.path.join(log_dir, args.save_model_name + ".out"))
+
+    logging.info(args)
     ############### Data ###############
 
     train_loader = get_loader(
@@ -67,7 +71,7 @@ def train(args) -> List[nn.Module]:
 
     # gpus = [int(gpu) for gpu in args.gpus.split(',')]
     # if len(gpus) > 1:
-    #     print("Using GPUs {}.".format(gpus))
+    #     logging.info("Using GPUs {}.".format(gpus))
     #     net = nn.DataParallel(net, device_ids=gpus)
 
     params = [{'params': net.parameters()} for net in nets]
@@ -94,20 +98,20 @@ def train(args) -> List[nn.Module]:
                     f"{name}.pth",
                 )
 
-                print('Loading %s from %s...' % (name, checkpoint_path))
+                logging.info('Loading %s from %s...' % (name, checkpoint_path))
                 net.load_state_dict(torch.load(checkpoint_path))
 
     def save(index: int) -> None:
         for name, net in zip(names, nets):
             if net is not None:
                 checkpoint_path = os.path.join(
-                    model_name_dir,
+                    model_dir,
                     f'{name}.pth',
                 )
                 torch.save(net.state_dict(), checkpoint_path)
 
     def save_tensor_as_img(t: torch.Tensor, name: str, extension: str = "png") -> None:
-        save_image(t + 0.5, os.path.join(model_dir, f"{name}.{extension}"))
+        save_image(t + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
 
     ############### Eval ###################
     def eval_scores(
@@ -141,8 +145,8 @@ def train(args) -> List[nn.Module]:
 
     def print_scores(scores):
         for key, value in scores.items():
-            print(f"{key}: {value.item() :.6f}")
-        print()
+            logging.info(f"{key}: {value.item() :.6f}")
+        logging.info("")
 
     def add_dict(dict_a, dict_b):
         for key, value_b in dict_b.items():
@@ -238,7 +242,7 @@ def train(args) -> List[nn.Module]:
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
-            print(f"{eval_name} epoch {epoch},", end="")
+            logging.info(f"{eval_name} epoch {epoch}:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
                 total_scores, ("flow", "reconstructed"), prefix + "eval")
@@ -250,7 +254,7 @@ def train(args) -> List[nn.Module]:
     train_iter = 0
     just_resumed = False
     if args.load_model_name:
-        print('Loading %s@iter %d' % (args.load_model_name,
+        logging.info('Loading %s@iter %d' % (args.load_model_name,
                                       args.load_epoch))
 
         resume(args.load_epoch)
@@ -390,7 +394,7 @@ def train(args) -> List[nn.Module]:
                 run_eval(eval_name, eval_loader, reuse_reconstructed=False)
             just_resumed = False
 
-    print('Training done.')
+    logging.info('Training done.')
     return nets
 
 
