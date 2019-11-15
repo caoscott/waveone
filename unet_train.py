@@ -174,15 +174,11 @@ def train(args) -> List[nn.Module]:
 
         with torch.no_grad():
             total_scores: Dict[str, float] = defaultdict(float)
-            frame1 = None
-
+            frame1 = next(eval_loader)[0]
             for eval_iter, (frame2,) in enumerate(eval_loader):
                 frame2 = frame2.cuda()
-                if frame1 is None:
-                    frame1 = frame2
-                    continue
                 residuals = network(torch.cat((frame1, frame2), dim=1))
-                reconstructed_frame2 = frame1 + residuals
+                reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
 
                 prefix = "" if not reuse_reconstructed else "vcii_"
                 total_scores = add_dict(total_scores, eval_scores(
@@ -240,24 +236,20 @@ def train(args) -> List[nn.Module]:
 
         loss = 0.
 
-        for frame1, frame2 in zip(frames[:-1], frames[1:]):
-            if reconstructed_frame2 is None:
-                frame1 = frame1.cuda()
-            else:
-                frame1 = reconstructed_frame2.detach()
+        frame1 = frames[0].cuda()
+        for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
             residuals = network(torch.cat((frame1, frame2), dim=1))
-
             reconstructed_frame2 = frame1 + residuals
             reconstructed_frames.append(reconstructed_frame2.cpu())
+            loss -= msssim_fn(reconstructed_frame2, frame2)
 
             with torch.no_grad():
                 batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
-                    dim=-1).mean(dim=-1).mean(dim=-1)
-                batch_l2_cpu = batch_l2.detach().cpu()
-                max_batch_l2, max_batch_l2_idx = torch.max(batch_l2_cpu, dim=0)
-                min_batch_l2, min_batch_l2_idx = torch.min(batch_l2_cpu, dim=0)
+                    dim=-1).mean(dim=-1).mean(dim=-1).cpu()
+                max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
+                min_batch_l2, min_batch_l2_idx = torch.min(batch_l2, dim=0)
                 max_batch_l2_frames = (
                     frame1[max_batch_l2_idx].cpu(),
                     frame2[max_batch_l2_idx].cpu(),
@@ -273,9 +265,9 @@ def train(args) -> List[nn.Module]:
                     min_batch_l2.item(), min_batch_l2_frames,
                 )
 
-            loss -= msssim_fn(reconstructed_frame2, frame2)
-
             log_flow_context_residuals(writer, torch.abs(frame2 - frame1))
+
+            frame1 = reconstructed_frame2.detach()
 
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
