@@ -194,10 +194,10 @@ def train(args) -> List[nn.Module]:
 
                 if args.save_out_img:
                     save_tensor_as_img(
-                        frame2, f"{prefix}{epoch}_{eval_iter}_frame2")
+                        frame2, f"{prefix}{epoch}_{eval_iter}_frame")
                     save_tensor_as_img(
                         reconstructed_frame2,
-                        f"{prefix}{epoch}_{eval_iter}_reconstructed_frame2"
+                        f"{prefix}{epoch}_{eval_iter}_reconstructed"
                     )
 
                 # Update frame1.
@@ -308,16 +308,12 @@ def train(args) -> List[nn.Module]:
                     ("min_l1", min_epoch_l1_frames, min_epoch_l1),
             ):
                 save_tensor_as_img(
-                    epoch_l1_frames[0],
-                    f"{epoch_l1 :.6f}_{epoch}_{name}_frame1"
-                )
-                save_tensor_as_img(
                     epoch_l1_frames[1],
-                    f"{epoch_l1 :.6f}_{epoch}_{name}_frame2"
+                    f"{epoch_l1 :.6f}_{epoch}_{name}_frame"
                 )
                 save_tensor_as_img(
                     epoch_l1_frames[2],
-                    f"{epoch_l1 :.6f}_{epoch}_{name}_reconstructed_frame2"
+                    f"{epoch_l1 :.6f}_{epoch}_{name}_reconstructed"
                 )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
