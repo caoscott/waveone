@@ -86,6 +86,7 @@ def train(args) -> List[nn.Module]:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
+    scheduler = LS.ReduceLROnPlateau(solver, mode="min", verbose=True)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
@@ -279,8 +280,10 @@ def train(args) -> List[nn.Module]:
 
         loss.backward()
         solver.step()
+        scheduler.step(loss.item())
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
+        writer.add_scalar("lr", scheduler.get_lr()[0], train_iter)
         plot_scores(writer, scores, train_iter)
         score_diffs = get_score_diffs(scores, ("reconstructed",), "train")
         plot_scores(writer, score_diffs, train_iter)
