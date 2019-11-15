@@ -241,7 +241,7 @@ def train(args) -> List[nn.Module]:
                 frame1 = reconstructed_frame2.detach()
             frame2 = frame2.cuda()
 
-            residuals = network(torch.cat(frame1, frame2, dim=1))
+            residuals = network(torch.cat((frame1, frame2), dim=1))
 
             reconstructed_frame2 = (frame2 + residuals).clamp(-0.5, 0.5)
             reconstructed_frames.append(reconstructed_frame2.cpu())
