@@ -86,8 +86,8 @@ def train(args) -> List[nn.Module]:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    scheduler = LS.ReduceLROnPlateau(
-        solver, mode="min", patience=100, verbose=True)
+    milestones = [150, 300, 450, 600]
+    scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
@@ -217,6 +217,10 @@ def train(args) -> List[nn.Module]:
             print_scores(score_diffs)
             plot_scores(writer, score_diffs, epoch)
 
+            scheduler.step()
+
+            return total_scores, score_diffs
+
     ############### Training ###############
 
     train_iter = 0
@@ -281,7 +285,6 @@ def train(args) -> List[nn.Module]:
 
         loss.backward()
         solver.step()
-        scheduler.step(loss.item())
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         writer.add_scalar("lr", solver.param_groups[0]["lr"], train_iter)
@@ -290,26 +293,26 @@ def train(args) -> List[nn.Module]:
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
-        max_epoch_l1 = 0.
-        min_epoch_l1 = float("inf")
-        max_epoch_l1_frames = (None, None, None)
-        min_epoch_l1_frames = (None, None, None)
+        max_epoch_l2 = 0.
+        min_epoch_l2 = float("inf")
+        max_epoch_l2_frames = (None, None, None)
+        min_epoch_l2_frames = (None, None, None)
 
         for frames in train_loader:
             train_iter += 1
             for (max_batch_l2, max_batch_l2_frames,
                  min_batch_l2, min_batch_l2_frames) in train_loop(frames):
-                if max_epoch_l1 < max_batch_l2:
-                    max_epoch_l1 = max_batch_l2
-                    max_epoch_l1_frames = max_batch_l2_frames
-                if min_epoch_l1 > min_batch_l2:
-                    min_epoch_l1 = min_batch_l2
-                    min_epoch_l1_frames = min_batch_l2_frames
+                if max_epoch_l2 < max_batch_l2:
+                    max_epoch_l2 = max_batch_l2
+                    max_epoch_l2_frames = max_batch_l2_frames
+                if min_epoch_l2 > min_batch_l2:
+                    min_epoch_l2 = min_batch_l2
+                    min_epoch_l2_frames = min_batch_l2_frames
 
         if args.save_out_img:
             for name, epoch_l1_frames, epoch_l1 in (
-                    ("max_l1", max_epoch_l1_frames, max_epoch_l1),
-                    ("min_l1", min_epoch_l1_frames, min_epoch_l1),
+                    ("max_l2", max_epoch_l2_frames, max_epoch_l2),
+                    ("min_l2", min_epoch_l2_frames, min_epoch_l2),
             ):
                 save_tensor_as_img(
                     epoch_l1_frames[1],
