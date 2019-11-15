@@ -283,7 +283,7 @@ def train(args) -> List[nn.Module]:
         scheduler.step(loss.item())
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
-        writer.add_scalar("lr", scheduler.get_lr()[0], train_iter)
+        writer.add_scalar("lr", solver.param_groups[0]["lr"], train_iter)
         plot_scores(writer, scores, train_iter)
         score_diffs = get_score_diffs(scores, ("reconstructed",), "train")
         plot_scores(writer, score_diffs, train_iter)
