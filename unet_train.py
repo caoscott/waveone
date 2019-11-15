@@ -79,7 +79,7 @@ def train(args) -> List[nn.Module]:
 
     ############### Model ###############
     latent_vec_size = 512
-    network = UNet(latent_vec_size, shrink=1)
+    network = UNet(3, shrink=1)
     nets = [network]
     names = ["unet"]
     solver = optim.Adam(

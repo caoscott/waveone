@@ -141,8 +141,8 @@ class Binarizer(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, n_channels: int, shrink: int):
-        super(UNet, self).__init__()
+    def __init__(self, n_channels: int, shrink: int) -> None:
+        super().__init__()
         self.inc = inconv(n_channels, 64 // shrink)
         self.down1 = down(64 // shrink, 128 // shrink)
         self.down2 = down(128 // shrink, 256 // shrink)
@@ -151,14 +151,16 @@ class UNet(nn.Module):
         self.up1 = up(1024 // shrink, 256 // shrink)
         self.up2 = up(512 // shrink, 128 // shrink)
         self.up3 = up(256 // shrink, 64 // shrink)
+        self.up4 = upconv(64 // shrink, 3)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
-        out1 = self.up1(x5, x4)
-        out2 = self.up2(out1, x3)
-        out3 = self.up3(out2, x2)
-        return out3
+        y1 = self.up1(x5, x4)
+        y2 = self.up2(y1, x3)
+        y3 = self.up3(y2, x2)
+        y4 = self.up4(y3)
+        return y4
