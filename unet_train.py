@@ -78,7 +78,7 @@ def train(args) -> List[nn.Module]:
     writer = SummaryWriter()
 
     ############### Model ###############
-    network = UNet(3, shrink=1).cuda()
+    network = UNet(6, shrink=1).cuda()
     nets = [network]
     names = ["unet"]
     solver = optim.Adam(
@@ -241,7 +241,7 @@ def train(args) -> List[nn.Module]:
                 frame1 = reconstructed_frame2.detach()
             frame2 = frame2.cuda()
 
-            residuals = network(frame2 - frame1)
+            residuals = network(torch.cat(frame1, frame2, dim=1))
 
             reconstructed_frame2 = (frame2 + residuals).clamp(-0.5, 0.5)
             reconstructed_frames.append(reconstructed_frame2.cpu())
@@ -267,7 +267,7 @@ def train(args) -> List[nn.Module]:
                     min_batch_l2.item(), min_batch_l2_frames,
                 )
 
-            loss += l2_loss_fn(residuals, frame2 - frame1)
+            loss -= msssim_fn(frame1 + residuals, frame2)
 
             log_flow_context_residuals(writer, torch.abs(frame2 - frame1))
 
