@@ -62,7 +62,7 @@ def train(args) -> List[nn.Module]:
     train_loader = get_loader(
         is_train=True,
         root=args.train,
-        frame_len=3,
+        frame_len=6,
         sampling_range=12,
         args=args
     )
