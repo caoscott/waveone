@@ -181,7 +181,7 @@ def train(args) -> List[nn.Module]:
                 if frame1 is None:
                     frame1 = frame2
                     continue
-                residuals = network(frame2 - frame1)
+                residuals = network(torch.cat((frame1, frame2), dim=1))
                 reconstructed_frame2 = frame2 + residuals
 
                 prefix = "" if not reuse_reconstructed else "vcii_"
