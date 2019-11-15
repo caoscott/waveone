@@ -148,10 +148,10 @@ class UNet(nn.Module):
         self.down2 = down(128 // shrink, 256 // shrink)
         self.down3 = down(256 // shrink, 512 // shrink)
         self.down4 = down(512 // shrink, 512 // shrink)
-        self.up1 = up(1024 // shrink, 256 // shrink, bilinear=False)
-        self.up2 = up(512 // shrink, 128 // shrink, bilinear=False)
-        self.up3 = up(256 // shrink, 64 // shrink, bilinear=False)
-        self.up4 = upconv(128 // shrink, 3, bilinear=False)
+        self.up1 = up(512 // shrink, 256 // shrink, bilinear=False)
+        self.up2 = up(256 // shrink, 128 // shrink, bilinear=False)
+        self.up3 = up(128 // shrink, 64 // shrink, bilinear=False)
+        self.up4 = upconv(64 // shrink, 3, bilinear=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x1 = self.inc(x)

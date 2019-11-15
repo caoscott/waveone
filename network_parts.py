@@ -56,9 +56,9 @@ class up(nn.Module):
         if bilinear:
             self.up = nn.UpsamplingBilinear2d(scale_factor=2)
         else:
-            self.up = nn.ConvTranspose2d(in_ch//2, in_ch//2, 2, stride=2)
+            self.up = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
 
-        self.conv = double_conv(in_ch, out_ch)
+        self.conv = double_conv(in_ch * 2, out_ch)
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
