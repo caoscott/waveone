@@ -86,7 +86,8 @@ def train(args) -> List[nn.Module]:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    scheduler = LS.ReduceLROnPlateau(solver, mode="min", verbose=True)
+    scheduler = LS.ReduceLROnPlateau(
+        solver, mode="min", patience=100, verbose=True)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
