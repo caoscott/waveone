@@ -78,8 +78,7 @@ def train(args) -> List[nn.Module]:
     writer = SummaryWriter()
 
     ############### Model ###############
-    latent_vec_size = 512
-    network = UNet(3, shrink=1)
+    network = UNet(3, shrink=1).cuda()
     nets = [network]
     names = ["unet"]
     solver = optim.Adam(
