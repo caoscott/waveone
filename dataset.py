@@ -2,7 +2,6 @@ import glob
 import os
 import os.path
 import random
-from collections import defaultdict
 
 import cv2
 import numpy as np
@@ -104,13 +103,14 @@ class ImageFolder(data.Dataset):
         self._load_image_list()
 
     def _load_image_list(self):
-        self.imgs = defaultdict(list)
+        self.imgs = []
+        self.fns = []
+
         for filename in sorted(glob.iglob(self.root + '/*png')):
             if os.path.isfile(filename):
-                file_key = "_".join(filename.split("_")[:-1])
-                self.imgs[file_key].append(
-                    default_loader(filename).astype(np.float64))
-        self.indices = []
+                self.imgs.append(default_loader(filename).astype(np.float64))
+                self.fns.append(filename)
+
         print('%d images loaded.' % len(self.imgs))
 
     def __getitem__(self, index):
