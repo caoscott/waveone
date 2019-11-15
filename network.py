@@ -151,7 +151,9 @@ class UNet(nn.Module):
         self.up1 = up(512 // shrink, 256 // shrink, bilinear=False)
         self.up2 = up(256 // shrink, 128 // shrink, bilinear=False)
         self.up3 = up(128 // shrink, 64 // shrink, bilinear=False)
-        self.up4 = upconv(64 // shrink, 3, bilinear=False)
+        self.up4 = up(64 // shrink, 64 // shrink, bilinear=False)
+        self.outconv = outconv(64 // shrink, n_channels)
+        self.tanh = nn.Tanh()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x1 = self.inc(x)
@@ -162,5 +164,6 @@ class UNet(nn.Module):
         y1 = self.up1(x5, x4)
         y2 = self.up2(y1, x3)
         y3 = self.up3(y2, x2)
-        y4 = self.up4(y3)
-        return y4
+        y4 = self.up4(y3, x1)
+        y5 = self.outconv(y4)
+        return self.tanh(y5) / 2
