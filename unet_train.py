@@ -202,7 +202,6 @@ def train(args) -> List[nn.Module]:
                 **eval_scores(frames[1:], reconstructed_frames,
                               prefix + "eval_reconstructed"),
             }
-            total_scores = {k: v/len(frames) for k, v in scores.items()}
             print(f"{eval_name} epoch {epoch}:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
