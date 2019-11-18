@@ -130,6 +130,37 @@ class Sign(nn.Module):
         return SignFunction.apply(x, self.training)
 
 
-class Pass(nn.Module):
+class LambdaModule(nn.Module):
+    def __init__(self, lambd):
+        super.__init__()
+        self.lambd = lambd
+
     def forward(self, x):
-        return x
+        return self.lambd(x)
+
+
+class revnet_block(nn.Module):
+    def __init__(self, channels: int) -> None:
+        super().__init__()
+        self.f_ch = channels // 2
+        self.g_ch = channels - (channels // 2)
+        self.f = double_conv(self.f_ch, self.f_ch)
+        self.g = double_conv(self.g_ch, self.g_ch)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x1, x2 = x[:, :self.f_ch], x[:, self.f_ch:]
+        y1 = x1 + self.f(x2)
+        y2 = x2 + self.g(y1)
+        y = torch.cat((y2, y1), dim=1)
+        return y
+
+
+# class permute_block(nn.Module):
+#     def __init__(self):
+#         self.t1000 = torch.tensor([[1., 0.], [0., 0.]])
+#         self.t0100 = torch.tensor([[0., 1.], [0., 0.]])
+#         self.t0010 = torch.tensor([[0., 0.], [1., 0.]])
+#         self.t0001 = torch.tensor([[0., 0.], [0., 1.]])
+
+#     def forward(x):
+#         F.conv2d(x, self.t1000, stride=2)

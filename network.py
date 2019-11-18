@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torchvision import models
 
 from waveone.network_parts import (Sign, double_conv, down, inconv, outconv,
-                                   up, upconv)
+                                   revnet_block, up, upconv)
 
 
 class Encoder(nn.Module):
@@ -151,7 +151,7 @@ class UNet(nn.Module):
         self.up1 = up(512 // shrink, 256 // shrink, bilinear=False)
         self.up2 = up(256 // shrink, 128 // shrink, bilinear=False)
         self.up3 = up(128 // shrink, 64 // shrink, bilinear=False)
-        self.up4 = up(64 // shrink, 64 // shrink, bilinear=False)
+        self.up4 = upconv(64 // shrink, 64 // shrink, bilinear=False)
         self.outconv = outconv(64 // shrink, n_channels // 2)
         self.tanh = nn.Tanh()
 
@@ -164,6 +164,17 @@ class UNet(nn.Module):
         y1 = self.up1(x5, x4)
         y2 = self.up2(y1, x3)
         y3 = self.up3(y2, x2)
-        y4 = self.up4(y3, x1)
+        y4 = self.up4(y3)
         y5 = self.outconv(y4)
         return self.tanh(y5) / 2
+
+
+class SimpleRevNet(nn.Module):
+    def __init__(self, channels: int, num_blocks: int = 6):
+        super().__init__()
+        self.model = nn.Sequential(
+            revnet_block(channels) for _ in range(num_blocks)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x)

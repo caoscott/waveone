@@ -20,15 +20,6 @@ from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
 from waveone.train_options import parser
 
 
-class LambdaModule(nn.Module):
-    def __init__(self, lambd):
-        super.__init__()
-        self.lambd = lambd
-
-    def forward(self, x):
-        return self.lambd(x)
-
-
 def create_directories(dir_names):
     for dir_name in dir_names:
         if not os.path.exists(dir_name):
