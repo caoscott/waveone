@@ -304,13 +304,13 @@ def train(args) -> List[nn.Module]:
             if args.save_out_img:
                 save_tensor_as_img(
                     max_epoch_l2_frames[1],
+                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame",
                     args,
-                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame"
                 )
                 save_tensor_as_img(
                     max_epoch_l2_frames[2],
+                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed",
                     args,
-                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed"
                 )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
