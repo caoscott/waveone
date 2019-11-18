@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 from collections import defaultdict
@@ -32,6 +33,123 @@ def add_dict(
     for key, value_b in dict_b.items():
         dict_a[key] += value_b
     return dict_a
+
+
+def save_tensor_as_img(
+    t: torch.Tensor,
+    name: str,
+    args: argparse.Namespace,
+    extension: str = "png"
+) -> None:
+    output_dir = os.path.join(args.out_dir, args.save_model_name)
+    save_image(t + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
+
+############### Eval ###################
+
+
+def eval_scores(
+    frames1: List[torch.Tensor],
+    frames2: List[torch.Tensor],
+    prefix: str,
+) -> Dict[str, torch.Tensor]:
+    l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
+    msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
+
+    assert len(frames1) == len(frames2)
+    frame_len = len(frames1)
+    msssim: torch.Tensor = 0.  # type: ignore
+    l1: torch.Tensor = 0.  # type: ignore
+    for frame1, frame2 in zip(frames1, frames2):
+        l1 += l1_loss_fn(frame1, frame2)
+        msssim += msssim_fn(frame1, frame2)
+    return {f"{prefix}_l1": l1/frame_len,
+            f"{prefix}_msssim": msssim/frame_len}
+
+
+def run_eval(
+        eval_name: str,
+        eval_loader: data.DataLoader,
+        network: nn.Module,
+        epoch: int,
+        args: argparse.Namespace,
+        writer: SummaryWriter,
+        reuse_reconstructed: bool = True,
+) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    prefix = "" if not reuse_reconstructed else "vcii_"
+    network.eval()
+
+    with torch.no_grad():
+        eval_iterator = iter(eval_loader)
+        frame1 = next(eval_iterator)[0]
+        frames = [frame1]
+        reconstructed_frames = []
+        frame1 = frame1.cuda()
+
+        for eval_iter, (frame2,) in enumerate(eval_iterator):
+            frames.append(frame2)
+            frame2 = frame2.cuda()
+            residuals = network(torch.cat((frame1, frame2), dim=1))
+            reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
+            reconstructed_frames.append(reconstructed_frame2.cpu())
+            if args.save_out_img:
+                save_tensor_as_img(
+                    frame2, f"{prefix}{epoch}_{eval_iter}_frame", args
+                )
+                save_tensor_as_img(
+                    reconstructed_frame2,
+                    f"{prefix}{epoch}_{eval_iter}_reconstructed",
+                    args
+                )
+
+            # Update frame1.
+            if reuse_reconstructed:
+                frame1 = reconstructed_frame2
+            else:
+                frame1 = frame2
+
+        total_scores = {
+            **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
+            **eval_scores(frames[1:], reconstructed_frames,
+                          prefix + "eval_reconstructed"),
+        }
+        print(f"{eval_name} epoch {epoch}:")
+        plot_scores(writer, total_scores, epoch)
+        score_diffs = get_score_diffs(
+            total_scores, ["reconstructed"], prefix + "eval")
+        print_scores(score_diffs)
+        plot_scores(writer, score_diffs, epoch)
+
+        return total_scores, score_diffs
+
+
+def plot_scores(
+        writer: SummaryWriter,
+        scores: Dict[str, torch.Tensor],
+        train_iter: int
+) -> None:
+    for key, value in scores.items():
+        writer.add_scalar(key, value, train_iter)
+
+
+def get_score_diffs(
+        scores: Dict[str, torch.Tensor],
+        prefixes: List[str],
+        prefix_type: str,
+) -> Dict[str, torch.Tensor]:
+    score_diffs = {}
+    for score_type in ("msssim", "l1"):
+        for prefix in prefixes:
+            baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
+            prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
+            score_diffs[f"{prefix_type}_{prefix}_{score_type}_diff"
+                        ] = prefix_score - baseline_score
+    return score_diffs
+
+
+def print_scores(scores: Dict[str, torch.Tensor]) -> None:
+    for key, value in scores.items():
+        print(f"{key}: {value.item() :.6f}")
+    print("")
 
 
 def train(args) -> List[nn.Module]:
@@ -103,52 +221,6 @@ def train(args) -> List[nn.Module]:
                 )
                 torch.save(net.state_dict(), checkpoint_path)
 
-    def save_tensor_as_img(t: torch.Tensor, name: str, extension: str = "png") -> None:
-        save_image(t + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
-
-    ############### Eval ###################
-    def eval_scores(
-        frames1: List[torch.Tensor],
-        frames2: List[torch.Tensor],
-        prefix: str,
-    ) -> Dict[str, torch.Tensor]:
-        assert len(frames1) == len(frames2)
-        frame_len = len(frames1)
-        msssim: torch.Tensor = 0.  # type: ignore
-        l1: torch.Tensor = 0.  # type: ignore
-        for frame1, frame2 in zip(frames1, frames2):
-            l1 += l1_loss_fn(frame1, frame2)
-            msssim += msssim_fn(frame1, frame2)
-        return {f"{prefix}_l1": l1/frame_len,
-                f"{prefix}_msssim": msssim/frame_len}
-
-    def plot_scores(
-        writer: SummaryWriter,
-        scores: Dict[str, torch.Tensor],
-        train_iter: int
-    ) -> None:
-        for key, value in scores.items():
-            writer.add_scalar(key, value, train_iter)
-
-    def get_score_diffs(
-        scores: Dict[str, torch.Tensor],
-        prefixes: List[str],
-        prefix_type: str,
-    ) -> Dict[str, torch.Tensor]:
-        score_diffs = {}
-        for score_type in ("msssim", "l1"):
-            for prefix in prefixes:
-                baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
-                prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
-                score_diffs[f"{prefix_type}_{prefix}_{score_type}_diff"
-                            ] = prefix_score - baseline_score
-        return score_diffs
-
-    def print_scores(scores: Dict[str, torch.Tensor]) -> None:
-        for key, value in scores.items():
-            print(f"{key}: {value.item() :.6f}")
-        print("")
-
     def log_flow_context_residuals(
         writer: SummaryWriter,
         residuals: torch.Tensor,
@@ -159,57 +231,6 @@ def train(args) -> List[nn.Module]:
                           residuals.max().item(), train_iter)
         writer.add_scalar("min_input_residuals",
                           residuals.min().item(), train_iter)
-
-    def run_eval(
-        eval_name: str,
-        eval_loader: data.DataLoader,
-        reuse_reconstructed: bool = True,
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
-        prefix = "" if not reuse_reconstructed else "vcii_"
-
-        for net in nets:
-            net.eval()
-
-        with torch.no_grad():
-            eval_iterator = iter(eval_loader)
-            frame1 = next(eval_iterator)[0]
-            frames = [frame1]
-            reconstructed_frames = []
-            frame1 = frame1.cuda()
-
-            for eval_iter, (frame2,) in enumerate(eval_iterator):
-                frames.append(frame2)
-                frame2 = frame2.cuda()
-                residuals = network(torch.cat((frame1, frame2), dim=1))
-                reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
-                reconstructed_frames.append(reconstructed_frame2.cpu())
-                if args.save_out_img:
-                    save_tensor_as_img(
-                        frame2, f"{prefix}{epoch}_{eval_iter}_frame")
-                    save_tensor_as_img(
-                        reconstructed_frame2,
-                        f"{prefix}{epoch}_{eval_iter}_reconstructed"
-                    )
-
-                # Update frame1.
-                if reuse_reconstructed:
-                    frame1 = reconstructed_frame2
-                else:
-                    frame1 = frame2
-
-            total_scores = {
-                **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
-                **eval_scores(frames[1:], reconstructed_frames,
-                              prefix + "eval_reconstructed"),
-            }
-            print(f"{eval_name} epoch {epoch}:")
-            plot_scores(writer, total_scores, epoch)
-            score_diffs = get_score_diffs(
-                total_scores, ["reconstructed"], prefix + "eval")
-            print_scores(score_diffs)
-            plot_scores(writer, score_diffs, epoch)
-
-            return total_scores, score_diffs
 
     ############### Training ###############
 
@@ -283,10 +304,12 @@ def train(args) -> List[nn.Module]:
             if args.save_out_img:
                 save_tensor_as_img(
                     max_epoch_l2_frames[1],
+                    args,
                     f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame"
                 )
                 save_tensor_as_img(
                     max_epoch_l2_frames[2],
+                    args,
                     f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed"
                 )
 
@@ -295,8 +318,10 @@ def train(args) -> List[nn.Module]:
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             for eval_name, eval_loader in eval_loaders.items():
-                run_eval(eval_name, eval_loader, reuse_reconstructed=True)
-                run_eval(eval_name, eval_loader, reuse_reconstructed=False)
+                run_eval(eval_name, eval_loader, network,
+                         epoch, args, writer, reuse_reconstructed=True)
+                run_eval(eval_name, eval_loader, network,
+                         epoch, args, writer, reuse_reconstructed=False)
             scheduler.step()  # type: ignore
             just_resumed = False
 
