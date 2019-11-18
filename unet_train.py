@@ -27,8 +27,8 @@ def create_directories(dir_names: Tuple[str, ...]) -> None:
 
 
 def add_dict(
-    dict_a: Dict[str, Union[float, torch.Tensor]], dict_b: Dict[str, Union[float, torch.Tensor]]
-) -> Dict[str, Union[float, torch.Tensor]]:
+    dict_a: Dict[str, torch.Tensor], dict_b: Dict[str, torch.Tensor]
+) -> Dict[str, torch.Tensor]:
     for key, value_b in dict_b.items():
         dict_a[key] += value_b
     return dict_a
@@ -113,11 +113,11 @@ def train(args) -> List[nn.Module]:
         frames1: List[torch.Tensor],
         frames2: List[torch.Tensor],
         prefix: str,
-    ) -> Dict[str, Union[float, torch.Tensor]]:
+    ) -> Dict[str, torch.Tensor]:
         assert len(frames1) == len(frames2)
         frame_len = len(frames1)
-        msssim = 0.
-        l1 = 0.
+        msssim: torch.Tensor = 0.  # type: ignore
+        l1: torch.Tensor = 0.  # type: ignore
         for frame1, frame2 in zip(frames1, frames2):
             l1 += l1_loss_fn(frame1, frame2)
             msssim += msssim_fn(frame1, frame2)
@@ -126,17 +126,17 @@ def train(args) -> List[nn.Module]:
 
     def plot_scores(
         writer: SummaryWriter,
-        scores: Dict[str, Union[float, torch.Tensor]],
+        scores: Dict[str, torch.Tensor],
         train_iter: int
     ) -> None:
         for key, value in scores.items():
             writer.add_scalar(key, value, train_iter)
 
     def get_score_diffs(
-        scores: Dict[str, Union[float, torch.Tensor]],
+        scores: Dict[str, torch.Tensor],
         prefixes: List[str],
         prefix_type: str,
-    ) -> Dict[sstr, torch.Tensor]:
+    ) -> Dict[str, torch.Tensor]:
         score_diffs = {}
         for score_type in ("msssim", "l1"):
             for prefix in prefixes:
@@ -146,7 +146,7 @@ def train(args) -> List[nn.Module]:
                             ] = prefix_score - baseline_score
         return score_diffs
 
-    def print_scores(scores: Dict[str, Union[float, torch.Tensor]]) -> None:
+    def print_scores(scores: Dict[str, torch.Tensor]) -> None:
         for key, value in scores.items():
             print(f"{key}: {value.item() :.6f}")
         print("")
