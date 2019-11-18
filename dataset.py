@@ -159,7 +159,7 @@ class ImageFolder(data.Dataset):
                      for img in imgs)
         for img in imgs:
             assert img.max() <= 0.5
-            assert img.min() >= 0.5
+            assert img.min() >= -0.5
 
         assert len(imgs) == self.frame_len
         return imgs
