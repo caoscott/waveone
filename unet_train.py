@@ -295,7 +295,7 @@ def train(args) -> List[nn.Module]:
         if args.save_out_img:
             for name, epoch_l1_frames, epoch_l1 in (
                     ("max_l2", max_epoch_l2_frames, max_epoch_l2),
-                    ("min_l2", min_epoch_l2_frames, min_epoch_l2),
+                    # ("min_l2", min_epoch_l2_frames, min_epoch_l2),
             ):
                 save_tensor_as_img(
                     epoch_l1_frames[1],
