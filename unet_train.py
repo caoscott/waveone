@@ -10,7 +10,6 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as LS
 import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import models
 from torchvision.utils import save_image
 
 from waveone.dataset import get_loader
@@ -165,8 +164,9 @@ def train(args) -> List[nn.Module]:
 
         with torch.no_grad():
             total_scores: Dict[str, float] = defaultdict(float)
-            frame1 = next(eval_loader)[0]
-            for eval_iter, (frame2,) in enumerate(eval_loader):
+            eval_iterator = iter(eval_loader)
+            frame1 = next(eval_iterator)[0]
+            for eval_iter, (frame2,) in enumerate(eval_iterator):
                 frame2 = frame2.cuda()
                 residuals = network(torch.cat((frame1, frame2), dim=1))
                 reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)

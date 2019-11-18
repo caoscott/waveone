@@ -22,7 +22,7 @@ from waveone.train_options import parser
 def create_directories(dir_names):
     for dir_name in dir_names:
         if not os.path.exists(dir_name):
-            logging.info("Creating directory %s." % dir_name)
+            print("Creating directory %s." % dir_name)
             os.makedirs(dir_name)
 
 
@@ -32,19 +32,19 @@ def train(args) -> List[nn.Module]:
     model_dir = os.path.join(args.model_dir, args.save_model_name)
     create_directories((output_dir, model_dir, log_dir))
 
-    logging.basicConfig(
-        filename=os.path.join(log_dir, args.save_model_name + ".out"),
-        filemode="w",
-        level=logging.DEBUG,
-    )
+    # logging.basicConfig(
+    #     filename=os.path.join(log_dir, args.save_model_name + ".out"),
+    #     filemode="w",
+    #     level=logging.DEBUG,
+    # )
 
-    logging.info(args)
+    print(args)
     ############### Data ###############
 
     train_loader = get_loader(
         is_train=True,
         root=args.train,
-        frame_len=3,
+        frame_len=4,
         sampling_range=12,
         args=args
     )
@@ -73,22 +73,15 @@ def train(args) -> List[nn.Module]:
     nets = [encoder, binarizer, decoder]
     names = ["encoder", "binarizer", "decoder"]
 
-    # gpus = [int(gpu) for gpu in args.gpus.split(',')]
-    # if len(gpus) > 1:
-    #     logging.info("Using GPUs {}.".format(gpus))
-    #     net = nn.DataParallel(net, device_ids=gpus)
-
     params = [{'params': net.parameters()} for net in nets]
-
     solver = optim.Adam(
         params,
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    # milestones = [int(s) for s in args.schedule.split(',')]
-    # scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=args.gamma)
+    milestones = [150, 300, 450, 600]
+    scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
-    # charbonnier_loss_fn = CharbonnierLoss().cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
 
@@ -103,7 +96,7 @@ def train(args) -> List[nn.Module]:
                     f"{name}.pth",
                 )
 
-                logging.info('Loading %s from %s...' % (name, checkpoint_path))
+                print('Loading %s from %s...' % (name, checkpoint_path))
                 net.load_state_dict(torch.load(checkpoint_path))
 
     def save() -> None:
@@ -150,8 +143,8 @@ def train(args) -> List[nn.Module]:
 
     def print_scores(scores):
         for key, value in scores.items():
-            logging.info(f"{key}: {value.item() :.6f}")
-        logging.info("")
+            print(f"{key}: {value.item() :.6f}")
+        print("")
 
     def add_dict(dict_a, dict_b):
         for key, value_b in dict_b.items():
@@ -247,7 +240,7 @@ def train(args) -> List[nn.Module]:
 
             total_scores = {k: v/len(eval_loader.dataset)
                             for k, v in total_scores.items()}
-            logging.info(f"{eval_name} epoch {epoch}:")
+            print(f"{eval_name} epoch {epoch}:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
                 total_scores, ("flow", "reconstructed"), prefix + "eval")
@@ -259,7 +252,7 @@ def train(args) -> List[nn.Module]:
     train_iter = 0
     just_resumed = False
     if args.load_model_name:
-        logging.info(f'Loading {args.load_model_name}')
+        print(f'Loading {args.load_model_name}')
         resume()
         # train_iter = args.load_epoch
         # scheduler.last_epoch = train_iter - 1
@@ -398,7 +391,7 @@ def train(args) -> List[nn.Module]:
                 run_eval(eval_name, eval_loader, reuse_reconstructed=False)
             just_resumed = False
 
-    logging.info('Training done.')
+    print('Training done.')
     logging.shutdown()
     return nets
 
