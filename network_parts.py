@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 # sub-parts of the U-Net model
+from typing import Callable, Tuple
 
 import torch
 import torch.nn as nn
@@ -11,7 +12,13 @@ from torch.autograd import Function
 class double_conv(nn.Module):
     '''(conv => BN => ELU) * 2'''
 
-    def __init__(self, in_ch, out_ch, downsample=False, norm="batch"):
+    def __init__(
+        self,
+        in_ch: int,
+        out_ch: int,
+        downsample: bool = False,
+        norm: str = "batch"
+    ):
         super().__init__()
         stride = 2 if downsample else 1
         self.conv = nn.Sequential(
@@ -25,30 +32,30 @@ class double_conv(nn.Module):
             nn.ELU(inplace=True)
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.conv(x)
 
 
 class inconv(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.conv = double_conv(in_ch, out_ch)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.conv(x)
 
 
 class down(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.mpconv = double_conv(in_ch, out_ch, downsample=True)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.mpconv(x)
 
 
 class up(nn.Module):
-    def __init__(self, in_ch, out_ch, bilinear=True):
+    def __init__(self, in_ch: int, out_ch: int, bilinear: bool = True) -> None:
         super().__init__()
 
         #  would be a nice idea if the upsampling could be learned too,
@@ -60,19 +67,19 @@ class up(nn.Module):
 
         self.conv = double_conv(in_ch * 2, out_ch)
 
-    def forward(self, x1, x2):
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:  # type: ignore
         x1 = self.up(x1)
-        diffX = x1.size()[2] - x2.size()[2]
-        diffY = x1.size()[3] - x2.size()[3]
-        x2 = F.pad(x2, (diffX // 2, int(diffX / 2),
-                        diffY // 2, int(diffY / 2)))
+        diff_x = x1.size()[2] - x2.size()[2]
+        diff_y = x1.size()[3] - x2.size()[3]
+        x2 = F.pad(x2, (diff_x // 2, int(diff_x / 2),
+                        diff_y // 2, int(diff_y / 2)))
         x = torch.cat([x2, x1], dim=1)
         x = self.conv(x)
         return x
 
 
 class upconv(nn.Module):
-    def __init__(self, in_ch, out_ch, bilinear=True):
+    def __init__(self, in_ch: int, out_ch: int, bilinear: bool = True) -> None:
         super().__init__()
 
         #  would be a nice idea if the upsampling could be learned too,
@@ -84,18 +91,18 @@ class upconv(nn.Module):
 
         self.conv = double_conv(out_ch, out_ch)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x = self.up(x)
         x = self.conv(x)
         return x
 
 
 class outconv(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch: int, out_ch: int) -> torch.Tensor:
         super().__init__()
         self.conv = nn.Conv2d(in_ch, out_ch, 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x = self.conv(x)
         return x
 
@@ -107,7 +114,11 @@ class SignFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, x, is_training=True):
+    def forward(
+        ctx: torch.Tensor,
+        x: torch.Tensor,
+        is_training: bool = True
+    ) -> torch.Tensor:  # type: ignore
         # Apply quantization noise while only training
         if is_training:
             prob = x.new(x.size()).uniform_()
@@ -126,16 +137,16 @@ class SignFunction(Function):
 
 
 class Sign(nn.Module):
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return SignFunction.apply(x, self.training)
 
 
 class LambdaModule(nn.Module):
-    def __init__(self, lambd):
-        super.__init__()
+    def __init__(self, lambd: Callable[torch.Tensor, torch.Tensor]) -> None:
+        super().__init__()
         self.lambd = lambd
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.lambd(x)
 
 
@@ -147,7 +158,7 @@ class revnet_block(nn.Module):
         self.f = double_conv(self.f_ch, self.f_ch)
         self.g = double_conv(self.g_ch, self.g_ch)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x1, x2 = x[:, :self.f_ch], x[:, self.f_ch:]
         y1 = x1 + self.f(x2)
         y2 = x2 + self.g(y1)
