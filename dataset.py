@@ -54,12 +54,14 @@ def default_loader(path: str) -> np.ndarray:
         print(cv2_img)
     else:
         cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
-
-    width, height, _ = cv2_img.shape
-    if width % 16 != 0 or height % 16 != 0:
-        cv2_img = cv2_img[:(width//16)*16, :(height//16)*16]
-
     return cv2_img
+
+
+def square_cv2(img: np.ndarray) -> np.ndarray:
+    width, height, _ = img.shape
+    if width % 16 != 0 or height % 16 != 0:
+        img = img[:(width//16)*16, :(height//16)*16]
+    return img
 
 
 def crop_cv2(img: np.ndarray, patch: int) -> np.ndarray:
@@ -147,6 +149,7 @@ class ImageListFolder(data.Dataset):
             imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
             if self.args.patch:
                 imgs = multi_crop_cv2(imgs, self.args.patch)
+        imgs = [square_cv2(img) for img in imgs]
 
         frames: List[torch.Tensor] = [np_to_torch(img.astype(np.float64) / 255 - 0.5)
                                       for img in imgs]
