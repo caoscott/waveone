@@ -40,11 +40,11 @@ def train(args) -> List[nn.Module]:
     model_dir = os.path.join(args.model_dir, args.save_model_name)
     create_directories((output_dir, model_dir, log_dir))
 
-    logging.basicConfig(
-        filename=os.path.join(log_dir, args.save_model_name + ".out"),
-        filemode="w",
-        level=logging.DEBUG,
-    )
+    # logging.basicConfig(
+    #     filename=os.path.join(log_dir, args.save_model_name + ".out"),
+    #     filemode="w",
+    #     level=logging.DEBUG,
+    # )
 
     print(args)
     ############### Data ###############
@@ -165,7 +165,7 @@ def train(args) -> List[nn.Module]:
         with torch.no_grad():
             total_scores: Dict[str, float] = defaultdict(float)
             eval_iterator = iter(eval_loader)
-            frame1 = next(eval_iterator)[0]
+            frame1 = next(eval_iterator)[0].cuda()
             for eval_iter, (frame2,) in enumerate(eval_iterator):
                 frame2 = frame2.cuda()
                 residuals = network(torch.cat((frame1, frame2), dim=1))
