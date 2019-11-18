@@ -279,15 +279,10 @@ def train(args) -> List[nn.Module]:
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
-        max_epoch_l2 = 0.
-        max_epoch_l2_frames = (None, None, None)
 
         for frames in train_loader:
             train_iter += 1
-            for (max_batch_l2, max_batch_l2_frames) in train_loop(frames):
-                if max_epoch_l2 < max_batch_l2:
-                    max_epoch_l2 = max_batch_l2
-                    max_epoch_l2_frames = max_batch_l2_frames
+            max_epoch_l2, max_epoch_l2_frames = max(train_loop(frames))
 
         if args.save_out_img:
             save_tensor_as_img(
