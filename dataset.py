@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os
 import os.path
@@ -29,7 +30,7 @@ def get_loaders(is_train: bool, root: str, frame_len: int, sampling_range: int,
     id_to_loaders: Dict[str, data.DataLoader] = {}
     for vid_id, imgs in id_to_images.items():
         dataset = ImageListFolder(
-            imgs, is_train, frame_len, sampling_range, args
+            imgs, is_train, args, frame_len, sampling_range
         )
         loader = data.DataLoader(
             dataset,
@@ -116,9 +117,9 @@ class ImageListFolder(data.Dataset):
         self,
         imgs: List[np.ndarray],
         is_train: bool,
+        args: argparse.Namespace,
         frame_len: int = 5,
         sampling_range: int = 0,
-        args,
     ) -> None:
         super().__init__()
         self.imgs = imgs
