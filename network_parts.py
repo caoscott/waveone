@@ -61,9 +61,9 @@ class up(nn.Module):
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
         if bilinear:
-            self.up = nn.UpsamplingBilinear2d(scale_factor=2)
+            self.up: nn.Module = nn.UpsamplingBilinear2d(scale_factor=2)
         else:
-            self.up = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
+            self.up: nn.Module = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
 
         self.conv = double_conv(in_ch * 2, out_ch)
 
