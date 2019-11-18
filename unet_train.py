@@ -291,15 +291,15 @@ def train(args) -> List[nn.Module]:
                     f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed"
                 )
 
-            if (epoch + 1) % args.checkpoint_epochs == 0:
-                save()
+        if (epoch + 1) % args.checkpoint_epochs == 0:
+            save()
 
-            if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-                for eval_name, eval_loader in eval_loaders.items():
-                    run_eval(eval_name, eval_loader, reuse_reconstructed=True)
-                    run_eval(eval_name, eval_loader, reuse_reconstructed=False)
-                scheduler.step()  # type: ignore
-                just_resumed = False
+        if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
+            for eval_name, eval_loader in eval_loaders.items():
+                run_eval(eval_name, eval_loader, reuse_reconstructed=True)
+                run_eval(eval_name, eval_loader, reuse_reconstructed=False)
+            scheduler.step()  # type: ignore
+            just_resumed = False
 
     print('Training done.')
     logging.shutdown()
