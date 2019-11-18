@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # full assembly of the sub-parts to form the complete net
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -11,14 +12,14 @@ from waveone.network_parts import (Sign, double_conv, down, inconv, outconv,
 
 
 class Encoder(nn.Module):
-    def __init__(self, channels_in: int, channels_out: int, use_context: bool) -> None:
+    def __init__(self, in_ch: int, out_ch: int, use_context: bool) -> None:
         super().__init__()
         self.encode_frame1 = nn.Sequential(
-            inconv(channels_in // 2, 128),
+            inconv(in_ch // 2, 128),
             down(128, 256),
         )
         self.encode_frame2 = nn.Sequential(
-            inconv(channels_in // 2, 128),
+            inconv(in_ch // 2, 128),
             down(128, 256),
         )
         self.encode_context = inconv(512, 512)
@@ -26,20 +27,22 @@ class Encoder(nn.Module):
             down(512, 512),
             down(512, 512),
             down(512, 512),
-            nn.Conv2d(512, channels_out, kernel_size=3, padding=1),
+            nn.Conv2d(512, out_ch, kernel_size=3, padding=1),
         )
         self.use_context = use_context
 
-    def forward(
+    def forward(  # type: ignore
         self,
         frame1: torch.Tensor,
         frame2: torch.Tensor,
         context_vec: torch.Tensor
-    ) -> nn.Module:
+    ) -> torch.Tensor:
         # frames_x = torch.cat(
             # (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
         frames_x = torch.cat(
-            (self.encode_frame1(frame2-frame1), self.encode_frame2(frame2-frame1)), dim=1)
+            (self.encode_frame1(frame2-frame1), self.encode_frame2(frame2-frame1)),
+            dim=1
+        )
         context_x = self.encode_context(context_vec) if self.use_context else 0.
         return self.encode(frames_x + context_x)
 
@@ -47,10 +50,10 @@ class Encoder(nn.Module):
 class BitToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
-    def __init__(self, channels_in: int, channels_out: int) -> None:
+    def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.ups = nn.Sequential(
-            upconv(channels_in, 512, bilinear=False),
+            upconv(in_ch, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
             upconv(512, 512, bilinear=False),
         )
@@ -61,12 +64,15 @@ class BitToFlowDecoder(nn.Module):
         )
         self.residual = nn.Sequential(
             upconv(512, 128, bilinear=False),
-            outconv(128, channels_out),
+            outconv(128, out_ch),
             nn.Tanh(),
-            # nn.Conv2d(128, channels_out, kernel_size=3, padding=1),
+            # nn.Conv2d(128, out_ch, kernel_size=3, padding=1),
         )
 
-    def forward(self, input_tuple) -> nn.Module:
+    def forward(  # type: ignore
+        self,
+        input_tuple: Tuple[torch.Tensor, torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x, context_vec = input_tuple
         x = self.ups(x)
         r = self.residual(x)  # .clamp(-1., 1.)
@@ -88,7 +94,10 @@ class BitToContextDecoder(nn.Module):
             outconv(512, 512),
         )
 
-    def forward(self, input_tuple) -> nn.Module:
+    def forward(  # type: ignore
+        self,
+        input_tuple: Tuple[torch.Tensor, torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         x, context_vec = input_tuple
         add_to_context = self.ups(x)
         return add_to_context, (context_vec + add_to_context).clamp(-1., 1.)
@@ -98,7 +107,7 @@ class BitToContextDecoder(nn.Module):
 class ContextToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
-    def __init__(self, channels_out: int) -> None:
+    def __init__(self, out_ch: int) -> None:
         super().__init__()
         self.flow = nn.Sequential(
             upconv(1024, 128, bilinear=False),
@@ -107,11 +116,14 @@ class ContextToFlowDecoder(nn.Module):
         )
         self.residual = nn.Sequential(
             upconv(1024, 128, bilinear=False),
-            outconv(128, channels_out),
+            outconv(128, out_ch),
             nn.Tanh(),
         )
 
-    def forward(self, input_tuple) -> nn.Module:
+    def forward(  # type: ignore
+        self,
+        input_tuple: Tuple[torch.Tensor, torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         _, context = input_tuple
         x = torch.cat(input_tuple, dim=1)
         r = self.residual(x)
@@ -124,14 +136,19 @@ class ContextToFlowDecoder(nn.Module):
 
 
 class Binarizer(nn.Module):
-    def __init__(self, channels_in, bits, use_binarizer=True) -> None:
+    def __init__(
+        self,
+        in_ch: int,
+        bits: int,
+        use_binarizer: bool = True
+    ) -> None:
         super().__init__()
-        self.conv = nn.Conv2d(channels_in, bits, kernel_size=1, bias=False)
+        self.conv = nn.Conv2d(in_ch, bits, kernel_size=1, bias=False)
         self.sign = Sign()
         self.tanh = nn.Tanh()
         self.use_binarizer = use_binarizer
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x = self.conv(x)
         x = self.tanh(x)
         if self.use_binarizer:
@@ -155,7 +172,7 @@ class UNet(nn.Module):
         self.outconv = outconv(64 // shrink, n_channels // 2)
         self.tanh = nn.Tanh()
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
@@ -170,11 +187,11 @@ class UNet(nn.Module):
 
 
 class SimpleRevNet(nn.Module):
-    def __init__(self, channels: int, num_blocks: int = 6):
+    def __init__(self, channels: int, num_blocks: int = 6) -> None:
         super().__init__()
         self.model = nn.Sequential(
             revnet_block(channels) for _ in range(num_blocks)
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.model(x)

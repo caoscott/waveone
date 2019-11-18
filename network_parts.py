@@ -71,8 +71,8 @@ class up(nn.Module):
         x1 = self.up(x1)
         diff_x = x1.size()[2] - x2.size()[2]
         diff_y = x1.size()[3] - x2.size()[3]
-        x2 = F.pad(x2, (diff_x // 2, int(diff_x / 2),
-                        diff_y // 2, int(diff_y / 2)))
+        x2 = F.pad(x2, [diff_x // 2, int(diff_x / 2),
+                        diff_y // 2, int(diff_y / 2)])
         x = torch.cat([x2, x1], dim=1)
         x = self.conv(x)
         return x
@@ -114,17 +114,17 @@ class SignFunction(Function):
     """
 
     @staticmethod
-    def forward(
+    def forward(  # type: ignore
         ctx: torch.Tensor,
         x: torch.Tensor,
         is_training: bool = True
-    ) -> torch.Tensor:  # type: ignore
+    ) -> torch.Tensor:
         # Apply quantization noise while only training
         if is_training:
-            prob = x.new(x.size()).uniform_()
+            prob = x.new(x.size()).uniform_()  # type: ignore
             x = x.clone()
-            x[(1 - x) / 2 <= prob] = 1
-            x[(1 - x) / 2 > prob] = -1
+            x[(1 - x) / 2 <= prob] = 1  # type: ignore
+            x[(1 - x) / 2 > prob] = -1  # type: ignore
             return x
         else:
             return x.sign()
@@ -138,11 +138,11 @@ class SignFunction(Function):
 
 class Sign(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
-        return SignFunction.apply(x, self.training)
+        return SignFunction.apply(x, self.training)  # type: ignore
 
 
 class LambdaModule(nn.Module):
-    def __init__(self, lambd: Callable[torch.Tensor, torch.Tensor]) -> None:
+    def __init__(self, lambd: Callable[[torch.Tensor], torch.Tensor]) -> None:
         super().__init__()
         self.lambd = lambd
 
