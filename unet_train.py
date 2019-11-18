@@ -69,7 +69,7 @@ def train(args) -> List[nn.Module]:
 
     ############### Model ###############
     network = UNet(6, shrink=1).cuda()
-    nets = [network]
+    nets: List[nn.Module] = [network]
     names = ["unet"]
     solver = optim.Adam(
         network.parameters(),
