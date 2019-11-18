@@ -166,29 +166,25 @@ def train(args) -> List[nn.Module]:
         eval_name: str,
         eval_loader: data.DataLoader,
         reuse_reconstructed: bool = True,
-    ) -> None:
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        prefix = "" if not reuse_reconstructed else "vcii_"
+
         for net in nets:
             net.eval()
 
         with torch.no_grad():
-            total_scores: Dict[str, float] = defaultdict(float)
             eval_iterator = iter(eval_loader)
-            frame1 = next(eval_iterator)[0].cuda()
+            frame1 = next(eval_iterator)[0]
+            frames = [frame1]
+            reconstructed_frames = []
+            frame1 = frame1.cuda()
+
             for eval_iter, (frame2,) in enumerate(eval_iterator):
+                frames.append(frame2)
                 frame2 = frame2.cuda()
                 residuals = network(torch.cat((frame1, frame2), dim=1))
                 reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
-
-                prefix = "" if not reuse_reconstructed else "vcii_"
-                total_scores = add_dict(total_scores, eval_scores(
-                    [frame1], [frame2],
-                    prefix + "eval_baseline",
-                ))
-                total_scores = add_dict(total_scores, eval_scores(
-                    [frame2], [reconstructed_frame2],
-                    prefix + "eval_reconstructed",
-                ))
-
+                reconstructed_frames.append(reconstructed_frame2.cpu())
                 if args.save_out_img:
                     save_tensor_as_img(
                         frame2, f"{prefix}{epoch}_{eval_iter}_frame")
@@ -203,8 +199,12 @@ def train(args) -> List[nn.Module]:
                 else:
                     frame1 = frame2
 
-            total_scores = {k: v/len(eval_loader.dataset)
-                            for k, v in total_scores.items()}
+            scores = {
+                **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
+                **eval_scores(frames[1:], reconstructed_frames,
+                              prefix + "eval_reconstructed"),
+            }
+            total_scores = {k: v/len(frames) for k, v in scores.items()}
             print(f"{eval_name} epoch {epoch}:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
