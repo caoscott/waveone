@@ -197,7 +197,7 @@ def train(args) -> List[nn.Module]:
                 else:
                     frame1 = frame2
 
-            scores = {
+            total_scores = {
                 **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
                 **eval_scores(frames[1:], reconstructed_frames,
                               prefix + "eval_reconstructed"),
