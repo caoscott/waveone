@@ -87,6 +87,7 @@ def contrast_cv2(imgs):
     contrast_factor = np.random.random() * 0.5 + 0.75
     out_imgs = []
     for img in imgs:
+        print(img.shape)
         mean = round(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY).mean())
         im = (1-contrast_factor)*mean + contrast_factor * im
         im = im.clip(min=0, max=255)
