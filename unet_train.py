@@ -1,7 +1,7 @@
 import logging
 import os
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, Iterator, List, Tuple
 
 import torch
 import torch.nn as nn
@@ -19,7 +19,7 @@ from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
 from waveone.train_options import parser
 
 
-def create_directories(dir_names):
+def create_directories(dir_names: Tuple[str, ...]) -> None:
     for dir_name in dir_names:
         if not os.path.exists(dir_name):
             print("Creating directory %s." % dir_name)
@@ -110,8 +110,8 @@ def train(args) -> List[nn.Module]:
 
     ############### Eval ###################
     def eval_scores(
-        frames1: torch.Tensor,
-        frames2: torch.Tensor,
+        frames1: List[torch.Tensor],
+        frames2: List[torch.Tensor],
         prefix: str,
     ) -> Dict[str, torch.Tensor]:
         assert len(frames1) == len(frames2)
@@ -124,11 +124,19 @@ def train(args) -> List[nn.Module]:
         return {f"{prefix}_l1": l1/frame_len,
                 f"{prefix}_msssim": msssim/frame_len}
 
-    def plot_scores(writer, scores, train_iter):
+    def plot_scores(
+        writer: SummaryWriter,
+        scores: Dict[str, torch.Tensor],
+        train_iter: int
+    ) -> None:
         for key, value in scores.items():
             writer.add_scalar(key, value, train_iter)
 
-    def get_score_diffs(scores, prefixes, prefix_type):
+    def get_score_diffs(
+        scores: Dict[str, torch.Tensor],
+        prefixes: List[str],
+        prefix_type: str,
+    ) -> Dict[sstr, torch.Tensor]:
         score_diffs = {}
         for score_type in ("msssim", "l1"):
             for prefix in prefixes:
@@ -138,7 +146,7 @@ def train(args) -> List[nn.Module]:
                             ] = prefix_score - baseline_score
         return score_diffs
 
-    def print_scores(scores):
+    def print_scores(scores: Dict[str, torch.Tensor]) -> None:
         for key, value in scores.items():
             print(f"{key}: {value.item() :.6f}")
         print("")
@@ -200,7 +208,7 @@ def train(args) -> List[nn.Module]:
             print(f"{eval_name} epoch {epoch}:")
             plot_scores(writer, total_scores, epoch)
             score_diffs = get_score_diffs(
-                total_scores, ("reconstructed",), prefix + "eval")
+                total_scores, ["reconstructed"], prefix + "eval")
             print_scores(score_diffs)
             plot_scores(writer, score_diffs, epoch)
 
@@ -217,7 +225,12 @@ def train(args) -> List[nn.Module]:
         resume()
         just_resumed = True
 
-    def train_loop(frames):
+    def train_loop(
+        frames: torch.Tensor
+    ) -> Iterator[Tuple[
+        int, Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        int, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+    ]:
         for net in nets:
             net.train()
         solver.zero_grad()
@@ -272,7 +285,7 @@ def train(args) -> List[nn.Module]:
         writer.add_scalar("training_loss", loss.item(), train_iter)
         writer.add_scalar("lr", solver.param_groups[0]["lr"], train_iter)
         plot_scores(writer, scores, train_iter)
-        score_diffs = get_score_diffs(scores, ("reconstructed",), "train")
+        score_diffs = get_score_diffs(scores, ["reconstructed"], "train")
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):

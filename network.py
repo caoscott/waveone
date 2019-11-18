@@ -80,7 +80,7 @@ class BitToFlowDecoder(nn.Module):
             BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
         # f = self.flow(x).permute(0, 2, 3, 1) + \
         # F.affine_grid(identity_theta, r.shape)
-        f = F.affine_grid(identity_theta, r.shape)
+        f = F.affine_grid(identity_theta, r.shape)  # type: ignore
         return f, r, context_vec
 
 
@@ -131,7 +131,7 @@ class ContextToFlowDecoder(nn.Module):
             ContextToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
         # f = self.flow(x).permute(0, 2, 3, 1) + \
         # F.affine_grid(identity_theta, r.shape)
-        f = F.affine_grid(identity_theta, r.shape)
+        f = F.affine_grid(identity_theta, r.shape)  # type: ignore
         return f, r, context
 
 
@@ -189,7 +189,7 @@ class UNet(nn.Module):
 class SimpleRevNet(nn.Module):
     def __init__(self, channels: int, num_blocks: int = 6) -> None:
         super().__init__()
-        self.model = nn.Sequential(
+        self.model = nn.Sequential(  # type: ignore
             revnet_block(channels) for _ in range(num_blocks)
         )
 
