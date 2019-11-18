@@ -77,6 +77,23 @@ def flip_cv2(imgs):
     return imgs
 
 
+def brightness_cv2(imgs):
+    brightness_factor = np.random.random() * 0.5 + 0.75
+    return [(img*brightness_factor).clip(min=0, max=255).astype(img.dtype)
+            for img in imgs]
+
+
+def contrast_cv2(imgs):
+    contrast_factor = np.random.random() * 0.5 + 0.75
+    out_imgs = []
+    for img in imgs:
+        mean = round(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY).mean())
+        im = (1-contrast_factor)*mean + contrast_factor * im
+        im = im.clip(min=0, max=255)
+        out_imgs.append(im.astype(img.dtype))
+    return out_imgs
+
+
 def np_to_torch(img):
     img = np.swapaxes(img, 0, 1)  # w, h, 9
     img = np.swapaxes(img, 0, 2)  # 9, h, w
@@ -106,7 +123,7 @@ class ImageFolder(data.Dataset):
 
         for filename in sorted(glob.iglob(self.root + '/*png')):
             if os.path.isfile(filename):
-                img = default_loader(filename).astype(np.float64) / 255 - 0.5
+                img = default_loader(filename).astype(np.float64)
                 assert img.max() <= 0.5
                 assert img.min() >= -0.5
                 self.imgs.append(img)
@@ -131,7 +148,7 @@ class ImageFolder(data.Dataset):
 
         if self.is_train:
             # If use_bmv, * -1.0 on bmv for flipped images.
-            imgs = flip_cv2(imgs)
+            imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
 
         # CV2 cropping in CPU is faster.
         if self.args.patch and self.is_train:
@@ -139,7 +156,7 @@ class ImageFolder(data.Dataset):
             # imgs = [crop_cv2(img, self.args.patch) for img in imgs]
             imgs = multi_crop_cv2(imgs, self.args.patch)
 
-        imgs = tuple(np_to_torch(img) for img in imgs)
+        imgs = tuple(np_to_torch(img / 255 - 0.5) for img in imgs)
 
         assert len(imgs) == self.frame_len
         return imgs
