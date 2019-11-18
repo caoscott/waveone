@@ -212,7 +212,7 @@ def train(args) -> List[nn.Module]:
             print_scores(score_diffs)
             plot_scores(writer, score_diffs, epoch)
 
-            scheduler.step()
+            scheduler.step()  # type: ignore
 
             return total_scores, score_diffs
 
@@ -226,10 +226,10 @@ def train(args) -> List[nn.Module]:
         just_resumed = True
 
     def train_loop(
-        frames: torch.Tensor
+        frames: Tuple[torch.Tensor, ...]
     ) -> Iterator[Tuple[
-        int, Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-        int, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+        float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
     ]:
         for net in nets:
             net.train()
@@ -264,9 +264,11 @@ def train(args) -> List[nn.Module]:
                     frame2[min_batch_l2_idx].cpu(),
                     reconstructed_frame2[min_batch_l2_idx].detach().cpu(),
                 )
+                max_l2: float = max_batch_l2.item()  # type: ignore
+                min_l2: float = min_batch_l2.item()  # type: ignore
                 yield (
-                    max_batch_l2.item(), max_batch_l2_frames,
-                    min_batch_l2.item(), min_batch_l2_frames,
+                    max_l2, max_batch_l2_frames,
+                    min_l2, min_batch_l2_frames,
                 )
 
             log_flow_context_residuals(writer, torch.abs(frame2 - frame1))
