@@ -226,11 +226,8 @@ def train(args) -> List[nn.Module]:
         just_resumed = True
 
     def train_loop(
-        frames: Tuple[torch.Tensor, ...]
-    ) -> Iterator[Tuple[
-        float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-        float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
-    ]:
+        frames: List[torch.Tensor]
+    ) -> Iterator[Tuple[float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]]:
         for net in nets:
             net.train()
         solver.zero_grad()
@@ -238,7 +235,7 @@ def train(args) -> List[nn.Module]:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
-        loss = 0.
+        loss: torch.Tensor = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
         for frame2 in frames[1:]:
@@ -253,23 +250,13 @@ def train(args) -> List[nn.Module]:
                 batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
                     dim=-1).mean(dim=-1).mean(dim=-1).cpu()
                 max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
-                min_batch_l2, min_batch_l2_idx = torch.min(batch_l2, dim=0)
                 max_batch_l2_frames = (
                     frame1[max_batch_l2_idx].cpu(),
                     frame2[max_batch_l2_idx].cpu(),
                     reconstructed_frame2[max_batch_l2_idx].detach().cpu(),
                 )
-                min_batch_l2_frames = (
-                    frame1[min_batch_l2_idx].cpu(),
-                    frame2[min_batch_l2_idx].cpu(),
-                    reconstructed_frame2[min_batch_l2_idx].detach().cpu(),
-                )
                 max_l2: float = max_batch_l2.item()  # type: ignore
-                min_l2: float = min_batch_l2.item()  # type: ignore
-                yield (
-                    max_l2, max_batch_l2_frames,
-                    min_l2, min_batch_l2_frames,
-                )
+                yield max_l2, max_batch_l2_frames
 
             log_flow_context_residuals(writer, torch.abs(frame2 - frame1))
 
@@ -285,41 +272,32 @@ def train(args) -> List[nn.Module]:
         solver.step()
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
-        writer.add_scalar("lr", solver.param_groups[0]["lr"], train_iter)
+        writer.add_scalar(
+            "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
         plot_scores(writer, scores, train_iter)
         score_diffs = get_score_diffs(scores, ["reconstructed"], "train")
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
         max_epoch_l2 = 0.
-        min_epoch_l2 = float("inf")
         max_epoch_l2_frames = (None, None, None)
-        min_epoch_l2_frames = (None, None, None)
 
         for frames in train_loader:
             train_iter += 1
-            for (max_batch_l2, max_batch_l2_frames,
-                 min_batch_l2, min_batch_l2_frames) in train_loop(frames):
+            for (max_batch_l2, max_batch_l2_frames) in train_loop(frames):
                 if max_epoch_l2 < max_batch_l2:
                     max_epoch_l2 = max_batch_l2
                     max_epoch_l2_frames = max_batch_l2_frames
-                if min_epoch_l2 > min_batch_l2:
-                    min_epoch_l2 = min_batch_l2
-                    min_epoch_l2_frames = min_batch_l2_frames
 
         if args.save_out_img:
-            for name, epoch_l1_frames, epoch_l1 in (
-                    ("max_l2", max_epoch_l2_frames, max_epoch_l2),
-                    # ("min_l2", min_epoch_l2_frames, min_epoch_l2),
-            ):
-                save_tensor_as_img(
-                    epoch_l1_frames[1],
-                    f"{epoch_l1 :.6f}_{epoch}_{name}_frame"
-                )
-                save_tensor_as_img(
-                    epoch_l1_frames[2],
-                    f"{epoch_l1 :.6f}_{epoch}_{name}_reconstructed"
-                )
+            save_tensor_as_img(
+                max_epoch_l2_frames[1],
+                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame"
+            )
+            save_tensor_as_img(
+                max_epoch_l2_frames[2],
+                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed"
+            )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save()
