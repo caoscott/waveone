@@ -80,7 +80,7 @@ def multi_crop_cv2(imgs: List[np.ndarray], patch: int) -> List[np.ndarray]:
 
 
 def flip_cv2(imgs: List[np.ndarray]) -> List[np.ndarray]:
-    if random.random() < 0.5:
+    if random.random() < 0.5:  # type: ignore
         imgs = [img[::-1].copy() for img in imgs]
 
         # assert img.shape[2] == 13, img.shape
@@ -144,15 +144,15 @@ class ImageListFolder(data.Dataset):
             if self.args.patch:
                 imgs = multi_crop_cv2(imgs, self.args.patch)
 
-        imgs: List[torch.Tensor] = [np_to_torch(img.astype(np.float64) / 255 - 0.5)
-                                    for img in imgs]
+        frames: List[torch.Tensor] = [np_to_torch(img.astype(np.float64) / 255 - 0.5)
+                                      for img in imgs]
 
-        for img in imgs:
-            assert img.max() <= 0.5  # type: ignore
-            assert img.min() >= -0.5  # type: ignore
-        assert len(imgs) == self.frame_len
+        for frame in frames:
+            assert frame.max() <= 0.5  # type: ignore
+            assert frame.min() >= -0.5  # type: ignore
+        assert len(frames) == self.frame_len
 
-        return imgs
+        return frames
 
     def __len__(self) -> int:
         length = self.sampling_range or self.frame_len
