@@ -124,8 +124,6 @@ class ImageFolder(data.Dataset):
         for filename in sorted(glob.iglob(self.root + '/*png')):
             if os.path.isfile(filename):
                 img = default_loader(filename).astype(np.float64)
-                assert img.max() <= 0.5
-                assert img.min() >= -0.5
                 self.imgs.append(img)
                 self.fns.append(filename)
 
@@ -157,6 +155,9 @@ class ImageFolder(data.Dataset):
             imgs = multi_crop_cv2(imgs, self.args.patch)
 
         imgs = tuple(np_to_torch(img / 255 - 0.5) for img in imgs)
+        for img in imgs:
+            assert img.max() <= 0.5
+            assert img.min() >= 0.5
 
         assert len(imgs) == self.frame_len
         return imgs
