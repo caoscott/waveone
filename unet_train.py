@@ -210,8 +210,6 @@ def train(args) -> List[nn.Module]:
             print_scores(score_diffs)
             plot_scores(writer, score_diffs, epoch)
 
-            scheduler.step()  # type: ignore
-
             return total_scores, score_diffs
 
     ############### Training ###############
@@ -300,6 +298,7 @@ def train(args) -> List[nn.Module]:
                 for eval_name, eval_loader in eval_loaders.items():
                     run_eval(eval_name, eval_loader, reuse_reconstructed=True)
                     run_eval(eval_name, eval_loader, reuse_reconstructed=False)
+                scheduler.step()  # type: ignore
                 just_resumed = False
 
     print('Training done.')
