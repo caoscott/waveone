@@ -130,11 +130,15 @@ class ImageListFolder(data.Dataset):
         self.sampling_range = sampling_range
         self.args = args
 
+        assert frame_len > 0
+        assert sampling_range == 0 or sampling_range >= frame_len
+        assert len(self.imgs) >= self.frame_len
+
     def __getitem__(self, index: int) -> List[torch.Tensor]:
         imgs: List[np.ndarray] = []
         if self.sampling_range:
-            offsets = np.random.permutation(
-                self.sampling_range)[:self.frame_len]
+            idx_sampling_range = min(self.sampling_range, len(self.imgs)-index)
+            offsets = np.random.permutation(idx_sampling_range)[:self.frame_len]
             imgs = [self.imgs[index + offset] for offset in offsets]
         else:
             imgs = self.imgs[index: index+self.frame_len]
@@ -155,9 +159,7 @@ class ImageListFolder(data.Dataset):
         return frames
 
     def __len__(self) -> int:
-        length = self.sampling_range or self.frame_len
-        return (0 if len(self.imgs) < length
-                else len(self.imgs) - length + 1)
+        return len(self.imgs) - self.frame_len + 1
 
 
 class ImageFolder(data.Dataset):
@@ -193,8 +195,9 @@ class ImageFolder(data.Dataset):
     def __getitem__(self, index):
         imgs = []
         if self.sampling_range:
+            idx_sampling_range = min(self.sampling_range, len(self.imgs)-index)
             offsets = np.random.permutation(
-                self.sampling_range)[:self.frame_len]
+                idx_sampling_range)[:self.frame_len]
             imgs = [self.imgs[index + offset] for offset in offsets]
         else:
             imgs = self.imgs[index: index+self.frame_len]
@@ -227,6 +230,4 @@ class ImageFolder(data.Dataset):
     def __len__(self):
         # return len(self.imgs) * (len(self.imgs) - 1) // 2 \
         #     if self.frame_len > 1 else len(self.imgs) - 1
-        length = self.sampling_range or self.frame_len
-        return (0 if len(self.imgs) < length
-                else len(self.imgs) - length + 1)
+        return len(self.imgs) - self.frame_len + 1
