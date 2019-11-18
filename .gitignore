@@ -4,3 +4,4 @@ temp.ipynb
 __pycache__
 .pyre*
 .mypy*
+.pytest*

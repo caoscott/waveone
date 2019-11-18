@@ -36,10 +36,10 @@ def add_dict(
 
 
 def save_tensor_as_img(
-    t: torch.Tensor,
-    name: str,
-    args: argparse.Namespace,
-    extension: str = "png"
+        t: torch.Tensor,
+        name: str,
+        args: argparse.Namespace,
+        extension: str = "png",
 ) -> None:
     output_dir = os.path.join(args.out_dir, args.save_model_name)
     save_image(t + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
@@ -48,9 +48,9 @@ def save_tensor_as_img(
 
 
 def eval_scores(
-    frames1: List[torch.Tensor],
-    frames2: List[torch.Tensor],
-    prefix: str,
+        frames1: List[torch.Tensor],
+        frames2: List[torch.Tensor],
+        prefix: str,
 ) -> Dict[str, torch.Tensor]:
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
@@ -64,6 +64,14 @@ def eval_scores(
         msssim += msssim_fn(frame1, frame2)
     return {f"{prefix}_l1": l1/frame_len,
             f"{prefix}_msssim": msssim/frame_len}
+
+
+def forward_model(
+        network: nn.Module, frame1: torch.Tensor, frame2: torch.Tensor,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    residuals = network(torch.cat((frame1, frame2), dim=1))
+    reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
+    return residuals, reconstructed_frame2
 
 
 def run_eval(
@@ -88,8 +96,7 @@ def run_eval(
         for eval_iter, (frame2,) in enumerate(eval_iterator):
             frames.append(frame2)
             frame2 = frame2.cuda()
-            residuals = network(torch.cat((frame1, frame2), dim=1))
-            reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
+            _, reconstructed_frame2 = forward_model(network, frame1, frame2)
             reconstructed_frames.append(reconstructed_frame2.cpu())
             if args.save_out_img:
                 save_tensor_as_img(
@@ -242,7 +249,7 @@ def train(args) -> List[nn.Module]:
         just_resumed = True
 
     def train_loop(
-        frames: List[torch.Tensor]
+            frames: List[torch.Tensor],
     ) -> Iterator[Tuple[float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]]:
         for net in nets:
             net.train()
