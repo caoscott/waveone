@@ -12,8 +12,8 @@ import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
-from waveone.dataset import get_loader
-from waveone.losses import MSSSIM, CharbonnierLoss
+from waveone.dataset import get_loaders
+from waveone.losses import MSSSIM
 from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
                              ContextToFlowDecoder, Encoder, UNet)
 from waveone.train_options import parser
@@ -49,22 +49,20 @@ def train(args) -> List[nn.Module]:
     print(args)
     ############### Data ###############
 
-    train_loader = get_loader(
+    train_loaders = get_loaders(
         is_train=True,
         root=args.train,
         frame_len=6,
         sampling_range=12,
         args=args
     )
-    eval_loaders = {
-        'TVL': get_loader(
-            is_train=False,
-            root=args.eval,
-            frame_len=1,
-            sampling_range=0,
-            args=args,
-        ),
-    }
+    eval_loaders = get_loaders(
+        is_train=False,
+        root=args.eval,
+        frame_len=1,
+        sampling_range=0,
+        args=args,
+    )
     writer = SummaryWriter()
 
     ############### Model ###############
@@ -280,28 +278,29 @@ def train(args) -> List[nn.Module]:
 
     for epoch in range(args.max_train_epochs):
 
-        for frames in train_loader:
-            train_iter += 1
-            max_epoch_l2, max_epoch_l2_frames = max(train_loop(frames))
+        for _, train_loader in train_loaders.items():
+            for frames in train_loader:
+                train_iter += 1
+                max_epoch_l2, max_epoch_l2_frames = max(train_loop(frames))
 
-        if args.save_out_img:
-            save_tensor_as_img(
-                max_epoch_l2_frames[1],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame"
-            )
-            save_tensor_as_img(
-                max_epoch_l2_frames[2],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed"
-            )
+            if args.save_out_img:
+                save_tensor_as_img(
+                    max_epoch_l2_frames[1],
+                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame"
+                )
+                save_tensor_as_img(
+                    max_epoch_l2_frames[2],
+                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed"
+                )
 
-        if (epoch + 1) % args.checkpoint_epochs == 0:
-            save()
+            if (epoch + 1) % args.checkpoint_epochs == 0:
+                save()
 
-        if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            for eval_name, eval_loader in eval_loaders.items():
-                run_eval(eval_name, eval_loader, reuse_reconstructed=True)
-                run_eval(eval_name, eval_loader, reuse_reconstructed=False)
-            just_resumed = False
+            if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
+                for eval_name, eval_loader in eval_loaders.items():
+                    run_eval(eval_name, eval_loader, reuse_reconstructed=True)
+                    run_eval(eval_name, eval_loader, reuse_reconstructed=False)
+                just_resumed = False
 
     print('Training done.')
     logging.shutdown()
