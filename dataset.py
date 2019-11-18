@@ -4,7 +4,7 @@ import os
 import os.path
 import random
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import DefaultDict, Dict, List, Tuple
 
 import cv2
 import numpy as np
@@ -20,7 +20,7 @@ def get_loaders(is_train: bool, root: str, frame_len: int, sampling_range: int,
                 args) -> Dict[str, data.DataLoader]:
     print('Creating loader for %s...' % root)
 
-    id_to_images = defaultdict(list)
+    id_to_images: DefaultDict[str, List[np.ndarray]] = defaultdict(list)
     for filename in sorted(glob.iglob(root + '/*png')):
         if os.path.isfile(filename):
             vid_id = "_".join(filename.split("_")[:-1])
@@ -39,7 +39,7 @@ def get_loaders(is_train: bool, root: str, frame_len: int, sampling_range: int,
             num_workers=2,
             drop_last=is_train,
         )
-        id_to_loaders[id] = loader
+        id_to_loaders[vid_id] = loader
         print('Loader for {} images ({} batches) created.'.format(
             len(dataset), len(loader))
         )
@@ -62,10 +62,11 @@ def default_loader(path: str) -> np.ndarray:
     return cv2_img
 
 
-def crop_cv2(img: List[np.ndarray], patch: int) -> np.ndarray:
+def crop_cv2(img: np.ndarray, patch: int) -> np.ndarray:
     height, width, _ = img.shape
     start_x = random.randint(0, height - patch)
     start_y = random.randint(0, width - patch)
+    # type: ignore
     return img[start_x: start_x + patch, start_y: start_y + patch]
 
 
@@ -73,7 +74,7 @@ def multi_crop_cv2(imgs: List[np.ndarray], patch: int) -> List[np.ndarray]:
     height, width, _ = imgs[0].shape
     start_x = random.randint(0, height - patch)
     start_y = random.randint(0, width - patch)
-    return [img[start_x: start_x + patch, start_y: start_y + patch]
+    return [img[start_x: start_x + patch, start_y: start_y + patch]  # type: ignore
             for img in imgs]
 
 
