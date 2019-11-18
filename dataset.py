@@ -2,6 +2,8 @@ import glob
 import os
 import os.path
 import random
+from collections import defaultdict
+from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
@@ -9,31 +11,39 @@ import torch
 import torch.utils.data as data
 
 
-def get_loader(is_train: bool, root: str, frame_len: int, sampling_range: int,
-               args) -> data.DataLoader:
-    # print('\nCreating loader for %s...' % root)
+def get_vid_id(filename: str) -> str:
+    return "_".join(filename.split("_")[:-1])
 
-    dset = ImageFolder(
-        is_train=is_train,
-        root=root,
-        args=args,
-        sampling_range=sampling_range,
-        frame_len=frame_len,
-    )
 
-    loader = data.DataLoader(
-        dataset=dset,
-        batch_size=args.batch_size if is_train else args.eval_batch_size,
-        shuffle=is_train,
-        num_workers=0,
-        drop_last=is_train,
-    )
+def get_loaders(is_train: bool, root: str, frame_len: int, sampling_range: int,
+                args) -> Dict[str, data.DataLoader]:
+    print('Creating loader for %s...' % root)
 
-    print('Loader for {} images ({} batches) created.'.format(
-        len(dset), len(loader))
-    )
+    id_to_images = defaultdict(list)
+    for filename in sorted(glob.iglob(root + '/*png')):
+        if os.path.isfile(filename):
+            vid_id = "_".join(filename.split("_")[:-1])
+            img = default_loader(filename)
+            id_to_images[vid_id].append(img)
 
-    return loader
+    id_to_loaders: Dict[str, data.DataLoader] = {}
+    for vid_id, imgs in id_to_images.items():
+        dataset = ImageListFolder(
+            imgs, is_train, frame_len, sampling_range, args
+        )
+        loader = data.DataLoader(
+            dataset,
+            batch_size=args.batch_size if is_train else args.eval_batch_size,
+            shuffle=is_train,
+            num_workers=2,
+            drop_last=is_train,
+        )
+        id_to_loaders[id] = loader
+        print('Loader for {} images ({} batches) created.'.format(
+            len(dataset), len(loader))
+        )
+
+    return id_to_loaders
 
 
 def default_loader(path: str):
@@ -101,11 +111,58 @@ def np_to_torch(img):
     return torch.from_numpy(img).float()
 
 
+class ImageListFolder(data.Dataset):
+    def __init__(
+        self,
+        imgs: List[np.ndarray],
+        is_train: bool,
+        frame_len: int = 5,
+        sampling_range: int = 0,
+        args,
+    ) -> None:
+        super().__init__()
+        self.imgs = imgs
+        self.is_train = is_train
+        self.frame_len = frame_len
+        self.sampling_range = sampling_range
+        self.args = args
+
+    def __getitem__(self, index: int) -> List[torch.Tensor]:
+        imgs = []
+        if self.sampling_range:
+            offsets = np.random.permutation(
+                self.sampling_range)[:self.frame_len]
+            imgs = [self.imgs[index + offset] for offset in offsets]
+        else:
+            imgs = self.imgs[index: index+self.frame_len]
+
+        if self.is_train:
+            imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
+            if self.args.patch:
+                imgs = multi_crop_cv2(imgs, self.args.patch)
+
+        imgs = [np_to_torch(img.astype(np.float64) / 255 - 0.5)
+                for img in imgs]
+
+        for img in imgs:
+            assert img.max() <= 0.5
+            assert img.min() >= -0.5
+        assert len(imgs) == self.frame_len
+
+        return imgs
+
+    def __len__(self) -> int:
+        length = self.sampling_range or self.frame_len
+        return (0 if len(self.imgs) < length
+                else len(self.imgs) - length + 1)
+
+
 class ImageFolder(data.Dataset):
     """ ImageFolder can be used to load images where there are no labels."""
 
     def __init__(self, is_train: bool, root: str, args,
                  frame_len: int = 5, sampling_range: int = 0) -> None:
+        super().__init__()
         self.is_train = is_train
         self.root = root
         self.args = args
