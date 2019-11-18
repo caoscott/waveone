@@ -64,16 +64,17 @@ def default_loader(path: str) -> np.ndarray:
 
 def crop_cv2(img: np.ndarray, patch: int) -> np.ndarray:
     height, width, _ = img.shape
-    start_x = random.randint(0, height - patch)
-    start_y = random.randint(0, width - patch)
-    # type: ignore
-    return img[start_x: start_x + patch, start_y: start_y + patch]
+    start_x = random.randint(0, height - patch)  # type: ignore
+    start_y = random.randint(0, width - patch)  # type: ignore
+    return img[  # type: ignore
+        start_x: start_x + patch, start_y: start_y + patch
+    ]
 
 
 def multi_crop_cv2(imgs: List[np.ndarray], patch: int) -> List[np.ndarray]:
     height, width, _ = imgs[0].shape
-    start_x = random.randint(0, height - patch)
-    start_y = random.randint(0, width - patch)
+    start_x = random.randint(0, height - patch)  # type: ignore
+    start_y = random.randint(0, width - patch)  # type: ignore
     return [img[start_x: start_x + patch, start_y: start_y + patch]  # type: ignore
             for img in imgs]
 
@@ -107,7 +108,7 @@ def contrast_cv2(imgs: List[np.ndarray]) -> List[np.ndarray]:
     return out_imgs
 
 
-def np_to_torch(img: List[np.ndarray]) -> List[np.ndarray]:
+def np_to_torch(img: np.ndarray) -> torch.Tensor:
     img = np.swapaxes(img, 0, 1)  # w, h, 9
     img = np.swapaxes(img, 0, 2)  # 9, h, w
     return torch.from_numpy(img).float()
@@ -130,7 +131,7 @@ class ImageListFolder(data.Dataset):
         self.args = args
 
     def __getitem__(self, index: int) -> List[torch.Tensor]:
-        imgs = []
+        imgs: List[np.ndarray] = []
         if self.sampling_range:
             offsets = np.random.permutation(
                 self.sampling_range)[:self.frame_len]
@@ -143,12 +144,12 @@ class ImageListFolder(data.Dataset):
             if self.args.patch:
                 imgs = multi_crop_cv2(imgs, self.args.patch)
 
-        imgs = [np_to_torch(img.astype(np.float64) / 255 - 0.5)
-                for img in imgs]
+        imgs: List[torch.Tensor] = [np_to_torch(img.astype(np.float64) / 255 - 0.5)
+                                    for img in imgs]
 
         for img in imgs:
-            assert img.max() <= 0.5
-            assert img.min() >= -0.5
+            assert img.max() <= 0.5  # type: ignore
+            assert img.min() >= -0.5  # type: ignore
         assert len(imgs) == self.frame_len
 
         return imgs
