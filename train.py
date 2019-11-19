@@ -75,6 +75,7 @@ def forward_model(
     codes = binarizer(encoder(frame1, frame2, 0.))
     flows, residuals, _ = decoder((codes, 0.))
     flow_frame2 = F.grid_sample(frame1, flows)
+    assert torch.allclose(frame2, flow_frame2)
     reconstructed_frame2 = (flow_frame2 + residuals).clamp(-0.5, 0.5)
     return codes, flows, residuals, flow_frame2, reconstructed_frame2
 
@@ -348,7 +349,7 @@ def train(args) -> List[nn.Module]:
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
-        
+
         for _, train_loader in train_loaders.items():
             for frames in train_loader:
                 train_iter += 1
