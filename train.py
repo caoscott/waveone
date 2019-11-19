@@ -90,7 +90,7 @@ def run_eval(
         reuse_reconstructed: bool = True,
         fgsm: bool = False,
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
-    prefix = "" if not reuse_reconstructed else "vcii_"
+    prefix = "" if reuse_reconstructed else "vcii_"
     for net in nets:
         net.eval()
 
