@@ -69,16 +69,13 @@ def eval_scores(
 
 def forward_model(
         nets: List[nn.Module], frame1: torch.Tensor, frame2: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     encoder, binarizer, decoder = nets
     codes = binarizer(encoder(frame1, frame2, 0.))
-    _, residuals, _ = decoder((codes, 0.))
-    # flow_frame2 = F.grid_sample(frame1, flows)
-    # flow_frames.append(flow_frame2.cpu())
-
-    # reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
-    reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
-    return codes, residuals, reconstructed_frame2
+    flows, residuals, _ = decoder((codes, 0.))
+    flow_frame2 = F.grid_sample(frame1, flows)
+    reconstructed_frame2 = (flow_frame2 + residuals).clamp(-0.5, 0.5)
+    return codes, flows, residuals, flow_frame2, reconstructed_frame2
 
 
 def run_eval(
@@ -105,7 +102,9 @@ def run_eval(
         for eval_iter, (frame2,) in enumerate(eval_iterator):
             frames.append(frame2)
             frame2 = frame2.cuda()
-            _, _, reconstructed_frame2 = forward_model(nets, frame1, frame2)
+            _, _, _, _, reconstructed_frame2 = forward_model(
+                nets, frame1, frame2
+            )
             reconstructed_frames.append(reconstructed_frame2.cpu())
             if args.save_out_img:
                 save_tensor_as_img(
@@ -173,12 +172,6 @@ def train(args) -> List[nn.Module]:
     output_dir = os.path.join(args.out_dir, args.save_model_name)
     model_dir = os.path.join(args.model_dir, args.save_model_name)
     create_directories((output_dir, model_dir, log_dir))
-
-    # logging.basicConfig(
-    #     filename=os.path.join(log_dir, args.save_model_name + ".out"),
-    #     filemode="w",
-    #     level=logging.DEBUG,
-    # )
 
     print(args)
     ############### Data ###############
@@ -252,13 +245,13 @@ def train(args) -> List[nn.Module]:
 
     def log_flow_context_residuals(
         writer: SummaryWriter,
-        # flows: torch.Tensor,
+        flows: torch.Tensor,
         context_vec: torch.Tensor,
         residuals: torch.Tensor,
     ) -> None:
-        # flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-        # flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values
-        # flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values
+        flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
+        flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values
+        flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values
 
         writer.add_scalar("mean_context_vec_norm",
                           context_vec.mean().item(), train_iter)
@@ -266,18 +259,18 @@ def train(args) -> List[nn.Module]:
                           context_vec.max().item(), train_iter)
         writer.add_scalar("min_context_vec_norm",
                           context_vec.min().item(), train_iter)
-        # writer.add_scalar(
-        #     "mean_flow_x", flows_mean[0].item(), train_iter)
-        # writer.add_scalar(
-        #     "mean_flow_y", flows_mean[1].item(), train_iter)
-        # writer.add_scalar(
-        #     "max_flow_x", flows_max[0].item(), train_iter)
-        # writer.add_scalar(
-        #     "max_flow_y", flows_max[1].item(), train_iter)
-        # writer.add_scalar(
-        #     "min_flow_x", flows_min[0].item(), train_iter)
-        # writer.add_scalar(
-        #     "min_flow_y", flows_min[1].item(), train_iter)
+        writer.add_scalar(
+            "mean_flow_x", flows_mean[0].item(), train_iter)
+        writer.add_scalar(
+            "mean_flow_y", flows_mean[1].item(), train_iter)
+        writer.add_scalar(
+            "max_flow_x", flows_max[0].item(), train_iter)
+        writer.add_scalar(
+            "max_flow_y", flows_max[1].item(), train_iter)
+        writer.add_scalar(
+            "min_flow_x", flows_min[0].item(), train_iter)
+        writer.add_scalar(
+            "min_flow_y", flows_min[1].item(), train_iter)
         writer.add_scalar("mean_input_residuals",
                           residuals.mean().item(), train_iter)
         writer.add_scalar("max_input_residuals",
@@ -311,7 +304,9 @@ def train(args) -> List[nn.Module]:
         for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
-            _, residuals, reconstructed_frame2 = forward_model(nets, frame1, frame2)
+            _, flows, residuals, _, reconstructed_frame2 = forward_model(
+                nets, frame1, frame2
+            )
             reconstructed_frames.append(reconstructed_frame2.cpu())
             loss += loss_fn(reconstructed_frame2, frame2)
 
@@ -328,7 +323,7 @@ def train(args) -> List[nn.Module]:
                 yield max_l2, max_batch_l2_frames
 
             log_flow_context_residuals(
-                writer, torch.tensor(context_vec), torch.abs(frame2 - frame1))
+                writer, flows, torch.tensor(context_vec), torch.abs(frame2 - frame1))
 
             frame1 = reconstructed_frame2.detach()
 
