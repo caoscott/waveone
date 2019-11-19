@@ -69,7 +69,10 @@ def eval_scores(
 def forward_model(
         network: nn.Module, frame1: torch.Tensor, frame2: torch.Tensor,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    residuals = network(torch.cat((frame1, frame2), dim=1))
+    frames = torch.cat((frame1, frame2), dim=1)
+    assert frames.max() <= 0.5
+    assert frames.min() >= -0.5
+    residuals = network(frames)
     reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
     return residuals, reconstructed_frame2
 
@@ -264,8 +267,8 @@ def train(args) -> List[nn.Module]:
         for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
-            residuals = network(torch.cat((frame1, frame2), dim=1))
-            reconstructed_frame2 = frame1 + residuals
+            residuals, reconstructed_frame2 = forward_model(
+                network, frame1, frame2)
             reconstructed_frames.append(reconstructed_frame2.cpu())
             loss -= msssim_fn(reconstructed_frame2, frame2)
 
