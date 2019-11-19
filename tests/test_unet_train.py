@@ -4,7 +4,7 @@ from torch import nn
 
 from waveone.losses import MSSSIM
 from waveone.network_parts import LambdaModule
-from waveone.train import forward_model
+from waveone.unet_train import forward_model
 
 
 def test_forward_model_exact_residual():
