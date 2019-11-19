@@ -250,8 +250,8 @@ def train(args) -> List[nn.Module]:
         residuals: torch.Tensor,
     ) -> None:
         flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-        flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values
-        flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values
+        flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values  # type: ignore
+        flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values  # type: ignore
 
         writer.add_scalar("mean_context_vec_norm",
                           context_vec.mean().item(), train_iter)
