@@ -39,6 +39,8 @@ parser.add_argument('--batch-size', type=int, default=16,
                     help='Batch size.')
 parser.add_argument('--eval-batch-size', type=int, default=1,
                     help='Batch size for evaluation.')
+parser.add_argument('--loss', choices=['l1', 'l2', 'msssim'],
+                    help='Choose loss type.', default='msssim')
 
 # To save computation, we compute objective for multiple
 # crops for each forward pass.

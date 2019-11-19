@@ -17,6 +17,7 @@ from waveone.dataset import get_loaders
 from waveone.losses import MSSSIM
 from waveone.network import (AutoencoderUNet, Binarizer, BitToContextDecoder,
                              BitToFlowDecoder, ContextToFlowDecoder, Encoder)
+from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
 
@@ -207,6 +208,8 @@ def train(args) -> List[nn.Module]:
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
+    loss_fn = l2_loss_fn if args.loss == 'l2' else l1_loss_fn if args.loss == 'l1' \
+        else LambdaModule(lambda x: -msssim_fn(x))
 
    ############### Checkpoints ###############
 
@@ -270,7 +273,7 @@ def train(args) -> List[nn.Module]:
             residuals, reconstructed_frame2 = forward_model(
                 network, frame1, frame2)
             reconstructed_frames.append(reconstructed_frame2.cpu())
-            loss -= msssim_fn(reconstructed_frame2, frame2)
+            loss += loss_fn(reconstructed_frame2, frame2)
 
             with torch.no_grad():
                 batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
