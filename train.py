@@ -16,7 +16,8 @@ from torchvision.utils import save_image
 from waveone.dataset import get_loaders
 from waveone.losses import MSSSIM
 from waveone.network import (AutoencoderUNet, Binarizer, BitToContextDecoder,
-                             BitToFlowDecoder, ContextToFlowDecoder, Encoder)
+                             BitToFlowDecoder, ContextToFlowDecoder, Encoder,
+                             UNet)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -197,6 +198,7 @@ def train(args) -> List[nn.Module]:
                             #    args.patch // 2 or 144, args.patch // 2 or 176)
     # context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
     latent_vec_size = 512
+    unet = UNet(3, shrink=1)
     encoder = Encoder(6, latent_vec_size, use_context=False).cuda()
     # decoder = nn.Sequential(BitToContextDecoder(),
                             # ContextToFlowDecoder(3)).cuda()
@@ -244,10 +246,10 @@ def train(args) -> List[nn.Module]:
                 torch.save(net.state_dict(), checkpoint_path)
 
     def log_flow_context_residuals(
-        writer: SummaryWriter,
-        flows: torch.Tensor,
-        context_vec: torch.Tensor,
-        residuals: torch.Tensor,
+            writer: SummaryWriter,
+            flows: torch.Tensor,
+            context_vec: torch.Tensor,
+            residuals: torch.Tensor,
     ) -> None:
         flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
         flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values  # type: ignore
@@ -334,10 +336,8 @@ def train(args) -> List[nn.Module]:
         }
 
         loss.backward()
-        # for net in nets:
-        # if net is not None:
-        # torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
-
+        for net in nets:
+            torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
         solver.step()
 
         writer.add_scalar("training_loss", loss.item(), train_iter)

@@ -47,6 +47,30 @@ class Encoder(nn.Module):
         return self.encode(frames_x + context_x)
 
 
+# class FeatureEncoder(nn.Module):
+#     def __init__(self, out_ch: int, use_context: bool, shrink: int = 1) -> None:
+#         super().__init__()
+#         self.down2 = down(128 // shrink, 256 // shrink)
+#         self.down3 = down(256 // shrink, 512 // shrink)
+#         self.down4 = down(512 // shrink, 512 // shrink)
+#         self.use_context = use_context
+
+#     def forward(  # type: ignore
+#         self,
+#         frame1: torch.Tensor,
+#         frame2: torch.Tensor,
+#         context_vec: torch.Tensor
+#     ) -> torch.Tensor:
+#         # frames_x = torch.cat(
+#             # (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
+#         frames_x = torch.cat(
+#             (self.encode_frame1(frame2-frame1), self.encode_frame2(frame2-frame1)),
+#             dim=1
+#         )
+#         context_x = self.encode_context(context_vec) if self.use_context else 0.
+#         return self.encode(frames_x + context_x)
+
+
 class BitToFlowDecoder(nn.Module):
     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
@@ -187,9 +211,9 @@ class AutoencoderUNet(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, n_channels: int, shrink: int) -> None:
+    def __init__(self, in_ch: int, shrink: int) -> None:
         super().__init__()
-        self.inc = inconv(n_channels, 64 // shrink)
+        self.inc = inconv(in_ch, 64 // shrink)
         self.down1 = down(64 // shrink, 128 // shrink)
         self.down2 = down(128 // shrink, 256 // shrink)
         self.down3 = down(256 // shrink, 512 // shrink)
@@ -204,10 +228,10 @@ class UNet(nn.Module):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
-        out1 = self.up1(x5, x4)
-        out2 = self.up2(out1, x3)
-        out3 = self.up3(out2, x2)
-        return [out1, out2, out3]
+        out4 = self.up1(x5, x4)
+        out3 = self.up2(out4, x3)
+        out2 = self.up3(out3, x2)
+        return [out4, out3, out2]
 
 
 class SimpleRevNet(nn.Module):
