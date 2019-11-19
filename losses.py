@@ -138,7 +138,7 @@ class SSIM(torch.nn.Module):
 
         # Assume 1 channel for SSIM
         self.channel = 1
-        self.window = create_window(window_size)
+        self.window: torch.Tensor = create_window(window_size)
 
     def forward(self,   # type: ignore
                 img1: torch.Tensor,
