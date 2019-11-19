@@ -151,7 +151,7 @@ class SSIM(torch.nn.Module):
         else:
             window = create_window(self.window_size, channel).to(
                 img1.device).type(img1.dtype)
-            assert type(window) is torch.Tensor
+            assert isinstance(window, torch.Tensor)
             self.window = window
             self.channel = channel
 
