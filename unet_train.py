@@ -86,6 +86,7 @@ def run_eval(
         args: argparse.Namespace,
         writer: SummaryWriter,
         reuse_reconstructed: bool = True,
+        fgsm: bool = False,
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     prefix = "" if not reuse_reconstructed else "vcii_"
     network.eval()
@@ -264,7 +265,7 @@ def train(args) -> List[nn.Module]:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
-        loss: torch.Tensor = 0.  # type: ignore
+        loss = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
         for frame2 in frames[1:]:
