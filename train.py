@@ -71,9 +71,6 @@ def forward_model(
         nets: List[nn.Module], frame1: torch.Tensor, frame2: torch.Tensor,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     encoder, binarizer, decoder = nets
-    frames = torch.cat((frame1, frame2), dim=1)
-    assert frames.max() <= 0.5
-    assert frames.min() >= -0.5
     codes = binarizer(encoder(frame1, frame2, 0.))
     _, residuals, _ = decoder((codes, 0.))
     # flow_frame2 = F.grid_sample(frame1, flows)
