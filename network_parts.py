@@ -142,7 +142,7 @@ class Sign(nn.Module):
 
 
 class LambdaModule(nn.Module):
-    def __init__(self, lambd: Callable[[torch.Tensor, ...], torch.Tensor]) -> None:
+    def __init__(self, lambd: Callable[..., torch.Tensor]) -> None:
         super().__init__()
         self.lambd = lambd
 
