@@ -34,6 +34,7 @@ def ssim(img1: torch.Tensor,
          val_range: Union[int, float] = -1,
          ) -> Tuple[torch.Tensor, torch.Tensor]:
     # Value range can be different from 255. Other common ranges are 1 (sigmoid) and 2 (tanh).
+    L: Union[int, float] = 0
     if val_range < 0:
         if torch.max(img1) > 128:
             max_val = 255
@@ -93,31 +94,31 @@ def msssim(img1: torch.Tensor,
            normalize: bool = False,
            ) -> torch.Tensor:
     device = img1.device
-    weights = torch.FloatTensor(
+    weights = torch.tensor(
         [0.0448, 0.2856, 0.3001, 0.2363, 0.1333]).to(device)
     levels = weights.size()[0]
-    mssim = []
-    mcs = []
+    mssim_list = []
+    mcs_list = []
     for _ in range(levels):
         sim, cs = ssim(img1, img2, window_size=window_size,
                        size_average=size_average, full=True, val_range=val_range)
-        mssim.append(sim)
-        mcs.append(cs)
+        mssim_list.append(sim)
+        mcs_list.append(cs)
 
         img1 = F.avg_pool2d(img1, (2, 2))
         img2 = F.avg_pool2d(img2, (2, 2))
 
-    mssim = torch.stack(mssim)
-    mcs = torch.stack(mcs)
+    mssim = torch.stack(mssim_list)
+    mcs = torch.stack(mcs_list)
 
     # Normalize (to avoid NaNs during training unstable models,
     # not compliant with original definition)
     if normalize:
-        mssim = (mssim + 1) / 2
-        mcs = (mcs + 1) / 2
+        mssim = (mssim + 1) / 2  # type: ignore
+        mcs = (mcs + 1) / 2  # type: ignore
 
-    pow1 = mcs ** weights
-    pow2 = mssim ** weights
+    pow1 = mcs ** weights  # type: ignore
+    pow2 = mssim ** weights  # type: ignore
     # From Matlab implementation https://ece.uwaterloo.ca/~z70wang/research/iwssim/
     output = torch.prod(pow1[:-1]) * pow2[-1]
     return output
