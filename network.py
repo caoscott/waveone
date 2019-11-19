@@ -40,7 +40,7 @@ class Encoder(nn.Module):
         # frames_x = torch.cat(
             # (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
         frames_x = torch.cat(
-            (self.encode_frame1(frame2-frame1), self.encode_frame2(frame2-frame1)),
+            (self.encode_frame1(frame1), self.encode_frame2(frame2)),
             dim=1
         )
         context_x = self.encode_context(context_vec) if self.use_context else 0.
