@@ -1,5 +1,5 @@
 from math import exp
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import torch
@@ -9,8 +9,10 @@ import torch.nn.functional as F
 
 def gaussian(window_size: int, sigma: float) -> torch.Tensor:
     offset = 0.5 if window_size % 2 == 0 else 0
-    gauss = torch.Tensor(
-        [exp(-(x + offset - window_size//2)**2/(2.0*sigma**2)) for x in range(window_size)])
+    gauss = torch.tensor(
+        [exp(-(x + offset - window_size//2)**2/(2.0*sigma**2))
+         for x in range(window_size)]
+    )
     return gauss/gauss.sum()
 
 
@@ -29,7 +31,7 @@ def ssim(img1: torch.Tensor,
          window: torch.Tensor = None,
          size_average: bool = True,
          full: bool = False,
-         val_range: float = -1.,
+         val_range: Union[int, float] = -1,
          ) -> Tuple[torch.Tensor, torch.Tensor]:
     # Value range can be different from 255. Other common ranges are 1 (sigmoid) and 2 (tanh).
     if val_range < 0:
@@ -87,7 +89,7 @@ def msssim(img1: torch.Tensor,
            img2: torch.Tensor,
            window_size: int = 11,
            size_average: bool = True,
-           val_range: float = -1.,
+           val_range: Union[int, float] = -1,
            normalize: bool = False,
            ) -> torch.Tensor:
     device = img1.device
@@ -126,7 +128,7 @@ class SSIM(torch.nn.Module):
     def __init__(self,
                  window_size: int = 11,
                  size_average: bool = True,
-                 val_range: float = 1.
+                 val_range: Union[int, float] = -1,
                  ) -> None:
         super(SSIM, self).__init__()
         self.window_size = window_size
@@ -162,7 +164,7 @@ class MSSSIM(torch.nn.Module):
                  window_size: int = 11,
                  size_average: bool = True,
                  channel: int = 3,
-                 val_range: float = -1.,
+                 val_range: Union[int, float] = -1,
                  normalize: bool = False
                  ) -> None:
         super().__init__()
