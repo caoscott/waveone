@@ -157,7 +157,7 @@ class Binarizer(nn.Module):
             return x
 
 
-class UNet(nn.Module):
+class AutoencoderUNet(nn.Module):
     def __init__(self, n_channels: int, shrink: int) -> None:
         super().__init__()
         self.inc = inconv(n_channels, 64 // shrink)
@@ -183,7 +183,7 @@ class UNet(nn.Module):
         y3 = self.up3(y2, x2)
         y4 = self.up4(y3)
         y5 = self.outconv(y4)
-        return self.tanh(y5) / 2
+        return self.tanh(y5)
 
 
 class SimpleRevNet(nn.Module):

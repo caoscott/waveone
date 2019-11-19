@@ -84,11 +84,6 @@ def multi_crop_cv2(imgs: List[np.ndarray], patch: int) -> List[np.ndarray]:
 def flip_cv2(imgs: List[np.ndarray]) -> List[np.ndarray]:
     if random.random() < 0.5:  # type: ignore
         imgs = [img[::-1].copy() for img in imgs]
-
-        # assert img.shape[2] == 13, img.shape
-        # height first, and then width. but BMV is (width, height)... sorry..
-        # img[:, :, 9] = img[:, :, 9] * (-1.0)
-        # img[:, :, 11] = img[:, :, 11] * (-1.0)
     return imgs
 
 

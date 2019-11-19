@@ -1,7 +1,7 @@
 import logging
 import os
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, Iterator, List, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -13,13 +13,13 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
 from waveone.dataset import get_loader
-from waveone.losses import MSSSIM, CharbonnierLoss
+from waveone.losses import MSSSIM
 from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
-                             ContextToFlowDecoder, Encoder)
+                             ContextToFlowDecoder, Encoder, AutoencoderUNet)
 from waveone.train_options import parser
 
 
-def create_directories(dir_names):
+def create_directories(dir_names: Tuple[str, ...]) -> None:
     for dir_name in dir_names:
         if not os.path.exists(dir_name):
             print("Creating directory %s." % dir_name)

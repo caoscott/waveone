@@ -15,8 +15,8 @@ from torchvision.utils import save_image
 
 from waveone.dataset import get_loaders
 from waveone.losses import MSSSIM
-from waveone.network import (Binarizer, BitToContextDecoder, BitToFlowDecoder,
-                             ContextToFlowDecoder, Encoder, UNet)
+from waveone.network import (AutoencoderUNet, Binarizer, BitToContextDecoder,
+                             BitToFlowDecoder, ContextToFlowDecoder, Encoder)
 from waveone.train_options import parser
 
 
@@ -194,7 +194,7 @@ def train(args) -> List[nn.Module]:
     writer = SummaryWriter()
 
     ############### Model ###############
-    network = UNet(6, shrink=1).cuda()
+    network = AutoencoderUNet(6, shrink=1).cuda()
     nets: List[nn.Module] = [network]
     names = ["unet"]
     solver = optim.Adam(
