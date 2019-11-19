@@ -265,7 +265,7 @@ def train(args) -> List[nn.Module]:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
-        loss = 0.  # type: ignore
+        loss: torch.Tensor = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
         for frame2 in frames[1:]:

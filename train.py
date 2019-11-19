@@ -308,7 +308,7 @@ def train(args) -> List[nn.Module]:
         reconstructed_frames = []
         reconstructed_frame2 = None
 
-        loss = 0.  # type: ignore
+        loss: torch.Tensor = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
         for frame2 in frames[1:]:
@@ -331,7 +331,7 @@ def train(args) -> List[nn.Module]:
                 yield max_l2, max_batch_l2_frames
 
             log_flow_context_residuals(
-                writer, context_vec, torch.abs(frame2 - frame1))
+                writer, torch.tensor(context_vec), torch.abs(frame2 - frame1))
 
             frame1 = reconstructed_frame2.detach()
 
