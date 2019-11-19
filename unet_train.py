@@ -209,7 +209,7 @@ def train(args) -> List[nn.Module]:
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
     l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
     loss_fn = l2_loss_fn if args.loss == 'l2' else l1_loss_fn if args.loss == 'l1' \
-        else LambdaModule(lambda x: -msssim_fn(x))
+        else LambdaModule(lambda a, b: -msssim_fn(a, b))
 
    ############### Checkpoints ###############
 

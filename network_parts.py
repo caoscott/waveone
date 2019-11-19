@@ -146,8 +146,8 @@ class LambdaModule(nn.Module):
         super().__init__()
         self.lambd = lambd
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
-        return self.lambd(x)
+    def forward(self, *argv: Tuple[torch.Tensor]) -> torch.Tensor:  # type: ignore
+        return self.lambd(*argv)
 
 
 class revnet_block(nn.Module):
