@@ -197,12 +197,12 @@ def train(args) -> List[nn.Module]:
 
     ############### Model ###############
     network = AutoencoderUNet(6, shrink=1) if args.network == 'unet' \
-        else nn.Sequential(LambdaModule(lambda x: x[:, 3:] - x[:, :3]), nn.Identity())
+        else LambdaModule(lambda x: x[:, 3:] - x[:, :3])
     network = network.cuda()
     nets: List[nn.Module] = [network]
     names = [args.network]
     solver = optim.Adam(
-        network.parameters(),
+        network.parameters() if args.network == 'unet' else nn.Conv2d().parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay
     )
