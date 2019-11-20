@@ -197,7 +197,7 @@ def train(args) -> List[nn.Module]:
 
     ############### Model ###############
     network = AutoencoderUNet(6, shrink=1) if args.network == 'unet' \
-        else nn.Sequential(LambdaModule(lambda x: x[:, 3:] - x[:, :3]))
+        else nn.Sequential(LambdaModule(lambda x: x[:, 3:] - x[:, :3]), nn.Identity())
     network = network.cuda()
     nets: List[nn.Module] = [network]
     names = [args.network]
