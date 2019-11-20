@@ -235,11 +235,12 @@ class UNet(nn.Module):
 
 
 class SimpleRevNet(nn.Module):
-    def __init__(self, channels: int, num_blocks: int = 6) -> None:
+    def __init__(self, channels: int, num_blocks: int = 10) -> None:
         super().__init__()
         self.model = nn.Sequential(  # type: ignore
-            revnet_block(channels) for _ in range(num_blocks)
+            revnet_block(channels // 2) for _ in range(num_blocks)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
-        return self.model(x)
+        f1, f2 = x[:, :3], x[:, 3:]
+        return self.model(f2 - f1)

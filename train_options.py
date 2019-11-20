@@ -21,6 +21,8 @@ parser.add_argument('--flow-off', action='store_true',
                     help='Turn off flow')
 parser.add_argument('--normalization', default='batch', type=str,
                     help='Set normalization in networks.')
+parser.add_argument('--network', choices=("unet", "opt"),
+                    help='Set network architecture.')
 
 ######## Learning ########
 parser.add_argument('--max-train-epochs', type=int, default=20,

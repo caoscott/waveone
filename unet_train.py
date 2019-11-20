@@ -196,9 +196,11 @@ def train(args) -> List[nn.Module]:
     writer = SummaryWriter()
 
     ############### Model ###############
-    network = AutoencoderUNet(6, shrink=1).cuda()
+    network = AutoencoderUNet(6, shrink=1) if args.network == 'unet' \
+        else LambdaModule(lambda x: x[:, 3:] - x[:, :3])
+    network = network.cuda()
     nets: List[nn.Module] = [network]
-    names = ["unet"]
+    names = [args.network]
     solver = optim.Adam(
         network.parameters(),
         lr=args.lr,
