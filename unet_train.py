@@ -197,7 +197,7 @@ def train(args) -> List[nn.Module]:
 
     ############### Model ###############
     network = AutoencoderUNet(6, shrink=1) if args.network == 'unet' \
-        else LambdaModule(lambda x: x[:, 3:] - x[:, :3])
+        else nn.Sequential(LambdaModule(lambda x: x[:, 3:] - x[:, :3]))
     network = network.cuda()
     nets: List[nn.Module] = [network]
     names = [args.network]
@@ -300,8 +300,9 @@ def train(args) -> List[nn.Module]:
                           "train_reconstructed"),
         }
 
-        loss.backward()
-        solver.step()
+        if args.network != "opt":
+            loss.backward()
+            solver.step()
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         writer.add_scalar(
