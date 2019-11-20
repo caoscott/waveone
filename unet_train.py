@@ -262,7 +262,8 @@ def train(args) -> List[nn.Module]:
     ) -> Iterator[Tuple[float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]]:
         for net in nets:
             net.train()
-        solver.zero_grad()
+        if args.network != 'opt':
+            solver.zero_grad()
 
         reconstructed_frames = []
         reconstructed_frame2 = None
