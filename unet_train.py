@@ -202,7 +202,7 @@ def train(args) -> List[nn.Module]:
     nets: List[nn.Module] = [network]
     names = [args.network]
     solver = optim.Adam(
-        network.parameters() if args.network == 'unet' else nn.Conv2d().parameters(),
+        network.parameters() if args.network == 'unet' else nn.Conv2d(3, 3, 1).parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay
     )
