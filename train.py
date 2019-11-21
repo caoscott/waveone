@@ -351,7 +351,8 @@ def train(args) -> List[nn.Module]:
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
             train_iter += 1
-            max_epoch_l2, max_epoch_l2_frames = max(train_loop(frames))
+            max_epoch_l2, max_epoch_l2_frames = max(
+                train_loop(frames), key=lambda x: x[0])
 
         if args.save_out_img:
             save_tensor_as_img(

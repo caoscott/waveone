@@ -13,7 +13,7 @@ import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
-from waveone.dataset import get_loaders
+from waveone.dataset import get_master_loader
 from waveone.losses import MSSSIM
 from waveone.network import (AutoencoderUNet, Binarizer, BitToContextDecoder,
                              BitToFlowDecoder, ContextToFlowDecoder, Encoder)
@@ -179,14 +179,14 @@ def train(args) -> List[nn.Module]:
     print(args)
     ############### Data ###############
 
-    train_loaders = get_loaders(
+    train_loader = get_master_loader(
         is_train=True,
         root=args.train,
-        frame_len=6,
+        frame_len=4,
         sampling_range=12,
         args=args
     )
-    eval_loaders = get_loaders(
+    eval_loader = get_master_loader(
         is_train=False,
         root=args.eval,
         frame_len=1,
@@ -313,34 +313,31 @@ def train(args) -> List[nn.Module]:
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
+        for frames in train_loader:
+            train_iter += 1
+            max_epoch_l2, max_epoch_l2_frames = max(
+                train_loop(frames), key=lambda x: x[0])
 
-        for _, train_loader in train_loaders.items():
-            for frames in train_loader:
-                train_iter += 1
-                max_epoch_l2, max_epoch_l2_frames = max(
-                    train_loop(frames), key=lambda x: x[0])
-
-            if args.save_out_img:
-                save_tensor_as_img(
-                    max_epoch_l2_frames[1],
-                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame",
-                    args,
-                )
-                save_tensor_as_img(
-                    max_epoch_l2_frames[2],
-                    f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed",
-                    args,
-                )
+        if args.save_out_img:
+            save_tensor_as_img(
+                max_epoch_l2_frames[1],
+                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame",
+                args,
+            )
+            save_tensor_as_img(
+                max_epoch_l2_frames[2],
+                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed",
+                args,
+            )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save()
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            for eval_name, eval_loader in eval_loaders.items():
-                run_eval(eval_name, eval_loader, network,
-                         epoch, args, writer, reuse_reconstructed=True)
-                run_eval(eval_name, eval_loader, network,
-                         epoch, args, writer, reuse_reconstructed=False)
+            run_eval("TVL", eval_loader, network,
+                        epoch, args, writer, reuse_reconstructed=True)
+            run_eval("TVL", eval_loader, network,
+                        epoch, args, writer, reuse_reconstructed=False)
             scheduler.step()  # type: ignore
             just_resumed = False
 
