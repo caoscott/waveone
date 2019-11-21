@@ -16,24 +16,6 @@ def get_vid_id(filename: str) -> str:
     return "_".join(filename.split("_")[:-1])
 
 
-def get_id_to_image_lists(
-        is_train: bool, root: str, args: argparse.Namespace,
-        frame_len: int, sampling_range: int
-) -> Dict[str, ImageList]:
-    id_to_images: DefaultDict[str, List[np.ndarray]] = defaultdict(list)
-    for filename in sorted(glob.iglob(root + '/*png')):
-        if os.path.isfile(filename):
-            vid_id = "_".join(filename.split("_")[:-1])
-            img = default_loader(filename)
-            id_to_images[vid_id].append(img)
-    id_to_datasets: Dict[str, ImageList] = {}
-    for vid_id, imgs in id_to_images.items():
-        id_to_datasets[vid_id] = ImageList(
-            imgs, is_train, args, frame_len, sampling_range
-        )
-    return id_to_datasets
-
-
 def get_loaders(
         is_train: bool, root: str, frame_len: int, sampling_range: int, args
 ) -> Dict[str, data.DataLoader]:
@@ -186,6 +168,24 @@ class ImageList(data.Dataset):
 
     def __len__(self) -> int:
         return len(self.imgs) - self.frame_len + 1
+
+
+def get_id_to_image_lists(
+        is_train: bool, root: str, args: argparse.Namespace,
+        frame_len: int, sampling_range: int
+) -> Dict[str, ImageList]:
+    id_to_images: DefaultDict[str, List[np.ndarray]] = defaultdict(list)
+    for filename in sorted(glob.iglob(root + '/*png')):
+        if os.path.isfile(filename):
+            vid_id = "_".join(filename.split("_")[:-1])
+            img = default_loader(filename)
+            id_to_images[vid_id].append(img)
+    id_to_datasets: Dict[str, ImageList] = {}
+    for vid_id, imgs in id_to_images.items():
+        id_to_datasets[vid_id] = ImageList(
+            imgs, is_train, args, frame_len, sampling_range
+        )
+    return id_to_datasets
 
 
 class ImageListDataset(data.Dataset):
