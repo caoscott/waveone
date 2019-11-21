@@ -15,8 +15,9 @@ from torchvision.utils import save_image
 
 from waveone.dataset import get_master_loader
 from waveone.losses import MSSSIM
-from waveone.network import (AutoencoderUNet, Binarizer, BitToContextDecoder,
-                             BitToFlowDecoder, ContextToFlowDecoder, Encoder)
+from waveone.network import (CAE, AutoencoderUNet, Binarizer,
+                             BitToContextDecoder, BitToFlowDecoder,
+                             ContextToFlowDecoder, Encoder)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -197,12 +198,13 @@ def train(args) -> List[nn.Module]:
 
     ############### Model ###############
     network = AutoencoderUNet(6, shrink=1) if args.network == 'unet' \
+        else CAE() if args.network == 'cae' \
         else LambdaModule(lambda x: x[:, 3:] - x[:, :3])
     network = network.cuda()
     nets: List[nn.Module] = [network]
     names = [args.network]
     solver = optim.Adam(
-        network.parameters() if network == 'unet' else [torch.zeros((1,))],
+        network.parameters() if network != 'opt' else [torch.zeros((1,))],
         lr=args.lr,
         weight_decay=args.weight_decay
     )

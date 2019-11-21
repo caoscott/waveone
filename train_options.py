@@ -21,7 +21,7 @@ parser.add_argument('--flow-off', action='store_true',
                     help='Turn off flow')
 parser.add_argument('--normalization', default='batch', type=str,
                     help='Set normalization in networks.')
-parser.add_argument('--network', choices=("unet", "opt"),
+parser.add_argument('--network', choices=("unet", "opt", "cae"),
                     help='Set network architecture.')
 
 ######## Learning ########
