@@ -72,10 +72,10 @@ def forward_model(
         network: nn.Module, frame1: torch.Tensor, frame2: torch.Tensor,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     frames = torch.cat((frame1, frame2), dim=1)
-    assert frames.max() <= 0.5
-    assert frames.min() >= -0.5
+    assert frame2.max() <= 0.5
+    assert frame2.min() >= -0.5
     residuals = network(frames)
-    reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
+    reconstructed_frame2 = frame1 + residuals
     return residuals, reconstructed_frame2
 
 

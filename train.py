@@ -76,7 +76,7 @@ def forward_model(
     flows, residuals, _ = decoder((codes, 0.))
     # flow_frame2 = F.grid_sample(frame1, flows)
     # assert torch.allclose(frame1, flow_frame2)
-    reconstructed_frame2 = (frame1 + residuals).clamp(-0.5, 0.5)
+    reconstructed_frame2 = frame1 + residuals
     return codes, flows, residuals, frame1, reconstructed_frame2
 
 
