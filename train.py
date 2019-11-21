@@ -192,7 +192,7 @@ def train(args) -> List[nn.Module]:
         sampling_range=0,
         args=args,
     )
-    writer = SummaryWriter()
+    writer = SummaryWriter(f"runs/{args.save_model_name}")
 
     ############### Model ###############
     # context_vec_train_shape = (args.batch_size, 512,

@@ -194,7 +194,7 @@ def train(args) -> List[nn.Module]:
         sampling_range=0,
         args=args,
     )
-    writer = SummaryWriter()
+    writer = SummaryWriter(f"runs/{args.save_model_name}")
 
     ############### Model ###############
     network = AutoencoderUNet(6, shrink=1) if args.network == 'unet' \
