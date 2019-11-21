@@ -4,7 +4,7 @@ import os
 import os.path
 import random
 from collections import defaultdict
-from typing import DefaultDict, Dict, List, Tuple
+from typing import DefaultDict, Dict, List
 
 import cv2
 import numpy as np
@@ -16,24 +16,34 @@ def get_vid_id(filename: str) -> str:
     return "_".join(filename.split("_")[:-1])
 
 
-def get_loaders(is_train: bool, root: str, frame_len: int, sampling_range: int,
-                args) -> Dict[str, data.DataLoader]:
-    print('Creating loader for %s...' % root)
-
+def get_id_to_image_lists(
+        is_train: bool, root: str, args: argparse.Namespace,
+        frame_len: int, sampling_range: int
+) -> Dict[str, ImageList]:
     id_to_images: DefaultDict[str, List[np.ndarray]] = defaultdict(list)
     for filename in sorted(glob.iglob(root + '/*png')):
         if os.path.isfile(filename):
             vid_id = "_".join(filename.split("_")[:-1])
             img = default_loader(filename)
             id_to_images[vid_id].append(img)
-
-    id_to_loaders: Dict[str, data.DataLoader] = {}
+    id_to_datasets: Dict[str, ImageList] = {}
     for vid_id, imgs in id_to_images.items():
-        dataset = ImageListFolder(
+        id_to_datasets[vid_id] = ImageList(
             imgs, is_train, args, frame_len, sampling_range
         )
+    return id_to_datasets
+
+
+def get_loaders(
+        is_train: bool, root: str, frame_len: int, sampling_range: int, args
+) -> Dict[str, data.DataLoader]:
+    print('Creating loaders for %s...' % root)
+    id_to_image_lists = get_id_to_image_lists(
+        is_train, root, args, frame_len, sampling_range)
+    id_to_loaders: Dict[str, data.DataLoader] = {}
+    for vid_id, image_list in id_to_image_lists.items():
         loader = data.DataLoader(
-            dataset,
+            image_list,
             batch_size=args.batch_size if is_train else args.eval_batch_size,
             shuffle=is_train,
             num_workers=2,
@@ -41,10 +51,28 @@ def get_loaders(is_train: bool, root: str, frame_len: int, sampling_range: int,
         )
         id_to_loaders[vid_id] = loader
         print('Loader for {} images ({} batches) created.'.format(
-            len(dataset), len(loader))
+            len(image_list), len(loader))
         )
 
     return id_to_loaders
+
+
+def get_master_loader(
+        is_train: bool, root: str, frame_len: int, sampling_range: int, args
+) -> data.DataLoader:
+    print(f'Creating loader for {root}')
+    dataset = ImageListDataset(is_train, root, args, frame_len, sampling_range)
+    loader = data.DataLoader(
+        dataset,
+        batch_size=args.batch_size if is_train else args.eval_batch_size,
+        shuffle=is_train,
+        num_workers=2,
+        drop_last=is_train,
+    )
+    print('Loader for {} images ({} batches) created.'.format(
+        len(dataset), len(loader))
+    )
+    return loader
 
 
 def default_loader(path: str) -> np.ndarray:
@@ -111,14 +139,14 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(img).float()
 
 
-class ImageListFolder(data.Dataset):
+class ImageList(data.Dataset):
     def __init__(
         self,
         imgs: List[np.ndarray],
         is_train: bool,
         args: argparse.Namespace,
-        frame_len: int = 5,
-        sampling_range: int = 0,
+        frame_len: int,
+        sampling_range: int,
     ) -> None:
         super().__init__()
         self.imgs = imgs
@@ -160,72 +188,23 @@ class ImageListFolder(data.Dataset):
         return len(self.imgs) - self.frame_len + 1
 
 
-class ImageFolder(data.Dataset):
-    """ ImageFolder can be used to load images where there are no labels."""
+class ImageListDataset(data.Dataset):
+    """ ImageListDataset can be used to load images where there are no labels."""
 
-    def __init__(self, is_train: bool, root: str, args,
-                 frame_len: int = 5, sampling_range: int = 0) -> None:
+    def __init__(self, is_train: bool, root: str, args: argparse.Namespace,
+                 frame_len: int, sampling_range: int) -> None:
         super().__init__()
-        self.is_train = is_train
-        self.root = root
-        self.args = args
+        self.id_to_image_lists: Dict[str, ImageList] = get_id_to_image_lists(
+            is_train, root, args, frame_len, sampling_range)
+        self.keys = tuple(
+            (vid_id, image_idx)
+            for vid_id, image_list in self.id_to_image_lists.items()
+            for image_idx in range(len(image_list))
+        )
 
-        assert frame_len > 0
-        assert sampling_range == 0 or sampling_range >= frame_len
+    def __getitem__(self, index: int) -> List[torch.Tensor]:
+        vid_id, image_idx = self.keys[index]
+        return self.id_to_image_lists[vid_id][image_idx]
 
-        self.frame_len = frame_len
-        self.sampling_range = sampling_range
-
-        self._load_image_list()
-
-    def _load_image_list(self):
-        self.imgs = []
-        self.fns = []
-
-        for filename in sorted(glob.iglob(self.root + '/*png')):
-            if os.path.isfile(filename):
-                img = default_loader(filename)
-                self.imgs.append(img)
-                self.fns.append(filename)
-
-        print('%d images loaded.' % len(self.imgs))
-
-    def __getitem__(self, index):
-        imgs = []
-        if self.sampling_range:
-            idx_sampling_range = min(self.sampling_range, len(self.imgs)-index)
-            offsets = np.random.permutation(
-                idx_sampling_range)[:self.frame_len]
-            imgs = [self.imgs[index + offset] for offset in offsets]
-        else:
-            imgs = self.imgs[index: index+self.frame_len]
-        # if self.frame_len > 1:
-        #     index1 = index // self.frame_len
-        #     index2 = index % self.frame_len
-        #     return [self.imgs[index1], self.imgs[index2]]
-        # else:
-        #     imgs = [self.imgs[index], self.imgs[index + 1]]
-
-        if self.is_train:
-            # If use_bmv, * -1.0 on bmv for flipped images.
-            imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
-
-        # CV2 cropping in CPU is faster.
-        if self.args.patch and self.is_train:
-            # imgs = multi_crop_cv2(imgs, self.args.patch + 1)
-            # imgs = [crop_cv2(img, self.args.patch) for img in imgs]
-            imgs = multi_crop_cv2(imgs, self.args.patch)
-
-        imgs = tuple(np_to_torch(img.astype(np.float64) / 255 - 0.5)
-                     for img in imgs)
-        for img in imgs:
-            assert img.max() <= 0.5
-            assert img.min() >= -0.5
-
-        assert len(imgs) == self.frame_len
-        return imgs
-
-    def __len__(self):
-        # return len(self.imgs) * (len(self.imgs) - 1) // 2 \
-        #     if self.frame_len > 1 else len(self.imgs) - 1
-        return len(self.imgs) - self.frame_len + 1
+    def __len__(self) -> int:
+        return len(self.keys)
