@@ -33,7 +33,7 @@ parser.add_argument('--clip', type=float, default=0.5,
                     help='Gradient clipping.')
 parser.add_argument('--weight-decay', type=float,
                     default=1e-4, help='Weight decay')
-parser.add_argument('--schedule', default='50000,60000,70000,80000,90000', type=str,
+parser.add_argument('--schedule', default='100,200', type=str,
                     help='Schedule milestones.')
 parser.add_argument('--gamma', type=float, default=0.5,
                     help='LR decay factor.')

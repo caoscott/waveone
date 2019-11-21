@@ -206,7 +206,7 @@ def train(args) -> List[nn.Module]:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    milestones = [150, 300, 450, 600]
+    milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
     msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
     l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
@@ -335,9 +335,9 @@ def train(args) -> List[nn.Module]:
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             run_eval("TVL", eval_loader, network,
-                        epoch, args, writer, reuse_reconstructed=True)
+                     epoch, args, writer, reuse_reconstructed=True)
             run_eval("TVL", eval_loader, network,
-                        epoch, args, writer, reuse_reconstructed=False)
+                     epoch, args, writer, reuse_reconstructed=False)
             scheduler.step()  # type: ignore
             just_resumed = False
 
