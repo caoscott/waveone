@@ -10,7 +10,7 @@ from torch.autograd import Function
 
 
 class double_conv(nn.Module):
-    '''(conv => BN => ELU) * 2'''
+    '''(conv => BN => LeakyReLU) * 2'''
 
     def __init__(
         self,
@@ -25,11 +25,11 @@ class double_conv(nn.Module):
             nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1),
             nn.BatchNorm2d(
                 out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            nn.ELU(inplace=True),
+            nn.LeakyReLU(inplace=True),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(
                 out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            nn.ELU(inplace=True)
+            nn.LeakyReLU(inplace=True)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
