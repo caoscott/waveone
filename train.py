@@ -327,7 +327,7 @@ def train(args) -> List[nn.Module]:
                     max_l2: float = max_batch_l2.item()  # type: ignore
                     yield max_l2, max_batch_l2_frames
             else:
-                yield 0, torh.tensor(0.)
+                yield 0, torch.tensor(0.)
 
             log_flow_context_residuals(
                 writer, flows, torch.tensor(context_vec), torch.abs(frame2 - frame1))
