@@ -70,3 +70,5 @@ parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
 parser.add_argument('--log-dir', type=str, default="logs",
                     help="Name of logs directory.")
+parser.add_argument('--save-max-l2', action='store_true',
+                    help='If true, save max l2 images for train epoch.')

@@ -106,11 +106,11 @@ def run_eval(
             reconstructed_frames.append(reconstructed_frame2.cpu())
             if args.save_out_img:
                 save_tensor_as_img(
-                    frame2, f"{prefix}{epoch}_{eval_iter}_frame", args
+                    frame2, f"{prefix}_{eval_iter}_frame", args
                 )
                 save_tensor_as_img(
                     reconstructed_frame2,
-                    f"{prefix}{epoch}_{eval_iter}_reconstructed",
+                    f"{prefix}_{eval_iter}_reconstructed",
                     args
                 )
 
@@ -281,17 +281,18 @@ def train(args) -> List[nn.Module]:
             reconstructed_frames.append(reconstructed_frame2.cpu())
             loss += loss_fn(reconstructed_frame2, frame2)
 
-            with torch.no_grad():
-                batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
-                    dim=-1).mean(dim=-1).mean(dim=-1).cpu()
-                max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
-                max_batch_l2_frames = (
-                    frame1[max_batch_l2_idx].cpu(),
-                    frame2[max_batch_l2_idx].cpu(),
-                    reconstructed_frame2[max_batch_l2_idx].detach().cpu(),
-                )
-                max_l2: float = max_batch_l2.item()  # type: ignore
-                yield max_l2, max_batch_l2_frames
+            if args.save_max_l2:
+                with torch.no_grad():
+                    batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
+                        dim=-1).mean(dim=-1).mean(dim=-1).cpu()
+                    max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
+                    max_batch_l2_frames = (
+                        frame1[max_batch_l2_idx].cpu(),
+                        frame2[max_batch_l2_idx].cpu(),
+                        reconstructed_frame2[max_batch_l2_idx].detach().cpu(),
+                    )
+                    max_l2: float = max_batch_l2.item()  # type: ignore
+                    yield max_l2, max_batch_l2_frames
 
             log_flow_context_residuals(writer, torch.abs(frame2 - frame1))
 
