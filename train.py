@@ -326,6 +326,8 @@ def train(args) -> List[nn.Module]:
                     )
                     max_l2: float = max_batch_l2.item()  # type: ignore
                     yield max_l2, max_batch_l2_frames
+            else:
+                yield 0, torh.tensor(0.)
 
             log_flow_context_residuals(
                 writer, flows, torch.tensor(context_vec), torch.abs(frame2 - frame1))
@@ -356,7 +358,7 @@ def train(args) -> List[nn.Module]:
             max_epoch_l2, max_epoch_l2_frames = max(
                 train_loop(frames), key=lambda x: x[0])
 
-        if args.save_out_img:
+        if args.save_max_l2:
             save_tensor_as_img(
                 max_epoch_l2_frames[1],
                 f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame",
