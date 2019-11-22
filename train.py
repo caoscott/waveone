@@ -257,29 +257,29 @@ def train(args) -> List[nn.Module]:
         flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values  # type: ignore
         flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values  # type: ignore
 
-        writer.add_scalar("mean_context_vec_norm",
+        writer.add_histogram("mean_context_vec_norm", 
                           context_vec.mean().item(), train_iter)
-        writer.add_scalar("max_context_vec_norm",
+        writer.add_histogram("max_context_vec_norm",
                           context_vec.max().item(), train_iter)
-        writer.add_scalar("min_context_vec_norm",
+        writer.add_histogram("min_context_vec_norm",
                           context_vec.min().item(), train_iter)
-        writer.add_scalar(
+        writer.add_histogram(
             "mean_flow_x", flows_mean[0].item(), train_iter)
-        writer.add_scalar(
+        writer.add_histogram(
             "mean_flow_y", flows_mean[1].item(), train_iter)
-        writer.add_scalar(
+        writer.add_histogram(
             "max_flow_x", flows_max[0].item(), train_iter)
-        writer.add_scalar(
+        writer.add_histogram(
             "max_flow_y", flows_max[1].item(), train_iter)
-        writer.add_scalar(
+        writer.add_histogram(
             "min_flow_x", flows_min[0].item(), train_iter)
-        writer.add_scalar(
+        writer.add_histogram(
             "min_flow_y", flows_min[1].item(), train_iter)
-        writer.add_scalar("mean_input_residuals",
+        writer.add_histogram("mean_input_residuals",
                           residuals.mean().item(), train_iter)
-        writer.add_scalar("max_input_residuals",
+        writer.add_histogram("max_input_residuals",
                           residuals.max().item(), train_iter)
-        writer.add_scalar("min_input_residuals",
+        writer.add_histogram("min_input_residuals",
                           residuals.min().item(), train_iter)
 
     ############### Training ###############
