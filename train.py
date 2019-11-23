@@ -75,8 +75,6 @@ def forward_model(
     codes = binarizer(encoder(frame1, frame2, 0.))
     flows, residuals, _ = decoder((codes, 0.))
     flow_frame2 = F.grid_sample(frame1, flows, align_corners=False)
-    with torch.no_grad():
-        assert nn.MSELoss()(frame1, flow_frame2).item() <= 1e-6
     reconstructed_frame2 = flow_frame2 + residuals
     return codes, flows, residuals, frame1, reconstructed_frame2
 
