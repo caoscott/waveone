@@ -379,10 +379,14 @@ def train(args) -> List[nn.Module]:
             save()
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            run_eval("TVL", eval_loader, nets,
-                        epoch, args, writer, reuse_reconstructed=True)
-            run_eval("TVL", eval_loader, nets,
-                        epoch, args, writer, reuse_reconstructed=False)
+            run_eval("eval", eval_loader, nets,
+                     epoch, args, writer, reuse_reconstructed=True)
+            run_eval("eval", eval_loader, nets,
+                     epoch, args, writer, reuse_reconstructed=False)
+            run_eval("train", train_sequential_loader, nets,
+                     epoch, args, writer, reuse_reconstructed=True)
+            run_eval("train", train_sequential_loader, nets,
+                     epoch, args, writer, reuse_reconstructed=False)
             scheduler.step()  # type: ignore
             just_resumed = False
 
