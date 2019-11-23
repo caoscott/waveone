@@ -17,7 +17,11 @@ def get_vid_id(filename: str) -> str:
 
 
 def get_loaders(
-        is_train: bool, root: str, frame_len: int, sampling_range: int, args
+        is_train: bool,
+        root: str,
+        frame_len: int,
+        sampling_range: int,
+        args: argparse.Namespace,
 ) -> Dict[str, data.DataLoader]:
     print('Creating loaders for %s...' % root)
     id_to_image_lists = get_id_to_image_lists(
@@ -40,10 +44,17 @@ def get_loaders(
 
 
 def get_master_loader(
-        is_train: bool, root: str, frame_len: int, sampling_range: int, args
+        is_train: bool,
+        root: str,
+        frame_len: int,
+        sampling_range: int,
+        args: argparse.Namespace,
 ) -> data.DataLoader:
     print(f'Creating loader for {root}')
-    dataset = ImageListDataset(is_train, root, args, frame_len, sampling_range)
+    id_to_image_lists: Dict[str, ImageList] = get_id_to_image_lists(
+        is_train, root, args, frame_len, sampling_range)
+    dataset = data.ConcatDataset(
+        [image_list for _, image_list in id_to_image_lists.items()])
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
@@ -186,25 +197,3 @@ def get_id_to_image_lists(
             imgs, is_train, args, frame_len, sampling_range
         )
     return id_to_datasets
-
-
-class ImageListDataset(data.Dataset):
-    """ ImageListDataset can be used to load images where there are no labels."""
-
-    def __init__(self, is_train: bool, root: str, args: argparse.Namespace,
-                 frame_len: int, sampling_range: int) -> None:
-        super().__init__()
-        self.id_to_image_lists: Dict[str, ImageList] = get_id_to_image_lists(
-            is_train, root, args, frame_len, sampling_range)
-        self.keys = tuple(
-            (vid_id, image_idx)
-            for vid_id, image_list in self.id_to_image_lists.items()
-            for image_idx in range(len(image_list))
-        )
-
-    def __getitem__(self, index: int) -> List[torch.Tensor]:
-        vid_id, image_idx = self.keys[index]
-        return self.id_to_image_lists[vid_id][image_idx]
-
-    def __len__(self) -> int:
-        return len(self.keys)
