@@ -54,8 +54,8 @@ def eval_scores(
         frames2: List[torch.Tensor],
         prefix: str,
 ) -> Dict[str, torch.Tensor]:
-    l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
-    msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
+    l1_loss_fn = nn.L1Loss(reduction="mean")
+    msssim_fn = MSSSIM(val_range=1, normalize=True)
 
     assert len(frames1) == len(frames2)
     frame_len = len(frames1)
@@ -66,6 +66,13 @@ def eval_scores(
         msssim += msssim_fn(frame1, frame2)
     return {f"{prefix}_l1": l1/frame_len,
             f"{prefix}_msssim": msssim/frame_len}
+
+
+def get_loss(loss_type: str):
+    assert loss_type in ["l1", "l2", "msssim"]
+    loss_fn = nn.MSELoss(reduction="mean") if loss_type == 'l2' \
+        else nn.L1Loss(reduction="mean") if loss_type == 'l1' \
+        else LambdaModule(lambda a, b: -MSSSIM(val_range=1, normalize=True)(a, b))
 
 
 def forward_model(
@@ -112,6 +119,9 @@ def run_eval(
             if args.save_out_img:
                 save_tensor_as_img(
                     frame2, f"{prefix}_{eval_iter}_frame", args
+                )
+                save_tensor_as_img(
+                    flow_frame2, f"{prefix}_{eval_iter}_flow", args
                 )
                 save_tensor_as_img(
                     reconstructed_frame2,
@@ -226,11 +236,8 @@ def train(args) -> List[nn.Module]:
     )
     milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
-    msssim_fn = MSSSIM(val_range=1, normalize=True).cuda()
-    l1_loss_fn = nn.L1Loss(reduction="mean").cuda()
-    l2_loss_fn = nn.MSELoss(reduction="mean").cuda()
-    loss_fn = l2_loss_fn if args.loss == 'l2' else l1_loss_fn if args.loss == 'l1' \
-        else LambdaModule(lambda a, b: -msssim_fn(a, b))
+    reconstructed_loss_fn = get_loss(args.reconstructed_loss).cuda()
+    flow_loss_fn = get_loss(args.flow_loss).cuda()
 
    ############### Checkpoints ###############
 
@@ -322,7 +329,9 @@ def train(args) -> List[nn.Module]:
             )
             flow_frames.append(flow_frame2.cpu())
             reconstructed_frames.append(reconstructed_frame2.cpu())
-            loss += loss_fn(reconstructed_frame2, frame2)
+            loss += reconstructed_loss_fn(reconstructed_frame2, frame2)
+            if not args.flow_off:
+                loss += flow_loss_fn(flow_frame2, frame2)
 
             if args.save_max_l2:
                 with torch.no_grad():
