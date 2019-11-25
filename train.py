@@ -74,9 +74,9 @@ def forward_model(
     encoder, binarizer, decoder = nets
     codes = binarizer(encoder(frame1, frame2, 0.))
     flows, residuals, _ = decoder((codes, 0.))
-    flow_frame2 = F.grid_sample(frame1, flows, align_corners=False)
+    flow_frame2 = F.grid_sample(frame1, flows, align_corners=False)  # type: ignore
     reconstructed_frame2 = flow_frame2 + residuals
-    return codes, flows, residuals, frame1, reconstructed_frame2
+    return codes, flows, residuals, flow_frame2, reconstructed_frame2
 
 
 def run_eval(
@@ -98,15 +98,17 @@ def run_eval(
         frame1 = next(eval_iterator)[0]
         frames = [frame1]
         reconstructed_frames = []
+        flow_frames = []
         frame1 = frame1.cuda()
 
         for eval_iter, (frame2,) in enumerate(eval_iterator):
             frames.append(frame2)
             frame2 = frame2.cuda()
-            _, _, _, _, reconstructed_frame2 = forward_model(
+            _, _, _, flow_frame2, reconstructed_frame2 = forward_model(
                 nets, frame1, frame2
             )
             reconstructed_frames.append(reconstructed_frame2.cpu())
+            flow_frames.append(flow_frame2.cpu())
             if args.save_out_img:
                 save_tensor_as_img(
                     frame2, f"{prefix}_{eval_iter}_frame", args
@@ -125,14 +127,15 @@ def run_eval(
 
         total_scores = {
             **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
+            **eval_scores(frames[1:], flow_frames, prefix + "eval_flow"),
             **eval_scores(frames[1:], reconstructed_frames,
                           prefix + "eval_reconstructed"),
         }
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
+        print_scores(total_scores)
         score_diffs = get_score_diffs(
             total_scores, ["reconstructed"], prefix + "eval")
-        print_scores(score_diffs)
         plot_scores(writer, score_diffs, epoch)
 
         return total_scores, score_diffs
@@ -305,6 +308,7 @@ def train(args) -> List[nn.Module]:
 
         context_vec = 0. # .cuda()
         reconstructed_frames = []
+        flow_frames = []
         reconstructed_frame2 = None
 
         loss: torch.Tensor = 0.  # type: ignore
@@ -313,9 +317,10 @@ def train(args) -> List[nn.Module]:
         for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
-            _, flows, residuals, _, reconstructed_frame2 = forward_model(
+            _, flows, residuals, flow_frame2, reconstructed_frame2 = forward_model(
                 nets, frame1, frame2
             )
+            flow_frames.append(flow_frame2.cpu())
             reconstructed_frames.append(reconstructed_frame2.cpu())
             loss += loss_fn(reconstructed_frame2, frame2)
 
@@ -341,6 +346,7 @@ def train(args) -> List[nn.Module]:
 
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
+            **eval_scores(frames[1:], flow_frames, "train_flow"),
             **eval_scores(frames[1:], reconstructed_frames,
                           "train_reconstructed"),
         }
