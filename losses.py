@@ -166,7 +166,8 @@ class MSSSIM(torch.nn.Module):
                  size_average: bool = True,
                  channel: int = 3,
                  val_range: Union[int, float] = -1,
-                 normalize: bool = False
+                 normalize: bool = False,
+                 negative: bool = False,
                  ) -> None:
         super().__init__()
         self.window_size = window_size
@@ -174,17 +175,19 @@ class MSSSIM(torch.nn.Module):
         self.channel = channel
         self.val_range = val_range
         self.normalize = normalize
+        self.negative = negative
 
     def forward(self,   # type: ignore
                 img1: torch.Tensor,
                 img2: torch.Tensor
                 ) -> torch.Tensor:
         # TODO: store window between calls if possible
-        return msssim(
+        score = msssim(
             img1, img2, window_size=self.window_size,
             size_average=self.size_average,
             val_range=self.val_range, normalize=self.normalize
         )
+        return score * (-1 if self.negative else 1)
 
 
 class CharbonnierLoss(torch.nn.Module):

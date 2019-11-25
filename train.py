@@ -68,11 +68,11 @@ def eval_scores(
             f"{prefix}_msssim": msssim/frame_len}
 
 
-def get_loss(loss_type: str):
+def get_loss_fn(loss_type: str) -> nn.Module:
     assert loss_type in ["l1", "l2", "msssim"]
-    loss_fn = nn.MSELoss(reduction="mean") if loss_type == 'l2' \
+    return nn.MSELoss(reduction="mean") if loss_type == 'l2' \
         else nn.L1Loss(reduction="mean") if loss_type == 'l1' \
-        else LambdaModule(lambda a, b: -MSSSIM(val_range=1, normalize=True)(a, b))
+        else MSSSIM(val_range=1, normalize=True, negative=True)
 
 
 def forward_model(
@@ -236,8 +236,8 @@ def train(args) -> List[nn.Module]:
     )
     milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
-    reconstructed_loss_fn = get_loss(args.reconstructed_loss).cuda()
-    flow_loss_fn = get_loss(args.flow_loss).cuda()
+    reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
+    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
 
    ############### Checkpoints ###############
 
