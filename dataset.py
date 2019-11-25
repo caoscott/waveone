@@ -53,7 +53,7 @@ def get_master_loader(
     print(f'Creating loader for {root}')
     id_to_image_lists: Dict[str, ImageList] = get_id_to_image_lists(
         is_train, root, args, frame_len, sampling_range)
-    dataset = data.ConcatDataset(
+    dataset: data.Dataset = data.ConcatDataset(
         [image_list for _, image_list in id_to_image_lists.items()])
     loader = data.DataLoader(
         dataset,

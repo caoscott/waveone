@@ -109,11 +109,11 @@ def run_eval(
             reconstructed_frames.append(reconstructed_frame2.cpu())
             if args.save_out_img:
                 save_tensor_as_img(
-                    frame2, f"{prefix}{epoch}_{eval_iter}_frame", args
+                    frame2, f"{prefix}_{eval_iter}_frame", args
                 )
                 save_tensor_as_img(
                     reconstructed_frame2,
-                    f"{prefix}{epoch}_{eval_iter}_reconstructed",
+                    f"{prefix}_{eval_iter}_reconstructed",
                     args
                 )
 
