@@ -102,8 +102,11 @@ class BitToFlowDecoder(nn.Module):
         r = self.residual(x)  # .clamp(-1., 1.)
         identity_theta = torch.tensor(
             BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
-        f = self.flow(x).permute(0, 2, 3, 1) + \
-            F.affine_grid(identity_theta, r.shape)  # type: ignore
+        f = self.flow(x)
+        grid_normalize = torch.tensor(
+            f.shape[2: ]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+        f = (f / grid_normalize).permute(0, 2, 3, 1)
+        f += F.affine_grid(identity_theta, r.shape, align_corners=False)  # type: ignore
         # f = F.affine_grid(identity_theta, r.shape,  # type: ignore
         #                   align_corners=False)
         return f, r, context_vec
