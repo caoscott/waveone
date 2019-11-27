@@ -4,6 +4,7 @@ import os
 from collections import defaultdict
 from typing import Dict, Iterator, List, Tuple, Union
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -324,7 +325,7 @@ def train(args) -> nn.Module:
         flow_frames = []
         reconstructed_frame2 = None
 
-        loss: torch.Tensor = 0.  # type: ignore
+        losses = []
 
         frame1 = frames[0].cuda()
         for frame2 in frames[1:]:
@@ -335,9 +336,13 @@ def train(args) -> nn.Module:
             )
             flow_frames.append(flow_frame.cpu())
             reconstructed_frames.append(reconstructed_frame2.cpu())
-            loss += reconstructed_loss_fn(frame2, reconstructed_frame2)
-            if not args.flow_off:
-                loss += flow_loss_fn(frame2, flow_frame)
+            loss = reconstructed_loss_fn(frame2, reconstructed_frame2) + (
+                0 if args.flow_off else flow_loss_fn(frame2, flow_frame))
+            losses.append(loss.item())
+            if args.network != "opt":
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+                solver.step()
 
             if args.save_max_l2:
                 with torch.no_grad():
@@ -366,12 +371,7 @@ def train(args) -> nn.Module:
                           "train_reconstructed"),
         }
 
-        if args.network != "opt":
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-            solver.step()
-
-        writer.add_scalar("training_loss", loss.item(), train_iter)
+        writer.add_scalar("training_loss", np.average(losses), train_iter)
         writer.add_scalar(
             "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
         plot_scores(writer, scores, train_iter)
