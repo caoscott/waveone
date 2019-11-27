@@ -110,7 +110,33 @@ class BitToFlowDecoder(nn.Module):
             identity_theta, r.shape, align_corners=False)
         # f = F.affine_grid(identity_theta, r.shape,  # type: ignore
         #                   align_corners=False)
-        return f, r, context_vec
+        return f_grid, r, context_vec
+
+
+class WaveoneModel(nn.Module):
+    NAMES = ("encoder", "binarizer", "decoder")
+
+    def __init__(self,
+                 encoder: nn.Module,
+                 binarizer: nn.Module,
+                 decoder: nn.Module,
+                 flow_off: bool) -> None:
+        super.__init__()
+        self.encoder = encoder
+        self.binarizer = binarizer
+        self.decoder = decoder
+        self.flow_off = flow_off
+        self.nets = (encoder, binarizer, decoder)
+
+    def forward(self,  # type: ignore
+                frame1: torch.Tensor,
+                frame2: torch.Tensor) -> torch.Tensor:
+        codes = self.binarizer(self.encoder(frame1, frame2, 0.))
+        flows, residuals, _ = self.decoder((codes, 0.))
+        flow_frame = frame1 if self.flow_off else F.grid_sample(  # type: ignore
+            frame1, flows, align_corners=False)
+        reconstructed_frame2 = flow_frame + residuals
+        return codes, flows, residuals, flow_frame, reconstructed_frame2
 
 
 class BitToContextDecoder(nn.Module):

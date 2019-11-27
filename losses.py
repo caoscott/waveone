@@ -179,7 +179,7 @@ class MSSSIM(torch.nn.Module):
 
     def forward(self,   # type: ignore
                 img1: torch.Tensor,
-                img2: torch.Tensor
+                img2: torch.Tensor,
                 ) -> torch.Tensor:
         # TODO: store window between calls if possible
         score = msssim(

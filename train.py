@@ -17,7 +17,7 @@ from waveone.dataset import get_master_loader
 from waveone.losses import MSSSIM
 from waveone.network import (AutoencoderUNet, Binarizer, BitToContextDecoder,
                              BitToFlowDecoder, ContextToFlowDecoder, Encoder,
-                             UNet)
+                             UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -75,83 +75,68 @@ def get_loss_fn(loss_type: str) -> nn.Module:
         else MSSSIM(val_range=1, normalize=True, negative=True)
 
 
-def forward_model(
-        nets: List[nn.Module], 
-        frame1: torch.Tensor, 
-        frame2: torch.Tensor, 
-        flow_off: bool = False,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    encoder, binarizer, decoder = nets
-    codes = binarizer(encoder(frame1, frame2, 0.))
-    flows, residuals, _ = decoder((codes, 0.))
-    flow_frame = frame1 if flow_off else F.grid_sample(  # type: ignore
-        frame1, flows, align_corners=False)
-    reconstructed_frame2 = flow_frame + residuals
-    return codes, flows, residuals, flow_frame, reconstructed_frame2
-
-
 def run_eval(
         eval_name: str,
         eval_loader: data.DataLoader,
-        nets: List[nn.Module],
+        model: nn.Module,
         epoch: int,
         args: argparse.Namespace,
         writer: SummaryWriter,
-        reuse_reconstructed: bool = True,
         fgsm: bool = False,
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
-    prefix = "" if reuse_reconstructed else "vcii_"
-    for net in nets:
-        net.eval()
+    model.eval()
+    total_scores = {}
 
     with torch.no_grad():
-        eval_iterator = iter(eval_loader)
-        frame1 = next(eval_iterator)[0]
-        frames = [frame1]
-        reconstructed_frames = []
-        flow_frames = []
-        frame1 = frame1.cuda()
+        for reuse_reconstructed, prefix in ((True, ""), (False, "vcii_")):
+            eval_iterator = iter(eval_loader)
+            frame1 = next(eval_iterator)[0]
+            frames = [frame1]
+            reconstructed_frames = []
+            flow_frames = []
+            frame1 = frame1.cuda()
 
-        for eval_iter, (frame2,) in enumerate(eval_iterator):
-            frames.append(frame2)
-            frame2 = frame2.cuda()
-            _, _, _, flow_frame, reconstructed_frame2 = forward_model(
-                nets, frame1, frame2, args.flow_off
-            )
-            reconstructed_frames.append(reconstructed_frame2.cpu())
-            flow_frames.append(flow_frame.cpu())
-            if args.save_out_img:
-                save_tensor_as_img(
-                    frames[-1], f"{prefix}_{eval_iter}_frame", args
+            for eval_iter, (frame2,) in enumerate(eval_iterator):
+                frames.append(frame2)
+                frame2 = frame2.cuda()
+                _, _, _, flow_frame, reconstructed_frame2 = model(
+                    frame1, frame2
                 )
-                save_tensor_as_img(
-                    flow_frames[-1], f"{prefix}_{eval_iter}_flow", args
-                )
-                save_tensor_as_img(
-                    reconstructed_frames[-1],
-                    f"{prefix}_{eval_iter}_reconstructed",
-                    args
-                )
+                reconstructed_frames.append(reconstructed_frame2.cpu())
+                flow_frames.append(flow_frame.cpu())
+                if args.save_out_img:
+                    save_tensor_as_img(
+                        frames[-1], f"{prefix}_{eval_iter}_frame", args
+                    )
+                    save_tensor_as_img(
+                        flow_frames[-1], f"{prefix}_{eval_iter}_flow", args
+                    )
+                    save_tensor_as_img(
+                        reconstructed_frames[-1],
+                        f"{prefix}_{eval_iter}_reconstructed",
+                        args
+                    )
 
-            # Update frame1.
-            if reuse_reconstructed:
-                frame1 = reconstructed_frame2
-            else:
-                frame1 = frame2
+                # Update frame1.
+                if reuse_reconstructed:
+                    frame1 = reconstructed_frame2
+                else:
+                    frame1 = frame2
 
-        total_scores = {
-            **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
-            **eval_scores(frames[1:], flow_frames, prefix + "eval_flow"),
-            **eval_scores(frames[1:], reconstructed_frames,
-                          prefix + "eval_reconstructed"),
-        }
+            total_scores = {
+                **total_scores,
+                **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
+                **eval_scores(frames[1:], flow_frames, prefix + "eval_flow"),
+                **eval_scores(frames[1:], reconstructed_frames,
+                            prefix + "eval_reconstructed"),
+            }
+
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
         print_scores(total_scores)
         score_diffs = get_score_diffs(
-            total_scores, ["reconstructed"], prefix + "eval")
+            total_scores, ["flow", "reconstructed"], ["eval", "vcii_eval"])
         plot_scores(writer, score_diffs, epoch)
-
         return total_scores, score_diffs
 
 
@@ -167,15 +152,16 @@ def plot_scores(
 def get_score_diffs(
         scores: Dict[str, torch.Tensor],
         prefixes: List[str],
-        prefix_type: str,
+        prefix_types: List[str],
 ) -> Dict[str, torch.Tensor]:
     score_diffs = {}
-    for score_type in ("msssim", "l1"):
-        for prefix in prefixes:
-            baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
-            prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
-            score_diffs[f"{prefix_type}_{prefix}_{score_type}_diff"
-                        ] = prefix_score - baseline_score
+    for prefix_type in prefix_types:
+        for score_type in ("msssim", "l1"):
+            for prefix in prefixes:
+                baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
+                prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
+                score_diffs[f"{prefix_type}_{prefix}_{score_type}_diff"
+                            ] = prefix_score - baseline_score
     return score_diffs
 
 
@@ -185,7 +171,33 @@ def print_scores(scores: Dict[str, torch.Tensor]) -> None:
     print("")
 
 
-def train(args) -> List[nn.Module]:
+def resume(args: argparse.Namespace,
+           names: Tuple[str],
+           nets: Tuple[nn.Module]) -> None:
+    for name, net in zip(names, nets):
+        checkpoint_path = os.path.join(
+            args.model_dir,
+            args.load_model_name,
+            f"{name}.pth",
+        )
+
+        print('Loading %s from %s...' % (name, checkpoint_path))
+        net.load_state_dict(torch.load(checkpoint_path))
+
+
+def save(args: argparse.Namespace,
+         names: Tuple[str],
+         nets: Tuple[nn.Module]) -> None:
+    for name, net in zip(names, nets):
+        checkpoint_path = os.path.join(
+            args.model_dir,
+            args.save_model_name,
+            f'{name}.pth',
+        )
+        torch.save(net.state_dict(), checkpoint_path)
+
+
+def train(args) -> nn.Module:
     log_dir = os.path.join(args.log_dir, args.save_model_name)
     output_dir = os.path.join(args.out_dir, args.save_model_name)
     model_dir = os.path.join(args.model_dir, args.save_model_name)
@@ -229,12 +241,10 @@ def train(args) -> List[nn.Module]:
     decoder = BitToFlowDecoder(args.bits, 3).cuda()
     binarizer = Binarizer(latent_vec_size, args.bits,
                           not args.binarize_off).cuda()
-    nets = [encoder, binarizer, decoder]
-    names = ["encoder", "binarizer", "decoder"]
+    model = WaveoneModel(encoder, binarizer, decoder, args.flow_off)
 
-    params = [{'params': net.parameters()} for net in nets]
     solver = optim.Adam(
-        params,
+        model.parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay
     )
@@ -242,29 +252,6 @@ def train(args) -> List[nn.Module]:
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
     reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
     flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
-
-   ############### Checkpoints ###############
-
-    def resume() -> None:
-        for name, net in zip(names, nets):
-            if net is not None:
-                checkpoint_path = os.path.join(
-                    args.model_dir, 
-                    args.load_model_name, 
-                    f"{name}.pth",
-                )
-
-                print('Loading %s from %s...' % (name, checkpoint_path))
-                net.load_state_dict(torch.load(checkpoint_path))
-
-    def save() -> None:
-        for name, net in zip(names, nets):
-            if net is not None:
-                checkpoint_path = os.path.join(
-                    model_dir,
-                    f'{name}.pth',
-                )
-                torch.save(net.state_dict(), checkpoint_path)
 
     def log_flow_context_residuals(
             writer: SummaryWriter,
@@ -307,14 +294,13 @@ def train(args) -> List[nn.Module]:
     just_resumed = False
     if args.load_model_name:
         print(f'Loading {args.load_model_name}')
-        resume()
+        resume(args, WaveoneModel.NAMES, model.nets)
         just_resumed = True
 
     def train_loop(
             frames: List[torch.Tensor],
     ) -> Iterator[Tuple[float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]]:
-        for net in nets:
-            net.train()
+        model.train()
         solver.zero_grad()
 
         context_vec = 0. # .cuda()
@@ -328,14 +314,14 @@ def train(args) -> List[nn.Module]:
         for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
-            _, flows, residuals, flow_frame, reconstructed_frame2 = forward_model(
-                nets, frame1, frame2, args.flow_off
+            _, flows, residuals, flow_frame, reconstructed_frame2 = model(
+                frame1, frame2
             )
             flow_frames.append(flow_frame.cpu())
             reconstructed_frames.append(reconstructed_frame2.cpu())
-            loss += reconstructed_loss_fn(reconstructed_frame2, frame2)
+            loss += reconstructed_loss_fn(frame2, reconstructed_frame2)
             if not args.flow_off:
-                loss += flow_loss_fn(flow_frame, frame2)
+                loss += flow_loss_fn(frame2, flow_frame)
 
             if args.save_max_l2:
                 with torch.no_grad():
@@ -365,15 +351,14 @@ def train(args) -> List[nn.Module]:
         }
 
         loss.backward()
-        for net in nets:
-            torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         solver.step()
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         writer.add_scalar(
             "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
         plot_scores(writer, scores, train_iter)
-        score_diffs = get_score_diffs(scores, ["reconstructed"], "train")
+        score_diffs = get_score_diffs(scores, ["reconstructed"], ["train"])
         plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
@@ -395,23 +380,19 @@ def train(args) -> List[nn.Module]:
             )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
-            save()
+            save(args, WaveoneModel.NAMES, model.nets)
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            run_eval("eval", eval_loader, nets,
-                     epoch, args, writer, reuse_reconstructed=True)
-            run_eval("eval", eval_loader, nets,
-                     epoch, args, writer, reuse_reconstructed=False)
-            run_eval("train", train_sequential_loader, nets,
-                     epoch, args, writer, reuse_reconstructed=True)
-            run_eval("train", train_sequential_loader, nets,
-                     epoch, args, writer, reuse_reconstructed=False)
+            run_eval("eval", eval_loader, model,
+                     epoch, args, writer)
+            run_eval("train", train_sequential_loader, model,
+                     epoch, args, writer)
             scheduler.step()  # type: ignore
             just_resumed = False
 
     print('Training done.')
     logging.shutdown()
-    return nets
+    return model
 
 
 if __name__ == '__main__':
