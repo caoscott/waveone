@@ -76,13 +76,19 @@ def get_loss_fn(loss_type: str) -> nn.Module:
 
 
 def forward_model(
-        nets: List[nn.Module], frame1: torch.Tensor, frame2: torch.Tensor,
+        nets: List[nn.Module], 
+        frame1: torch.Tensor, 
+        frame2: torch.Tensor, 
+        flow_off: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     encoder, binarizer, decoder = nets
     codes = binarizer(encoder(frame1, frame2, 0.))
     flows, residuals, _ = decoder((codes, 0.))
-    flow_frame2 = F.grid_sample(frame1, flows, align_corners=False)  # type: ignore
-    reconstructed_frame2 = flow_frame2 + residuals
+    if flow_off:
+        reconstructed_frame2 = frame1 + residuals
+    else:
+        flow_frame2 = F.grid_sample(frame1, flows, align_corners=False)  # type: ignore
+        reconstructed_frame2 = flow_frame2 + residuals
     return codes, flows, residuals, flow_frame2, reconstructed_frame2
 
 
@@ -112,7 +118,7 @@ def run_eval(
             frames.append(frame2)
             frame2 = frame2.cuda()
             _, _, _, flow_frame2, reconstructed_frame2 = forward_model(
-                nets, frame1, frame2
+                nets, frame1, frame2, args.flow_off
             )
             reconstructed_frames.append(reconstructed_frame2.cpu())
             flow_frames.append(flow_frame2.cpu())
@@ -325,7 +331,7 @@ def train(args) -> List[nn.Module]:
             frame2 = frame2.cuda()
 
             _, flows, residuals, flow_frame2, reconstructed_frame2 = forward_model(
-                nets, frame1, frame2
+                nets, frame1, frame2, args.flow_off
             )
             flow_frames.append(flow_frame2.cpu())
             reconstructed_frames.append(reconstructed_frame2.cpu())
