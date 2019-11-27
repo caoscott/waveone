@@ -194,26 +194,29 @@ def save(args: argparse.Namespace,
 
 
 def get_model(args: argparse.Namespace) -> nn.Module:
-    if args.network == "waveone":
+    if "waveone" in args.network:
         # context_vec_train_shape = (args.batch_size, 512,
                             #    args.patch // 2 or 144, args.patch // 2 or 176)
         # context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
         latent_vec_size = 512
         # unet = UNet(3, shrink=1)
-        encoder = Encoder(6, latent_vec_size, use_context=False).cuda()
+        encoder = Encoder(6, latent_vec_size, use_context=False)
         # decoder = nn.Sequential(BitToContextDecoder(),
         # ContextToFlowDecoder(3)).cuda()
-        decoder = BitToFlowDecoder(args.bits, 3).cuda()
+        decoder = BitToFlowDecoder(args.bits, 3)
         binarizer = Binarizer(latent_vec_size, args.bits,
-                              not args.binarize_off).cuda()
+                              not args.binarize_off)
         return WaveoneModel(encoder, binarizer, decoder, args.flow_off)
     if args.network == "cae":
         return CAE()
     if args.network == "unet":
         return AutoencoderUNet(6, shrink=1)
     if args.network == "opt":
-        z = torch.tensor(0.)
-        return LambdaModule(lambda _, f2: (z, z, z, z, f2))
+        encoder = LambdaModule(lambda f1, f2, _: f2 - f1)
+        binarizer = nn.Identity()
+        decoder = LambdaModule(lambda r, _: (
+            torch.tensor(0.), r, torch.tensor(0.)))
+        return WaveoneModel(encoder, binarizer, decoder, flow_off=True)
     raise ValueError(f"No model type named {args.network}.")
 
 
@@ -250,7 +253,7 @@ def train(args) -> nn.Module:
     writer = SummaryWriter(f"runs/{args.save_model_name}")
 
     ############### Model ###############
-    model = get_model(args)
+    model = get_model(args).cuda()
     solver = optim.Adam(
         model.parameters() if args.network != "opt" else [torch.zeros((1,))],
         lr=args.lr,
@@ -267,30 +270,33 @@ def train(args) -> nn.Module:
             context_vec: torch.Tensor,
             residuals: torch.Tensor,
     ) -> None:
-        flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-        flows_max = flows.max(dim=0).values.max(  # type: ignore
-            dim=0).values.max(dim=0).values  # type: ignore
-        flows_min = flows.min(dim=0).values.min(  # type: ignore
-            dim=0).values.min(dim=0).values  # type: ignore
+        if args.network != "opt" or args.flow_off is False:
+            flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
+            flows_max = flows.max(dim=0).values.max(  # type: ignore
+                dim=0).values.max(dim=0).values  # type: ignore
+            flows_min = flows.min(dim=0).values.min(  # type: ignore
+                dim=0).values.min(dim=0).values  # type: ignore
+            writer.add_histogram(
+                "mean_flow_x", flows_mean[0].item(), train_iter)
+            writer.add_histogram(
+                "mean_flow_y", flows_mean[1].item(), train_iter)
+            writer.add_histogram(
+                "max_flow_x", flows_max[0].item(), train_iter)
+            writer.add_histogram(
+                "max_flow_y", flows_max[1].item(), train_iter)
+            writer.add_histogram(
+                "min_flow_x", flows_min[0].item(), train_iter)
+            writer.add_histogram(
+                "min_flow_y", flows_min[1].item(), train_iter)
 
-        writer.add_histogram("mean_context_vec_norm",
-                             context_vec.mean().item(), train_iter)
-        writer.add_histogram("max_context_vec_norm",
-                             context_vec.max().item(), train_iter)
-        writer.add_histogram("min_context_vec_norm",
-                             context_vec.min().item(), train_iter)
-        writer.add_histogram(
-            "mean_flow_x", flows_mean[0].item(), train_iter)
-        writer.add_histogram(
-            "mean_flow_y", flows_mean[1].item(), train_iter)
-        writer.add_histogram(
-            "max_flow_x", flows_max[0].item(), train_iter)
-        writer.add_histogram(
-            "max_flow_y", flows_max[1].item(), train_iter)
-        writer.add_histogram(
-            "min_flow_x", flows_min[0].item(), train_iter)
-        writer.add_histogram(
-            "min_flow_y", flows_min[1].item(), train_iter)
+        if "ctx" in args.network:
+            writer.add_histogram("mean_context_vec_norm",
+                                 context_vec.mean().item(), train_iter)
+            writer.add_histogram("max_context_vec_norm",
+                                 context_vec.max().item(), train_iter)
+            writer.add_histogram("min_context_vec_norm",
+                                 context_vec.min().item(), train_iter)
+
         writer.add_histogram("mean_input_residuals",
                              residuals.mean().item(), train_iter)
         writer.add_histogram("max_input_residuals",

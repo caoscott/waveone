@@ -1,7 +1,5 @@
 #!/usr/bin/python
-
-# sub-parts of the U-Net model
-from typing import Callable, Tuple
+from typing import Any, Callable, Tuple
 
 import torch
 import torch.nn as nn
@@ -142,12 +140,11 @@ class Sign(nn.Module):
 
 
 class LambdaModule(nn.Module):
-    def __init__(self, lambd: Callable[..., Tuple[torch.Tensor, ...]]) -> None:
+    def __init__(self, lambd: Callable[Any, Any]) -> None:
         super().__init__()
         self.lambd = lambd
 
-    def forward(self,  # type: ignore
-                *argv: Tuple[torch.Tensor]) -> Tuple[torch.Tensor, ...]:
+    def forward(self, *argv: Tuple[Any]):  # type: ignore
         return self.lambd(*argv)
 
 
