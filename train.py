@@ -123,7 +123,7 @@ def run_eval(
                 else:
                     frame1 = frame2
 
-            total_scores: Dict[str, torch.Tensor] = {
+            total_scores = {
                 **total_scores,
                 **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
                 **eval_scores(frames[1:], flow_frames, prefix + "eval_flow"),
