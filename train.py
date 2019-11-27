@@ -213,9 +213,9 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         return AutoencoderUNet(6, shrink=1)
     if args.network == "opt":
         opt_encoder = LambdaModule(lambda f1, f2, _: f2 - f1)
-        opt_binarizer = nn.Identity()
-        opt_decoder = LambdaModule(lambda r, _: (
-            torch.tensor(0.), r, torch.tensor(0.)))
+        opt_binarizer = nn.Identity()  # type: ignore
+        opt_decoder = LambdaModule(lambda t: (
+            torch.tensor(0.), t[0], torch.tensor(0.)))
         return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
     raise ValueError(f"No model type named {args.network}.")
 
