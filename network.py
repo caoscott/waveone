@@ -121,16 +121,18 @@ class WaveoneModel(nn.Module):
                  binarizer: nn.Module,
                  decoder: nn.Module,
                  flow_off: bool) -> None:
-        super.__init__()
+        super().__init__()
         self.encoder = encoder
         self.binarizer = binarizer
         self.decoder = decoder
         self.flow_off = flow_off
         self.nets = (encoder, binarizer, decoder)
 
-    def forward(self,  # type: ignore
-                frame1: torch.Tensor,
-                frame2: torch.Tensor) -> torch.Tensor:
+    def forward(  # type: ignore
+            self,
+            frame1: torch.Tensor,
+            frame2: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         codes = self.binarizer(self.encoder(frame1, frame2, 0.))
         flows, residuals, _ = self.decoder((codes, 0.))
         flow_frame = frame1 if self.flow_off else F.grid_sample(  # type: ignore

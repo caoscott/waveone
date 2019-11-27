@@ -85,7 +85,7 @@ def run_eval(
         fgsm: bool = False,
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     model.eval()
-    total_scores = {}
+    total_scores: Dict[str, torch.Tensor] = {}
 
     with torch.no_grad():
         for reuse_reconstructed, prefix in ((True, ""), (False, "vcii_")):
@@ -123,7 +123,7 @@ def run_eval(
                 else:
                     frame1 = frame2
 
-            total_scores = {
+            total_scores: Dict[str, torch.Tensor] = {
                 **total_scores,
                 **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
                 **eval_scores(frames[1:], flow_frames, prefix + "eval_flow"),
@@ -172,8 +172,9 @@ def print_scores(scores: Dict[str, torch.Tensor]) -> None:
 
 
 def resume(args: argparse.Namespace,
-           names: Tuple[str],
-           nets: Tuple[nn.Module]) -> None:
+           names: Tuple[str, ...],
+           nets: Tuple[nn.Module, ...]) -> None:
+    assert len(names) == len(nets)
     for name, net in zip(names, nets):
         checkpoint_path = os.path.join(
             args.model_dir,
@@ -186,8 +187,9 @@ def resume(args: argparse.Namespace,
 
 
 def save(args: argparse.Namespace,
-         names: Tuple[str],
-         nets: Tuple[nn.Module]) -> None:
+         names: Tuple[str, ...],
+         nets: Tuple[nn.Module, ...]) -> None:
+    assert len(names) == len(nets)
     for name, net in zip(names, nets):
         checkpoint_path = os.path.join(
             args.model_dir,
