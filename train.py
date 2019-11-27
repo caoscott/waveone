@@ -115,20 +115,20 @@ def run_eval(
         for eval_iter, (frame2,) in enumerate(eval_iterator):
             frames.append(frame2)
             frame2 = frame2.cuda()
-            _, _, _, flow_frame2, reconstructed_frame2 = forward_model(
+            _, _, _, flow_frame, reconstructed_frame2 = forward_model(
                 nets, frame1, frame2, args.flow_off
             )
             reconstructed_frames.append(reconstructed_frame2.cpu())
-            flow_frames.append(flow_frame2.cpu())
+            flow_frames.append(flow_frame.cpu())
             if args.save_out_img:
                 save_tensor_as_img(
-                    frame2, f"{prefix}_{eval_iter}_frame", args
+                    frames[-1], f"{prefix}_{eval_iter}_frame", args
                 )
                 save_tensor_as_img(
-                    flow_frame2, f"{prefix}_{eval_iter}_flow", args
+                    flow_frames[-1], f"{prefix}_{eval_iter}_flow", args
                 )
                 save_tensor_as_img(
-                    reconstructed_frame2,
+                    reconstructed_frames[-1],
                     f"{prefix}_{eval_iter}_reconstructed",
                     args
                 )
@@ -328,14 +328,14 @@ def train(args) -> List[nn.Module]:
         for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
-            _, flows, residuals, flow_frame2, reconstructed_frame2 = forward_model(
+            _, flows, residuals, flow_frame, reconstructed_frame2 = forward_model(
                 nets, frame1, frame2, args.flow_off
             )
-            flow_frames.append(flow_frame2.cpu())
+            flow_frames.append(flow_frame.cpu())
             reconstructed_frames.append(reconstructed_frame2.cpu())
             loss += reconstructed_loss_fn(reconstructed_frame2, frame2)
             if not args.flow_off:
-                loss += flow_loss_fn(flow_frame2, frame2)
+                loss += flow_loss_fn(flow_frame, frame2)
 
             if args.save_max_l2:
                 with torch.no_grad():
