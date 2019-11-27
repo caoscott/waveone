@@ -146,7 +146,8 @@ class LambdaModule(nn.Module):
         super().__init__()
         self.lambd = lambd
 
-    def forward(self, *argv: Tuple[torch.Tensor]) -> torch.Tensor:  # type: ignore
+    def forward(self,  # type: ignore
+                *argv: Tuple[torch.Tensor]) -> Tuple[torch.Tensor, ...]:
         return self.lambd(*argv)
 
 
