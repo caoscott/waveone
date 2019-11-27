@@ -84,12 +84,10 @@ def forward_model(
     encoder, binarizer, decoder = nets
     codes = binarizer(encoder(frame1, frame2, 0.))
     flows, residuals, _ = decoder((codes, 0.))
-    if flow_off:
-        reconstructed_frame2 = frame1 + residuals
-    else:
-        flow_frame2 = F.grid_sample(frame1, flows, align_corners=False)  # type: ignore
-        reconstructed_frame2 = flow_frame2 + residuals
-    return codes, flows, residuals, flow_frame2, reconstructed_frame2
+    flow_frame = frame1 if flow_off else F.grid_sample(  # type: ignore
+        frame1, flows, align_corners=False)
+    reconstructed_frame2 = flow_frame + residuals
+    return codes, flows, residuals, flow_frame, reconstructed_frame2
 
 
 def run_eval(
