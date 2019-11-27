@@ -54,7 +54,8 @@ def get_master_loader(
     id_to_image_lists: Dict[str, ImageList] = get_id_to_image_lists(
         is_train, root, args, frame_len, sampling_range)
     dataset: data.Dataset = data.ConcatDataset(
-        [image_list for _, image_list in id_to_image_lists.items()])
+        [image_list for _, image_list in id_to_image_lists.items()]
+    ) if is_train else MultiVidDataset(id_to_image_lists)
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
@@ -130,6 +131,23 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
     img = np.swapaxes(img, 0, 1)  # w, h, 9
     img = np.swapaxes(img, 0, 2)  # 9, h, w
     return torch.from_numpy(img).float()
+
+
+class MultiVidDataset(data.Dataset):
+    def __init__(self, id_to_image_lists: Dict[str, data.Dataset]) -> None:
+        super().__init__()
+        self.id_to_image_lists = id_to_image_lists
+
+    def __getitem__(self, index: int) -> List[torch.Tensor]:
+        # num_of_datasets x frame_len
+        dataset_by_frames = [image_list[index]
+                             for _, image_list in self.id_to_image_lists.items()]
+        # frame_len x num_of_datasets
+        frames_list = zip(*dataset_by_frames)
+        return [torch.cat(frames) for frames in frames_list]
+
+    def __len__(self) -> int:
+        return 0
 
 
 class ImageList(data.Dataset):
