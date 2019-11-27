@@ -212,11 +212,11 @@ def get_model(args: argparse.Namespace) -> nn.Module:
     if args.network == "unet":
         return AutoencoderUNet(6, shrink=1)
     if args.network == "opt":
-        encoder = LambdaModule(lambda f1, f2, _: f2 - f1)
-        binarizer = nn.Identity()
-        decoder = LambdaModule(lambda r, _: (
+        opt_encoder = LambdaModule(lambda f1, f2, _: f2 - f1)
+        opt_binarizer = nn.Identity()
+        opt_decoder = LambdaModule(lambda r, _: (
             torch.tensor(0.), r, torch.tensor(0.)))
-        return WaveoneModel(encoder, binarizer, decoder, flow_off=True)
+        return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
     raise ValueError(f"No model type named {args.network}.")
 
 

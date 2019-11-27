@@ -140,7 +140,7 @@ class Sign(nn.Module):
 
 
 class LambdaModule(nn.Module):
-    def __init__(self, lambd: Callable[Any, Any]) -> None:
+    def __init__(self, lambd: Callable[..., Any]) -> None:
         super().__init__()
         self.lambd = lambd
 
