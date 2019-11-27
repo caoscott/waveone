@@ -55,7 +55,7 @@ def get_master_loader(
         is_train, root, args, frame_len, sampling_range)
     dataset: data.Dataset = data.ConcatDataset(
         [image_list for _, image_list in id_to_image_lists.items()]
-    ) if is_train else MultiVidDataset(id_to_image_lists)
+    )
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
