@@ -212,7 +212,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
     if args.network == "unet":
         return AutoencoderUNet(6, shrink=1)
     if args.network == "opt":
-        return LambdaModule(lambda f1, f2: f2 - f1)
+        return LambdaModule(lambda _, f2: (0., 0., 0., 0., f2))
     raise ValueError(f"No model type named {args.network}.")
 
 
