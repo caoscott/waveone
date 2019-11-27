@@ -204,7 +204,7 @@ def train(args) -> List[nn.Module]:
     nets: List[nn.Module] = [network]
     names = [args.network]
     solver = optim.Adam(
-        network.parameters() if network != 'opt' else [torch.zeros((1,))],
+        network.parameters() if args.network != 'opt' else [torch.zeros((1,))],
         lr=args.lr,
         weight_decay=args.weight_decay
     )

@@ -15,9 +15,9 @@ from torchvision.utils import save_image
 
 from waveone.dataset import get_master_loader
 from waveone.losses import MSSSIM
-from waveone.network import (AutoencoderUNet, Binarizer, BitToContextDecoder,
-                             BitToFlowDecoder, ContextToFlowDecoder, Encoder,
-                             UNet, WaveoneModel)
+from waveone.network import (CAE, AutoencoderUNet, Binarizer,
+                             BitToContextDecoder, BitToFlowDecoder,
+                             ContextToFlowDecoder, Encoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -128,7 +128,7 @@ def run_eval(
                 **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
                 **eval_scores(frames[1:], flow_frames, prefix + "eval_flow"),
                 **eval_scores(frames[1:], reconstructed_frames,
-                            prefix + "eval_reconstructed"),
+                              prefix + "eval_reconstructed"),
             }
 
         print(f"{eval_name} epoch {epoch}:")
@@ -172,31 +172,48 @@ def print_scores(scores: Dict[str, torch.Tensor]) -> None:
 
 
 def resume(args: argparse.Namespace,
-           names: Tuple[str, ...],
-           nets: Tuple[nn.Module, ...]) -> None:
-    assert len(names) == len(nets)
-    for name, net in zip(names, nets):
-        checkpoint_path = os.path.join(
-            args.model_dir,
-            args.load_model_name,
-            f"{name}.pth",
-        )
+           model: nn.Module) -> None:
+    checkpoint_path = os.path.join(
+        args.model_dir,
+        args.load_model_name,
+        f"{args.network}.pth",
+    )
 
-        print('Loading %s from %s...' % (name, checkpoint_path))
-        net.load_state_dict(torch.load(checkpoint_path))
+    print('Loading %s from %s...' % (args.network, checkpoint_path))
+    model.load_state_dict(torch.load(checkpoint_path))
 
 
 def save(args: argparse.Namespace,
-         names: Tuple[str, ...],
-         nets: Tuple[nn.Module, ...]) -> None:
-    assert len(names) == len(nets)
-    for name, net in zip(names, nets):
-        checkpoint_path = os.path.join(
-            args.model_dir,
-            args.save_model_name,
-            f'{name}.pth',
-        )
-        torch.save(net.state_dict(), checkpoint_path)
+         model: nn.Module) -> None:
+    checkpoint_path = os.path.join(
+        args.model_dir,
+        args.save_model_name,
+        f'{args.network}.pth',
+    )
+    torch.save(model.state_dict(), checkpoint_path)
+
+
+def get_model(args: argparse.Namespace) -> nn.Module:
+    if args.network == "waveone":
+        # context_vec_train_shape = (args.batch_size, 512,
+                            #    args.patch // 2 or 144, args.patch // 2 or 176)
+        # context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
+        latent_vec_size = 512
+        # unet = UNet(3, shrink=1)
+        encoder = Encoder(6, latent_vec_size, use_context=False).cuda()
+        # decoder = nn.Sequential(BitToContextDecoder(),
+        # ContextToFlowDecoder(3)).cuda()
+        decoder = BitToFlowDecoder(args.bits, 3).cuda()
+        binarizer = Binarizer(latent_vec_size, args.bits,
+                              not args.binarize_off).cuda()
+        return WaveoneModel(encoder, binarizer, decoder, args.flow_off)
+    if args.network == "cae":
+        return CAE()
+    if args.network == "unet":
+        return AutoencoderUNet(6, shrink=1)
+    if args.network == "opt":
+        return LambdaModule(lambda f1, f2: f2 - f1)
+    raise ValueError(f"No model type named {args.network}.")
 
 
 def train(args) -> nn.Module:
@@ -232,21 +249,9 @@ def train(args) -> nn.Module:
     writer = SummaryWriter(f"runs/{args.save_model_name}")
 
     ############### Model ###############
-    # context_vec_train_shape = (args.batch_size, 512,
-                            #    args.patch // 2 or 144, args.patch // 2 or 176)
-    # context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
-    latent_vec_size = 512
-    # unet = UNet(3, shrink=1)
-    encoder = Encoder(6, latent_vec_size, use_context=False).cuda()
-    # decoder = nn.Sequential(BitToContextDecoder(),
-                            # ContextToFlowDecoder(3)).cuda()
-    decoder = BitToFlowDecoder(args.bits, 3).cuda()
-    binarizer = Binarizer(latent_vec_size, args.bits,
-                          not args.binarize_off).cuda()
-    model = WaveoneModel(encoder, binarizer, decoder, args.flow_off)
-
+    model = get_model(args)
     solver = optim.Adam(
-        model.parameters(),
+        model.parameters() if args.network != "opt" else [torch.zeros((1,))],
         lr=args.lr,
         weight_decay=args.weight_decay
     )
@@ -262,15 +267,17 @@ def train(args) -> nn.Module:
             residuals: torch.Tensor,
     ) -> None:
         flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-        flows_max = flows.max(dim=0).values.max(dim=0).values.max(dim=0).values  # type: ignore
-        flows_min = flows.min(dim=0).values.min(dim=0).values.min(dim=0).values  # type: ignore
+        flows_max = flows.max(dim=0).values.max(
+            dim=0).values.max(dim=0).values  # type: ignore
+        flows_min = flows.min(dim=0).values.min(
+            dim=0).values.min(dim=0).values  # type: ignore
 
-        writer.add_histogram("mean_context_vec_norm", 
-                          context_vec.mean().item(), train_iter)
+        writer.add_histogram("mean_context_vec_norm",
+                             context_vec.mean().item(), train_iter)
         writer.add_histogram("max_context_vec_norm",
-                          context_vec.max().item(), train_iter)
+                             context_vec.max().item(), train_iter)
         writer.add_histogram("min_context_vec_norm",
-                          context_vec.min().item(), train_iter)
+                             context_vec.min().item(), train_iter)
         writer.add_histogram(
             "mean_flow_x", flows_mean[0].item(), train_iter)
         writer.add_histogram(
@@ -284,11 +291,11 @@ def train(args) -> nn.Module:
         writer.add_histogram(
             "min_flow_y", flows_min[1].item(), train_iter)
         writer.add_histogram("mean_input_residuals",
-                          residuals.mean().item(), train_iter)
+                             residuals.mean().item(), train_iter)
         writer.add_histogram("max_input_residuals",
-                          residuals.max().item(), train_iter)
+                             residuals.max().item(), train_iter)
         writer.add_histogram("min_input_residuals",
-                          residuals.min().item(), train_iter)
+                             residuals.min().item(), train_iter)
 
     ############### Training ###############
 
@@ -296,7 +303,7 @@ def train(args) -> nn.Module:
     just_resumed = False
     if args.load_model_name:
         print(f'Loading {args.load_model_name}')
-        resume(args, WaveoneModel.NAMES, model.nets)
+        resume(args, model)
         just_resumed = True
 
     def train_loop(
@@ -305,7 +312,7 @@ def train(args) -> nn.Module:
         model.train()
         solver.zero_grad()
 
-        context_vec = 0. # .cuda()
+        context_vec = 0.  # .cuda()
         reconstructed_frames = []
         flow_frames = []
         reconstructed_frame2 = None
@@ -352,9 +359,10 @@ def train(args) -> nn.Module:
                           "train_reconstructed"),
         }
 
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-        solver.step()
+        if args.network != "opt":
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+            solver.step()
 
         writer.add_scalar("training_loss", loss.item(), train_iter)
         writer.add_scalar(
@@ -382,7 +390,7 @@ def train(args) -> nn.Module:
             )
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
-            save(args, WaveoneModel.NAMES, model.nets)
+            save(args, model)
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             run_eval("eval", eval_loader, model,
