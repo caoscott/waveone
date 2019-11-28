@@ -271,7 +271,7 @@ def train(args) -> nn.Module:
             context_vec: torch.Tensor,
             residuals: torch.Tensor,
     ) -> None:
-        if args.network != "opt" or args.flow_off is False:
+        if args.network != "opt" and args.flow_off is False:
             flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
             flows_max = flows.max(dim=0).values.max(  # type: ignore
                 dim=0).values.max(dim=0).values  # type: ignore
