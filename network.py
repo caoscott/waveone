@@ -424,8 +424,12 @@ class CAE(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, x):
-        x = x[:, 3:] - x[:, :3]
+    def forward(  # type: ignore
+            self,
+            frame1: torch.Tensor,
+            frame2: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        x = frame2 - frame1
         ec1 = self.e_conv_1(x)
         ec2 = self.e_conv_2(ec1)
         eblock1 = self.e_block_1(ec2) + ec2
@@ -444,7 +448,8 @@ class CAE(nn.Module):
         # encoded tensor
         self.encoded = 0.5 * (ec3 + eps + 1)  # (-1|1) -> (0|1)
 
-        return self.decode(self.encoded)
+        r = self.decode(self.encoded)
+        return self.encoded, 0., r, frame1, frame1 + r
 
     def decode(self, encoded):
         y = encoded * 2.0 - 1  # (0|1) -> (-1|1)
