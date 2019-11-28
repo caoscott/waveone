@@ -89,7 +89,7 @@ def run_eval(
     total_scores: Dict[str, torch.Tensor] = {}
 
     with torch.no_grad():
-        for reuse_reconstructed, prefix in ((True, ""), (False, "vcii_")):
+        for reuse_reconstructed, prefix in ((True, ""), (False, "vcii")):
             eval_iterator = iter(eval_loader)
             frame1 = next(eval_iterator)[0]
             frames = [frame1]
@@ -107,14 +107,14 @@ def run_eval(
                 flow_frames.append(flow_frame.cpu())
                 if args.save_out_img:
                     save_tensor_as_img(
-                        frames[-1], f"{prefix}_{eval_iter}_frame", args
+                        frames[-1], f"{eval_name}_{prefix}_{eval_iter}_frame", args
                     )
                     save_tensor_as_img(
-                        flow_frames[-1], f"{prefix}_{eval_iter}_flow", args
+                        flow_frames[-1], f"{eval_name}_{prefix}_{eval_iter}_flow", args
                     )
                     save_tensor_as_img(
                         reconstructed_frames[-1],
-                        f"{prefix}_{eval_iter}_reconstructed",
+                        f"{eval_name}_{prefix}_{eval_iter}_reconstructed",
                         args
                     )
 
