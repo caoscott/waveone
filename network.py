@@ -449,7 +449,7 @@ class CAE(nn.Module):
         self.encoded = 0.5 * (ec3 + eps + 1)  # (-1|1) -> (0|1)
 
         r = self.decode(self.encoded)
-        return self.encoded, 0., r, frame1, frame1 + r
+        return self.encoded, 0., r, frame1, frame1 + r  # type: ignore
 
     def decode(self, encoded):
         y = encoded * 2.0 - 1  # (0|1) -> (-1|1)
