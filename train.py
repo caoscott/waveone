@@ -89,7 +89,7 @@ def run_eval(
     total_scores: Dict[str, torch.Tensor] = {}
 
     with torch.no_grad():
-        for reuse_reconstructed, prefix in ((True, ""), (False, "vcii")):
+        for reuse_reconstructed, prefix in ((True, ""), (False, "vcii_")):
             eval_iterator = iter(eval_loader)
             frame1 = next(eval_iterator)[0]
             frames = [frame1]
