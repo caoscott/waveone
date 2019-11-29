@@ -91,13 +91,14 @@ def run_eval(
     with torch.no_grad():
         for reuse_reconstructed, prefix in ((True, ""), (False, "vcii_")):
             eval_iterator = iter(eval_loader)
-            frame1 = next(eval_iterator)[0]
+            frame1 = next(eval_iterator)[0].squeeze(0)
             frames = [frame1]
             reconstructed_frames = []
             flow_frames = []
             frame1 = frame1.cuda()
 
             for eval_iter, (frame2,) in enumerate(eval_iterator):
+                frame2 = frame2.squeeze(0)
                 frames.append(frame2)
                 frame2 = frame2.cuda()
                 _, _, _, flow_frame, reconstructed_frame2 = model(
@@ -106,17 +107,18 @@ def run_eval(
                 reconstructed_frames.append(reconstructed_frame2.cpu())
                 flow_frames.append(flow_frame.cpu())
                 if args.save_out_img:
-                    save_tensor_as_img(
-                        frames[-1], f"{eval_name}_{prefix}_{eval_iter}_frame", args
-                    )
-                    save_tensor_as_img(
-                        flow_frames[-1], f"{eval_name}_{prefix}_{eval_iter}_flow", args
-                    )
-                    save_tensor_as_img(
-                        reconstructed_frames[-1],
-                        f"{eval_name}_{prefix}_{eval_iter}_reconstructed",
-                        args
-                    )
+                    for img in imgs:
+                        save_tensor_as_img(
+                            frames[-1], f"{eval_name}_{prefix}_{eval_iter}_frame", args
+                        )
+                        save_tensor_as_img(
+                            flow_frames[-1], f"{eval_name}_{prefix}_{eval_iter}_flow", args
+                        )
+                        save_tensor_as_img(
+                            reconstructed_frames[-1],
+                            f"{eval_name}_{prefix}_{eval_iter}_reconstructed",
+                            args
+                        )
 
                 # Update frame1.
                 if reuse_reconstructed:
@@ -404,7 +406,8 @@ def train(args) -> nn.Module:
                      epoch, args, writer)
             run_eval("train", train_sequential_loader, model,
                      epoch, args, writer)
-            scheduler.step()  # type: ignore
+            if args.network != "opt":
+                scheduler.step()  # type: ignore
             just_resumed = False
 
     print('Training done.')

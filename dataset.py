@@ -1,5 +1,6 @@
 import argparse
 import glob
+import itertools
 import os
 import os.path
 import random
@@ -55,12 +56,12 @@ def get_master_loader(
         is_train, root, args, frame_len, sampling_range)
     dataset: data.Dataset = data.ConcatDataset(
         [image_list for _, image_list in id_to_image_lists.items()]
-    )
+    ) if is_train else MultiVidDataset(id_to_image_lists)
     loader = data.DataLoader(
         dataset,
-        batch_size=args.batch_size if is_train else args.eval_batch_size,
+        batch_size=args.batch_size if is_train else 1,
         shuffle=is_train,
-        num_workers=2,
+        num_workers=0,
         drop_last=is_train,
     )
     print('Loader for {} images ({} batches) created.'.format(
@@ -136,18 +137,21 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 class MultiVidDataset(data.Dataset):
     def __init__(self, id_to_image_lists: Dict[str, data.Dataset]) -> None:
         super().__init__()
-        self.id_to_image_lists = id_to_image_lists
+        self.length = max(len(image_list)
+                          for _, image_list in id_to_image_lists.items())
+        
 
     def __getitem__(self, index: int) -> List[torch.Tensor]:
         # num_of_datasets x frame_len
-        dataset_by_frames = [image_list[index]
-                             for _, image_list in self.id_to_image_lists.items()]
+        datasets_by_frames = [image_list[index] if index < len(image_list) else 
+                              for _, image_list in self.id_to_image_lists.items()]
         # frame_len x num_of_datasets
-        frames_list = zip(*dataset_by_frames)
-        return [torch.cat(frames) for frames in frames_list]
+        frames_by_datasets = itertools.zip_longest(
+            *datasets_by_frames, fillvalue=datasets_by_frames[0][0])
+        return [torch.stack(frames) for frames in frames_by_datasets]
 
     def __len__(self) -> int:
-        return 0
+        return self.length
 
 
 class ImageList(data.Dataset):

@@ -39,8 +39,8 @@ parser.add_argument('--gamma', type=float, default=0.5,
                     help='LR decay factor.')
 parser.add_argument('--batch-size', type=int, default=16,
                     help='Batch size.')
-parser.add_argument('--eval-batch-size', type=int, default=1,
-                    help='Batch size for evaluation.')
+# parser.add_argument('--eval-batch-size', type=int, default=1,
+# help='Batch size for evaluation.')
 parser.add_argument('--reconstructed-loss', choices=['l1', 'l2', 'msssim'],
                     help='Choose loss type for overall reconstruction.', default='msssim')
 parser.add_argument('--flow-loss', choices=['l1', 'l2', 'msssim'],
