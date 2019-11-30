@@ -272,7 +272,7 @@ def train(args) -> nn.Module:
         sampling_range=0,
         args=args,
     )
-    writer = SummaryWriter(f"runs/{args.save_model_name}")
+    writer = SummaryWriter(f"runs/{args.save_model_name}", purge_step=0)
 
     ############### Model ###############
     model = get_model(args).cuda()
