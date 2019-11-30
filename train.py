@@ -86,57 +86,74 @@ def run_eval(
         fgsm: bool = False,
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     model.eval()
-    total_scores: Dict[str, torch.Tensor] = {}
 
     with torch.no_grad():
-        for reuse_reconstructed, prefix in ((True, ""), (False, "vcii_")):
-            eval_iterator = iter(eval_loader)
-            frame1 = next(eval_iterator)[0]
-            frames = [frame1]
-            reconstructed_frames = []
-            flow_frames = []
-            frame1 = frame1.cuda()
+        eval_iterator = iter(eval_loader)
+        frame1 = next(eval_iterator)[0]
+        frames = [frame1]
+        reconstructed_frames = []
+        reconstructed_frames_vcii = []
+        flow_frames = []
+        flow_frames_vcii = []
+        frame1 = torch.cat((frame1, frame1), dim=0).cuda()
 
-            for eval_iter, (frame2,) in enumerate(eval_iterator):
-                frames.append(frame2)
-                frame2 = frame2.cuda()
-                _, _, _, flow_frame, reconstructed_frame2 = model(
-                    frame1, frame2
+        for eval_iter, (frame,) in enumerate(eval_iterator):
+            frames.append(frame)
+            frame = frame.cuda()
+            frame2 = torch.cat((frame, frame), dim=0)
+            _, _, _, flow_frame, reconstructed_frame2 = model(
+                frame1, frame2
+            )
+            reconstructed_frame2_cpu = reconstructed_frame2.cpu()
+            flow_frame_cpu = flow_frame.cpu()
+
+            reconstructed_frames.append(reconstructed_frame2_cpu[0])
+            reconstructed_frames_vcii.append(reconstructed_frame2_cpu[1])
+            flow_frames.append(flow_frame_cpu[0])
+            flow_frames_vcii.append(flow_frame_cpu[1])
+            if args.save_out_img:
+                save_tensor_as_img(
+                    frames[-1], f"{eval_name}_{eval_iter}_frame", args
                 )
-                reconstructed_frames.append(reconstructed_frame2.cpu())
-                flow_frames.append(flow_frame.cpu())
-                if args.save_out_img:
-                    save_tensor_as_img(
-                        frames[-1], f"{eval_name}_{prefix}_{eval_iter}_frame", args
-                    )
-                    save_tensor_as_img(
-                        flow_frames[-1], f"{eval_name}_{prefix}_{eval_iter}_flow", args
-                    )
-                    save_tensor_as_img(
-                        reconstructed_frames[-1],
-                        f"{eval_name}_{prefix}_{eval_iter}_reconstructed",
-                        args
-                    )
+                save_tensor_as_img(
+                    flow_frames[-1], f"{eval_name}_{eval_iter}_flow", args
+                )
+                save_tensor_as_img(
+                    flow_frames_vcii[-1], f"{eval_name}_{eval_iter}_flow_vcii", args
+                )
+                save_tensor_as_img(
+                    reconstructed_frames[-1],
+                    f"{eval_name}_{eval_iter}_reconstructed",
+                    args
+                )
+                save_tensor_as_img(
+                    reconstructed_frames_vcii[-1],
+                    f"{eval_name}_{eval_iter}_reconstructed_vcii",
+                    args
+                )
 
-                # Update frame1.
-                if reuse_reconstructed:
-                    frame1 = reconstructed_frame2
-                else:
-                    frame1 = frame2
+            # Update frame1.
+            frame1 = torch.cat((reconstructed_frame2[0: 1], frame2), dim=0)
 
-            total_scores = {
-                **total_scores,
-                **eval_scores(frames[:-1], frames[1:], prefix + "eval_baseline"),
-                **eval_scores(frames[1:], flow_frames, prefix + "eval_flow"),
-                **eval_scores(frames[1:], reconstructed_frames,
-                              prefix + "eval_reconstructed"),
-            }
+        total_scores: Dict[str, torch.Tensor] = {
+            **eval_scores(frames[:-1], frames[1:], f"{eval_name}_baseline"),
+            **eval_scores(frames[1:], flow_frames, f"{eval_name}_flow"),
+            **eval_scores(frames[1:], reconstructed_frames,
+                          f"{eval_name}_reconstructed"),
+            # **eval_scores(frames[:-1], frames[1:], "vcii_eval_baseline"),
+            **eval_scores(frames[1:], flow_frames_vcii, f"{eval_name}_vcii_flow"),
+            **eval_scores(frames[1:], reconstructed_frames_vcii,
+                          f"{eval_name}_vcii_reconstructed"),
+        }
 
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
         print_scores(total_scores)
         score_diffs = get_score_diffs(
-            total_scores, ["flow", "reconstructed"], ["eval", "vcii_eval"])
+            total_scores,
+            ["flow", "reconstructed", "vcii_flow", "vcii_reconstructed"],
+            [eval_name]
+        )
         plot_scores(writer, score_diffs, epoch)
         return total_scores, score_diffs
 
