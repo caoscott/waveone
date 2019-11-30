@@ -109,10 +109,10 @@ def run_eval(
             reconstructed_frame2_cpu = reconstructed_frame2.cpu()
             flow_frame_cpu = flow_frame.cpu()
 
-            reconstructed_frames.append(reconstructed_frame2_cpu[0])
-            reconstructed_frames_vcii.append(reconstructed_frame2_cpu[1])
-            flow_frames.append(flow_frame_cpu[0])
-            flow_frames_vcii.append(flow_frame_cpu[1])
+            reconstructed_frames.append(reconstructed_frame2_cpu[:1])
+            reconstructed_frames_vcii.append(reconstructed_frame2_cpu[1:])
+            flow_frames.append(flow_frame_cpu[:1])
+            flow_frames_vcii.append(flow_frame_cpu[1:])
             if args.save_out_img:
                 save_tensor_as_img(
                     frames[-1], f"{eval_name}_{eval_iter}_frame", args
