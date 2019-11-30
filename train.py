@@ -419,7 +419,7 @@ def train(args) -> nn.Module:
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             run_eval("eval", eval_loader, model,
                      epoch, args, writer)
-            run_eval("train", train_sequential_loader, model,
+            run_eval("training", train_sequential_loader, model,
                      epoch, args, writer)
             scheduler.step()  # type: ignore
             just_resumed = False
