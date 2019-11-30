@@ -243,10 +243,9 @@ def get_model(args: argparse.Namespace) -> nn.Module:
 
 
 def train(args) -> nn.Module:
-    log_dir = os.path.join(args.log_dir, args.save_model_name)
     output_dir = os.path.join(args.out_dir, args.save_model_name)
     model_dir = os.path.join(args.model_dir, args.save_model_name)
-    create_directories((output_dir, model_dir, log_dir))
+    create_directories((output_dir, model_dir))
 
     print(args)
     ############### Data ###############
@@ -346,7 +345,7 @@ def train(args) -> nn.Module:
         flow_frames = []
         reconstructed_frame2 = None
 
-        losses = []
+        loss: torch.Tensor = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
         for frame2 in frames[1:]:
@@ -357,13 +356,8 @@ def train(args) -> nn.Module:
             )
             flow_frames.append(flow_frame.cpu())
             reconstructed_frames.append(reconstructed_frame2.cpu())
-            loss = reconstructed_loss_fn(frame2, reconstructed_frame2) + (
+            loss += reconstructed_loss_fn(frame2, reconstructed_frame2) + (
                 0 if args.flow_off else flow_loss_fn(frame2, flow_frame))
-            losses.append(loss.item())
-            if args.network != "opt":
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-                solver.step()
 
             if args.save_max_l2:
                 with torch.no_grad():
@@ -383,9 +377,13 @@ def train(args) -> nn.Module:
             log_flow_context_residuals(
                 writer, flows, torch.tensor(context_vec), torch.abs(frame2 - frame1))
 
-            # frame1 = reconstructed_frame2.detach()
-            frame1 = frame2
+            frame1 = reconstructed_frame2.detach()
+            # frame1 = frame2
 
+        if args.network != "opt":
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+            solver.step()
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
             **eval_scores(frames[1:], flow_frames, "train_flow"),
@@ -393,7 +391,11 @@ def train(args) -> nn.Module:
                           "train_reconstructed"),
         }
 
-        writer.add_scalar("training_loss", np.average(losses), train_iter)
+        writer.add_scalar(
+            "training_loss",
+            loss.item() / (len(frames)-1),
+            train_iter,
+        )
         writer.add_scalar(
             "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
         plot_scores(writer, scores, train_iter)
