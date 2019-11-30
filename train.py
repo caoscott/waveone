@@ -101,6 +101,8 @@ def run_eval(
             frames.append(frame)
             frame = frame.cuda()
             frame2 = torch.cat((frame, frame), dim=0)
+            assert frame1.shape == frame2.shape
+            assert frame1.shape[0] == 2
             _, _, _, flow_frame, reconstructed_frame2 = model(
                 frame1, frame2
             )
@@ -133,7 +135,9 @@ def run_eval(
                 )
 
             # Update frame1.
-            frame1 = torch.cat((reconstructed_frame2[0: 1], frame2), dim=0)
+            frame1 = torch.cat((reconstructed_frame2[0: 1], frame), dim=0)
+            assert frame1.shape == frame2.shape
+            assert frame1.shape[0] == 2
 
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(frames[:-1], frames[1:], f"{eval_name}_baseline"),
