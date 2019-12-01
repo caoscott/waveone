@@ -4,7 +4,13 @@ from typing import Any, Callable, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.data
+from torch import nn as nn
+from torch import optim
 from torch.autograd import Function
+from torch.nn import functional as F
+from torchvision import datasets, transforms
+from torchvision.utils import save_image
 
 
 class double_conv(nn.Module):
@@ -15,19 +21,23 @@ class double_conv(nn.Module):
         in_ch: int,
         out_ch: int,
         downsample: bool = False,
-        norm: str = "batch"
-    ):
+        norm: str = "batch",
+        activation: str = "leaky_relu",
+    ) -> None:
         super().__init__()
         stride = 2 if downsample else 1
+        activation = nn.LeakyReLU(inplace=True) if activation == "leaky_relu" \
+            else GDN(out_ch, inverse=False) if activation == "gdn" \
+            else GDN(out_ch, inverse=True)
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1),
             nn.BatchNorm2d(
                 out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            nn.LeakyReLU(inplace=True),
+            activation,
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(
                 out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            nn.LeakyReLU(inplace=True)
+            acivation,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
@@ -37,7 +47,7 @@ class double_conv(nn.Module):
 class inconv(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.conv = double_conv(in_ch, out_ch)
+        self.conv = double_conv(in_ch, out_ch, activation="gdn")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.conv(x)
@@ -46,7 +56,8 @@ class inconv(nn.Module):
 class down(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.mpconv = double_conv(in_ch, out_ch, downsample=True)
+        self.mpconv = double_conv(
+            in_ch, out_ch, downsample=True, activation="gdn")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.mpconv(x)
@@ -63,7 +74,7 @@ class up(nn.Module):
         else:
             self.up: nn.Module = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
 
-        self.conv = double_conv(in_ch * 2, out_ch)
+        self.conv = double_conv(in_ch * 2, out_ch, activation="igdn")
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:  # type: ignore
         x1 = self.up(x1)
@@ -87,7 +98,7 @@ class upconv(nn.Module):
         else:
             self.up: nn.Module = nn.ConvTranspose2d(in_ch, out_ch, 2, stride=2)
 
-        self.conv = double_conv(out_ch, out_ch)
+        self.conv = double_conv(out_ch, out_ch, activation="igdn")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x = self.up(x)
@@ -173,3 +184,93 @@ class revnet_block(nn.Module):
 
 #     def forward(x):
 #         F.conv2d(x, self.t1000, stride=2)
+
+
+class LowerBound(Function):
+    @staticmethod
+    def forward(ctx, inputs, bound):
+        b = torch.ones(inputs.size())*bound
+        b = b.to(inputs.device)
+        ctx.save_for_backward(inputs, b)
+        return torch.max(inputs, b)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        inputs, b = ctx.saved_tensors
+
+        pass_through_1 = inputs >= b
+        pass_through_2 = grad_output < 0
+
+        pass_through = pass_through_1 | pass_through_2
+        return pass_through.type(grad_output.dtype) * grad_output, None
+
+
+class GDN(nn.Module):
+    """Generalized divisive normalization layer.
+    y[i] = x[i] / sqrt(beta[i] + sum_j(gamma[j, i] * x[j]))
+    """
+
+    def __init__(self,
+                 ch: int,
+                 inverse: bool = False,
+                 beta_min: float = 1e-6,
+                 gamma_init: float = 0.1,
+                 reparam_offset: float = 2**-18) -> None:
+        super(GDN, self).__init__()
+        self.inverse = inverse
+        self.beta_min = beta_min
+        self.gamma_init = gamma_init
+        self.reparam_offset = torch.FloatTensor([reparam_offset])
+
+        self.build(ch)
+
+    def build(self, ch: int) -> None:
+        self.pedestal = self.reparam_offset**2
+        self.beta_bound = (self.beta_min + self.reparam_offset**2)**.5
+        self.gamma_bound = self.reparam_offset
+
+        # Create beta param
+        beta = torch.sqrt(torch.ones(ch)+self.pedestal)
+        self.beta = nn.Parameter(beta)
+
+        # Create gamma param
+        eye = torch.eye(ch)
+        g = self.gamma_init*eye
+        g = g + self.pedestal
+        gamma = torch.sqrt(g)
+
+        self.gamma = nn.Parameter(gamma)
+        self.pedestal = self.pedestal
+
+    def forward(self,  # type: ignore
+                inputs: torch.Tensor) -> torch.Tensor:
+        unfold = False
+        if inputs.dim() == 5:
+            unfold = True
+            bs, ch, d, w, h = inputs.size()
+            inputs = inputs.view(bs, ch, d*w, h)
+
+        _, ch, _, _ = inputs.size()
+
+        # Beta bound and reparam
+        beta = LowerBound()(self.beta, self.beta_bound)
+        beta = beta**2 - self.pedestal
+
+        # Gamma bound and reparam
+        gamma = LowerBound()(self.gamma, self.gamma_bound)
+        gamma = gamma**2 - self.pedestal
+        gamma = gamma.view(ch, ch, 1, 1)
+
+        # Norm pool calc
+        norm_ = nn.functional.conv2d(inputs**2, gamma, beta)
+        norm_ = torch.sqrt(norm_)
+
+        # Apply norm
+        if self.inverse:
+            outputs = inputs * norm_
+        else:
+            outputs = inputs / norm_
+
+        if unfold:
+            outputs = outputs.view(bs, ch, d, w, h)
+        return outputs

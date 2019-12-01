@@ -344,7 +344,6 @@ def train(args) -> nn.Module:
         reconstructed_frames = []
         flow_frames = []
         reconstructed_frame2 = None
-
         loss: torch.Tensor = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
