@@ -59,7 +59,8 @@ class double_conv(nn.Module):
 class inconv(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.conv = double_conv(in_ch, out_ch, norm="off", activation="gdn")
+        self.conv = double_conv(in_ch, out_ch, norm="batch",
+                                activation="leaky_relu")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.conv(x)
@@ -69,7 +70,7 @@ class down(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.mpconv = double_conv(
-            in_ch, out_ch, downsample=True, norm="off", activation="gdn")
+            in_ch, out_ch, downsample=True, norm="batch", activation="leaky_relu")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.mpconv(x)
@@ -87,7 +88,7 @@ class up(nn.Module):
             self.up: nn.Module = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
 
         self.conv = double_conv(
-            in_ch * 2, out_ch, norm="off", activation="igdn")
+            in_ch * 2, out_ch, norm="batch", activation="ileaky_relu")
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:  # type: ignore
         x1 = self.up(x1)
@@ -111,7 +112,8 @@ class upconv(nn.Module):
         else:
             self.up: nn.Module = nn.ConvTranspose2d(in_ch, out_ch, 2, stride=2)
 
-        self.conv = double_conv(out_ch, out_ch, norm="off", activation="igdn")
+        self.conv = double_conv(
+            out_ch, out_ch, norm="batch", activation="ileaky_relu")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x = self.up(x)

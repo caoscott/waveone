@@ -86,13 +86,12 @@ class BitToFlowDecoder(nn.Module):
         )
         self.flow = nn.Sequential(
             upconv(256, 128, bilinear=False),
-            outconv(128, 2),
+            nn.Conv2d(128, 2, kernel_size=1, bias=False),
             # nn.Conv2d(128, 2, kernel_size=3, padding=1),
         )
         self.residual = nn.Sequential(
             upconv(256, 128, bilinear=False),
-            outconv(128, out_ch),
-            nn.Tanh(),
+            nn.Conv2d(128, out_ch, kernel_size=1, bias=False),
             # nn.Conv2d(128, out_ch, kernel_size=3, padding=1),
         )
 
@@ -141,6 +140,9 @@ class WaveoneModel(nn.Module):
         flow_frame = frame1 if self.flow_off else F.grid_sample(  # type: ignore
             frame1, flows, align_corners=False)
         reconstructed_frame2 = flow_frame + residuals
+        if self.training is False:  # type: ignore
+            reconstructed_frame2 = torch.clamp(
+                reconstructed_frame2, min=-0.5, max=0.5)
         return codes, flows, residuals, flow_frame, reconstructed_frame2
 
 
