@@ -225,7 +225,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         # decoder = nn.Sequential(BitToContextDecoder(),
         # ContextToFlowDecoder(3)).cuda()
         decoder = BitToFlowDecoder(args.bits, 3)
-        binarizer = Binarizer(latent_vec_size, args.bits,
+        binarizer = Binarizer(args.bits, args.bits,
                               not args.binarize_off)
         return WaveoneModel(encoder, binarizer, decoder, args.flow_off)
     if args.network == "cae":
