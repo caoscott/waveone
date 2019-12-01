@@ -25,19 +25,32 @@ class double_conv(nn.Module):
     ) -> None:
         super().__init__()
         stride = 2 if downsample else 1
-        nonlinearity = nn.LeakyReLU(inplace=True) if activation == "leaky_relu" \
-            else GDN(out_ch, inverse=False) if activation == "gdn" \
-            else GDN(out_ch, inverse=True)
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1),
-            nn.BatchNorm2d(
-                out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            nonlinearity,
+            self.get_norm(norm, out_ch),
+            self.get_activation(activation, out_ch),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
-            nn.BatchNorm2d(
-                out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            nonlinearity,
+            self.get_norm(norm, out_ch),
+            self.get_activation(activation, out_ch),
         )
+
+    def get_norm(self, norm: str, ch: int) -> nn.Module:
+        if norm == "off":
+            return nn.Identity()
+        if norm == "batch":
+            return nn.BatchNorm2d(ch)
+        if norm == "group":
+            return nn.GroupNorm(32, ch)
+        raise ValueError("f{norm} normalization not found.")
+
+    def get_activation(self, activation: str, ch: int) -> nn.Module:
+        if activation == "leaky_relu":
+            return nn.LeakyReLU(inplace=True)
+        if activation == "gdn":
+            return GDN(ch, inverse=False)
+        if activation == "igdn":
+            return GDN(ch, inverse=True)
+        raise ValueError(f"{activation} activation not found.")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.conv(x)
@@ -46,7 +59,7 @@ class double_conv(nn.Module):
 class inconv(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.conv = double_conv(in_ch, out_ch, activation="gdn")
+        self.conv = double_conv(in_ch, out_ch, norm="off", activation="gdn")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.conv(x)
@@ -56,7 +69,7 @@ class down(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.mpconv = double_conv(
-            in_ch, out_ch, downsample=True, activation="gdn")
+            in_ch, out_ch, downsample=True, norm="off", activation="gdn")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.mpconv(x)
@@ -73,7 +86,8 @@ class up(nn.Module):
         else:
             self.up: nn.Module = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
 
-        self.conv = double_conv(in_ch * 2, out_ch, activation="igdn")
+        self.conv = double_conv(
+            in_ch * 2, out_ch, norm="off", activation="igdn")
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:  # type: ignore
         x1 = self.up(x1)
@@ -97,7 +111,7 @@ class upconv(nn.Module):
         else:
             self.up: nn.Module = nn.ConvTranspose2d(in_ch, out_ch, 2, stride=2)
 
-        self.conv = double_conv(out_ch, out_ch, activation="igdn")
+        self.conv = double_conv(out_ch, out_ch, norm="off", activation="igdn")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x = self.up(x)

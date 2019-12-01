@@ -32,10 +32,10 @@ class Encoder(nn.Module):
         self.use_context = use_context
 
     def forward(  # type: ignore
-        self,
-        frame1: torch.Tensor,
-        frame2: torch.Tensor,
-        context_vec: torch.Tensor
+            self,
+            frame1: torch.Tensor,
+            frame2: torch.Tensor,
+            context_vec: torch.Tensor
     ) -> torch.Tensor:
         # frames_x = torch.cat(
         #     (self.encode_frame1(frame1), self.encode_frame2(frame2)),
@@ -171,12 +171,12 @@ class ContextToFlowDecoder(nn.Module):
         super().__init__()
         self.flow = nn.Sequential(
             upconv(1024, 128, bilinear=False),
-            outconv(128, 2),
+            nn.Conv2d(128, 2, kernel_size=1, bias=False),
             nn.Tanh(),
         )
         self.residual = nn.Sequential(
             upconv(1024, 128, bilinear=False),
-            outconv(128, out_ch),
+            nn.Conv2d(128, out_ch, kernel_size=1, bias=False),
             nn.Tanh(),
         )
 
