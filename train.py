@@ -252,8 +252,8 @@ def train(args) -> nn.Module:
     train_loader = get_master_loader(
         is_train=True,
         root=args.train,
-        frame_len=4,
-        sampling_range=12,
+        frame_len=args.frame_len,
+        sampling_range=args.sampling_range,
         args=args,
     )
     train_sequential_loader = get_master_loader(

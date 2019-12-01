@@ -45,6 +45,11 @@ parser.add_argument('--reconstructed-loss', choices=['l1', 'l2', 'msssim'],
                     help='Choose loss type for overall reconstruction.', default='msssim')
 parser.add_argument('--flow-loss', choices=['l1', 'l2', 'msssim'],
                     help='Choose loss type for flow. No-op for --flow-off', default='l1')
+parser.add_argument('--sampling-range', type=int, default=5,
+                    help='Number of frames in future to sample from for next frame during '
+                         'training. 0 means picking the exact next frame in sequential order')
+parser.add_argument('--frame-len', type=int, default=3,
+                    help='Number of next frames to actually pick for training.')
 
 # To save computation, we compute objective for multiple
 # crops for each forward pass.
@@ -70,7 +75,5 @@ parser.add_argument('--checkpoint-epochs', type=int, default=20,
                     help='Model checkpoint period.')
 parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
-parser.add_argument('--log-dir', type=str, default="logs",
-                    help="Name of logs directory.")
 parser.add_argument('--save-max-l2', action='store_true',
                     help='If true, save max l2 images for train epoch.')
