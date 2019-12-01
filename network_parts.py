@@ -26,18 +26,18 @@ class double_conv(nn.Module):
     ) -> None:
         super().__init__()
         stride = 2 if downsample else 1
-        activation = nn.LeakyReLU(inplace=True) if activation == "leaky_relu" \
+        nonlinearity = nn.LeakyReLU(inplace=True) if activation == "leaky_relu" \
             else GDN(out_ch, inverse=False) if activation == "gdn" \
             else GDN(out_ch, inverse=True)
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1),
             nn.BatchNorm2d(
                 out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            activation,
+            nonlinearity,
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(
                 out_ch) if norm == "batch" else nn.GroupNorm(32, out_ch),
-            acivation,
+            nonlinearity,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
