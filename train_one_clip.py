@@ -249,20 +249,20 @@ def train(args) -> nn.Module:
     print(args)
     ############### Data ###############
 
-    train_loader = get_loaders(
+    train_loader = list(get_loaders(
         is_train=True,
         root=args.train,
         frame_len=args.frame_len,
         sampling_range=args.sampling_range,
         args=args,
-    ).values()[0]
-    train_sequential_loader = get_loaders(
+    ).values())[0]
+    train_sequential_loader = list(get_loaders(
         is_train=False,
         root=args.train,
         frame_len=1,
         sampling_range=0,
         args=args,
-    ).values()[0]
+    ).values())[0]
     eval_loader = get_master_loader(
         is_train=False,
         root=args.eval,
