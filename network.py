@@ -24,10 +24,10 @@ class Encoder(nn.Module):
         )
         self.encode_context = inconv(512, 512)
         self.encode = nn.Sequential(
-            down(512, 512),
-            down(512, 512),
-            down(512, 512),
-            nn.Conv2d(512, out_ch, kernel_size=3, padding=1),
+            down(512, 1024),
+            down(1024, 1024),
+            down(1024, 1024),
+            nn.Conv2d(1024, out_ch, kernel_size=3, padding=1),
         )
         self.use_context = use_context
 
@@ -38,9 +38,12 @@ class Encoder(nn.Module):
         context_vec: torch.Tensor
     ) -> torch.Tensor:
         # frames_x = torch.cat(
-            # (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
+        #     (self.encode_frame1(frame1), self.encode_frame2(frame2)),
+        #     dim=1
+        # )
+        x = frame2 - frame1
         frames_x = torch.cat(
-            (self.encode_frame1(frame1), self.encode_frame2(frame2)),
+            (self.encode_frame1(x), self.encode_frame2(x)),
             dim=1
         )
         context_x = self.encode_context(context_vec) if self.use_context else 0.
@@ -77,17 +80,17 @@ class BitToFlowDecoder(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.ups = nn.Sequential(
-            upconv(in_ch, 512, bilinear=False),
-            upconv(512, 512, bilinear=False),
-            upconv(512, 512, bilinear=False),
+            upconv(in_ch, 1024, bilinear=False),
+            upconv(1024, 512, bilinear=False),
+            upconv(512, 256, bilinear=False),
         )
         self.flow = nn.Sequential(
-            upconv(512, 128, bilinear=False),
+            upconv(256, 128, bilinear=False),
             outconv(128, 2),
             # nn.Conv2d(128, 2, kernel_size=3, padding=1),
         )
         self.residual = nn.Sequential(
-            upconv(512, 128, bilinear=False),
+            upconv(256, 128, bilinear=False),
             outconv(128, out_ch),
             nn.Tanh(),
             # nn.Conv2d(128, out_ch, kernel_size=3, padding=1),

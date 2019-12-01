@@ -220,9 +220,8 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         # context_vec_train_shape = (args.batch_size, 512,
                             #    args.patch // 2 or 144, args.patch // 2 or 176)
         # context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
-        latent_vec_size = 512
         # unet = UNet(3, shrink=1)
-        encoder = Encoder(6, latent_vec_size, use_context=False)
+        encoder = Encoder(6, args.bits, use_context=False)
         # decoder = nn.Sequential(BitToContextDecoder(),
         # ContextToFlowDecoder(3)).cuda()
         decoder = BitToFlowDecoder(args.bits, 3)
