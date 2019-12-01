@@ -220,7 +220,7 @@ class GDN(nn.Module):
         self.inverse = inverse
         self.beta_min = beta_min
         self.gamma_init = gamma_init
-        self.reparam_offset = torch.FloatTensor([reparam_offset])
+        self.reparam_offset = torch.tensor(reparam_offset)
 
         self.build(ch)
 
