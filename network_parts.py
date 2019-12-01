@@ -8,7 +8,6 @@ import torch.utils.data
 from torch import nn as nn
 from torch import optim
 from torch.autograd import Function
-from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
 
@@ -253,11 +252,11 @@ class GDN(nn.Module):
         _, ch, _, _ = inputs.size()
 
         # Beta bound and reparam
-        beta = LowerBound()(self.beta, self.beta_bound)
+        beta = LowerBound.apply(self.beta, self.beta_bound)
         beta = beta**2 - self.pedestal
 
         # Gamma bound and reparam
-        gamma = LowerBound()(self.gamma, self.gamma_bound)
+        gamma = LowerBound.apply(self.gamma, self.gamma_bound)
         gamma = gamma**2 - self.pedestal
         gamma = gamma.view(ch, ch, 1, 1)
 
