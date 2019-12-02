@@ -185,12 +185,12 @@ class ImageList(data.Dataset):
                 imgs = multi_crop_cv2(imgs, self.args.patch)
         imgs = [square_cv2(img) for img in imgs]
 
-        frames: List[torch.Tensor] = [np_to_torch(img.astype(np.float64) / 255 - 0.5)
+        frames: List[torch.Tensor] = [np_to_torch(img.astype(np.float64)/255*2 - 1)
                                       for img in imgs]
 
         for frame in frames:
-            assert frame.max() <= 0.5  # type: ignore
-            assert frame.min() >= -0.5  # type: ignore
+            assert frame.max() <= 1  # type: ignore
+            assert frame.min() >= -1  # type: ignore
         assert len(frames) == self.frame_len
 
         return frames

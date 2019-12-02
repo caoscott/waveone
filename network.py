@@ -485,7 +485,9 @@ class PredNet(nn.Module):
 
         for i in range(self.n_layers):
             conv = nn.Sequential(
-                nn.Conv2d(self.r_channels[i], self.a_channels[i], 3, padding=1), nn.ReLU())
+                nn.Conv2d(self.r_channels[i], self.a_channels[i], 3, padding=1),
+                # nn.ReLU(),
+            )
             if i == 0:
                 conv.add_module('satlu', SatLU())
             setattr(self, 'conv{}'.format(i), conv)
@@ -571,4 +573,4 @@ class PredNet(nn.Module):
         if self.output_mode == 'error':
             return torch.stack(total_error, 2)  # batch x n_layers x nt
         elif self.output_mode == 'prediction':
-            return frame_prediction
+            return frame_prediction.clamp(-1., 1.)

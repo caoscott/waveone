@@ -46,7 +46,8 @@ def save_tensor_as_img(
         extension: str = "png",
 ) -> None:
     output_dir = os.path.join(args.out_dir, args.save_model_name)
-    save_image(t + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
+    save_image(t, os.path.join(
+        output_dir, f"{name}.{extension}"), range=(-1., 1.))
 
 ############### Eval ###################
 
