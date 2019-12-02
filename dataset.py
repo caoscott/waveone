@@ -107,7 +107,7 @@ def flip_cv2(imgs: List[np.ndarray]) -> List[np.ndarray]:
     if random.random() < 0.5:  # type: ignore
         # imgs = [img[::-1].copy() for img in imgs]
         # trying this flip
-        imgs = [np.flip(img, axis=1) for img in imgs]
+        imgs = [np.flip(img, axis=0) for img in imgs]
     return imgs
 
 
