@@ -241,10 +241,14 @@ def train(args) -> nn.Module:
     model = get_model(args)
     print(model)
     model = model.cuda()
-    solver = optim.Adam(
-        model.parameters() if args.network != "opt" else [torch.zeros((1,))],
-        lr=args.lr,
-        weight_decay=args.weight_decay
+    # solver = optim.Adam(
+    #     model.parameters() if args.network != "opt" else [torch.zeros((1,))],
+    #     lr=args.lr,
+    #     weight_decay=args.weight_decay
+    # )
+    solver = optim.SGD(
+        model.parameters(), args.lr, momentum=0.9,
+        weight_decay=args.weight_decay, nesterov=True,
     )
     milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
