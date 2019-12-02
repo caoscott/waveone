@@ -88,6 +88,7 @@ def run_eval(
         fgsm: bool = False,
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     model.eval()
+    model.set_output_mode("prediction")
     frames = []
     preds = []
 
