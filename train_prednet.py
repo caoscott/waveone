@@ -87,68 +87,29 @@ def run_eval(
         fgsm: bool = False,
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     model.eval()
+    frames = []
+    preds = []
 
     with torch.no_grad():
-        eval_iterator = iter(eval_loader)
-        frame1 = next(eval_iterator)[0]
-        frames = [frame1]
-        reconstructed_frames = []
-        reconstructed_frames_vcii = []
-        flow_frames = []
-        flow_frames_vcii = []
-        frame1 = torch.cat((frame1, frame1), dim=0).cuda()
-
-        for eval_iter, (frame,) in enumerate(eval_iterator):
+        for eval_iter, (frame,) in enumerate(eval_loader):
+            pred = model(frame.unsqueeze(dim=1).cuda()).cpu().squeeze()
             frames.append(frame)
-            frame = frame.cuda()
-            frame2 = torch.cat((frame, frame), dim=0)
-            assert frame1.shape == frame2.shape
-            assert frame1.shape[0] == 2
-            _, _, _, flow_frame, reconstructed_frame2 = model(
-                frame1, frame2
-            )
-            reconstructed_frame2_cpu = reconstructed_frame2.cpu()
-            flow_frame_cpu = flow_frame.cpu()
+            preds.append(pred)
 
-            reconstructed_frames.append(reconstructed_frame2_cpu[:1])
-            reconstructed_frames_vcii.append(reconstructed_frame2_cpu[1:])
-            flow_frames.append(flow_frame_cpu[:1])
-            flow_frames_vcii.append(flow_frame_cpu[1:])
             if args.save_out_img:
                 save_tensor_as_img(
-                    frames[-1], f"{eval_name}_{eval_iter}_frame", args
+                    frame, f"{eval_name}_{eval_iter}_frame", args
                 )
                 save_tensor_as_img(
-                    flow_frames[-1], f"{eval_name}_{eval_iter}_flow", args
-                )
-                save_tensor_as_img(
-                    flow_frames_vcii[-1], f"{eval_name}_{eval_iter}_flow_vcii", args
-                )
-                save_tensor_as_img(
-                    reconstructed_frames[-1],
-                    f"{eval_name}_{eval_iter}_reconstructed",
+                    pred,
+                    f"{eval_name}_{eval_iter}_pred",
                     args
                 )
-                save_tensor_as_img(
-                    reconstructed_frames_vcii[-1],
-                    f"{eval_name}_{eval_iter}_reconstructed_vcii",
-                    args
-                )
-
-            # Update frame1.
-            frame1 = torch.cat((reconstructed_frame2[0: 1], frame), dim=0)
-            assert frame1.shape == frame2.shape
-            assert frame1.shape[0] == 2
 
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(frames[:-1], frames[1:], f"{eval_name}_baseline"),
-            **eval_scores(frames[1:], flow_frames, f"{eval_name}_flow"),
-            **eval_scores(frames[1:], reconstructed_frames,
+            **eval_scores(frames[1:], preds[:-1],
                           f"{eval_name}_reconstructed"),
-            # **eval_scores(frames[:-1], frames[1:], "vcii_eval_baseline"),
-            **eval_scores(frames[1:], flow_frames_vcii, f"{eval_name}_vcii_flow"),
-            **eval_scores(frames[1:], reconstructed_frames_vcii,
-                          f"{eval_name}_vcii_reconstructed"),
         }
 
         print(f"{eval_name} epoch {epoch}:")
@@ -156,7 +117,7 @@ def run_eval(
         print_scores(total_scores)
         score_diffs = get_score_diffs(
             total_scores,
-            ["flow", "reconstructed", "vcii_flow", "vcii_reconstructed"],
+            ["reconstructed"],
             [eval_name]
         )
         plot_scores(writer, score_diffs, epoch)
@@ -286,8 +247,6 @@ def train(args) -> nn.Module:
     )
     milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
-    reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
-    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
 
     layer_loss_weights = torch.tensor([[1.], [0.], [0.], [0.]]).cuda()
     time_loss_weights = 1./(args.frame_len - 1) * torch.ones(args.frame_len, 1)
@@ -351,49 +310,24 @@ def train(args) -> nn.Module:
         solver.zero_grad()
 
         seq = torch.stack(frames).cuda()
-        loss = model(seq)
-
-           if args.save_max_l2:
-                with torch.no_grad():
-                    batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
-                        dim=-1).mean(dim=-1).mean(dim=-1).cpu()
-                    max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
-                    max_batch_l2_frames = (
-                        frame1[max_batch_l2_idx].cpu(),
-                        frame2[max_batch_l2_idx].cpu(),
-                        reconstructed_frame2[max_batch_l2_idx].detach().cpu(),
-                    )
-                    max_l2: float = max_batch_l2.item()  # type: ignore
-                    yield max_l2, max_batch_l2_frames
-            else:
-                yield 0, (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
-
-            log_flow_context_residuals(
-                writer, flows, torch.tensor(context_vec), torch.abs(frame2 - frame1))
-
-            frame1 = reconstructed_frame2.detach()
-
-            # frame1 = frame2
+        errors = model(seq)
+        # batch*n_layers x 1
+        errors = torch.mm(errors.view(-1, args.frame_len), time_loss_weights)
+        errors = torch.mm(errors.view(errors.size(0), -1), layer_loss_weights)
+        loss = torch.mean(errors)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         solver.step()
-        scores = {
-            **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:], flow_frames, "train_flow"),
-            **eval_scores(frames[1:], reconstructed_frames,
-                          "train_reconstructed"),
-        }
 
         writer.add_scalar(
             "training_loss",
-            loss.item() / (len(frames)-1),
+            loss.item(),
             train_iter,
         )
         writer.add_scalar(
-            "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
-        plot_scores(writer, scores, train_iter)
-        score_diffs = get_score_diffs(scores, ["reconstructed"], ["train"])
-        plot_scores(writer, score_diffs, train_iter)
+            "lr", solver.param_groups[0]["lr"], train_iter)
+
+        yield 0, (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
 
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
