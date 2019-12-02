@@ -13,8 +13,6 @@ from torch.nn.modules.utils import _pair
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
 
-import asnp
-
 
 class double_conv(nn.Module):
     '''(conv => BN => LeakyReLU) * 2'''
