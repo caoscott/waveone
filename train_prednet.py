@@ -58,7 +58,7 @@ def eval_scores(
         prefix: str,
 ) -> Dict[str, torch.Tensor]:
     l1_loss_fn = nn.L1Loss(reduction="mean")
-    msssim_fn = MSSSIM(val_range=1, normalize=True)
+    msssim_fn = MSSSIM(val_range=2, normalize=True)
 
     assert len(frames1) == len(frames2)
     frame_len = len(frames1)
