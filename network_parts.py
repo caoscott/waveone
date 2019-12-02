@@ -356,7 +356,7 @@ class ConvLSTMCell(nn.Module):
         n = 4 * self.in_channels
         for k in self.kernel_size:
             n *= k
-        stdv = 1. / torch.sqrt(n)
+        stdv = 1. / np.sqrt(n)
         self.weight_ih.data.uniform_(-stdv, stdv)
         self.weight_hh.data.uniform_(-stdv, stdv)
         self.weight_ch.data.uniform_(-stdv, stdv)
