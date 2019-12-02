@@ -310,10 +310,11 @@ def train(args) -> nn.Module:
         solver.zero_grad()
 
         seq = torch.stack(frames, dim=1).cuda()
-        errors = model(seq)
+        errors = model(seq)  # batch x n_layers x nt
+        batch_size = errors.size(0)
         # batch*n_layers x 1
         errors = torch.mm(errors.view(-1, args.frame_len), time_loss_weights)
-        errors = torch.mm(errors.view(errors.size(0), -1), layer_loss_weights)
+        errors = torch.mm(errors.view(batch_size, -1), layer_loss_weights)
         loss = torch.mean(errors)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
