@@ -75,7 +75,7 @@ def get_loss_fn(loss_type: str) -> nn.Module:
     assert loss_type in ["l1", "l2", "msssim"]
     return nn.MSELoss(reduction="mean") if loss_type == 'l2' \
         else nn.L1Loss(reduction="mean") if loss_type == 'l1' \
-        else MSSSIM(val_range=1, normalize=True, negative=True)
+        else MSSSIM(val_range=2, normalize=True, negative=True)
 
 
 def run_eval(
