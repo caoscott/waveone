@@ -1,6 +1,7 @@
 #!/usr/bin/python
 from typing import Any, Callable, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,6 +12,8 @@ from torch.autograd import Function, Variable
 from torch.nn.modules.utils import _pair
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
+
+import asnp
 
 
 class double_conv(nn.Module):
@@ -246,7 +249,7 @@ class GDN(nn.Module):
         self.gamma_bound = self.reparam_offset
 
         # Create beta param
-        beta = torch.sqrt(torch.ones(ch)+self.pedestal)
+        beta = np.sqrt(torch.ones(ch)+self.pedestal)
         self.beta = nn.Parameter(beta)
 
         # Create gamma param
