@@ -375,7 +375,7 @@ def train(args) -> nn.Module:
             log_flow_context_residuals(
                 writer, flows, torch.tensor(context_vec), torch.abs(frame2 - frame1))
 
-            frame1 = reconstructed_frame2.detach()
+            frame1 = reconstructed_frame2  # .detach()
             # frame1 = frame2
 
         if args.network != "opt":
