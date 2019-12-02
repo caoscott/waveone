@@ -180,7 +180,8 @@ class ImageList(data.Dataset):
             imgs = self.imgs[index: index+self.frame_len]
 
         if self.is_train:
-            imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
+            # imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
+            imgs = flip_cv2(imgs)
             if self.args.patch:
                 imgs = multi_crop_cv2(imgs, self.args.patch)
         imgs = [square_cv2(img) for img in imgs]

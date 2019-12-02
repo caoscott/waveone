@@ -1,13 +1,10 @@
 import argparse
 import logging
 import os
-from collections import defaultdict
-from typing import Dict, Iterator, List, Tuple, Union
+from typing import Dict, Iterator, List, Tuple
 
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as LS
 import torch.utils.data as data
@@ -306,18 +303,26 @@ def train(args) -> nn.Module:
         resume(args, model)
         just_resumed = True
 
-    def train_loop(
-            frames: List[torch.Tensor],
-    ) -> Iterator[Tuple[float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]]:
+    def train_loop(frames: List[torch.Tensor]) -> None:
         model.train()
         model.set_output_mode("error")
         solver.zero_grad()
 
-        seq = torch.stack(frames, dim=1).cuda()
+        seq = torch.stack(frames, dim=1)
+        if args.save_out_img:
+            for imgs in seq:
+                save_tensor_as_img(
+                    imgs,
+                    f"seq_{train_iter}_imgs",
+                    args,
+                )
+
+        seq = seq.cuda()
         errors = model(seq)  # batch x n_layers x nt
         batch_size = errors.size(0)
         # batch*n_layers x 1
         errors = torch.mm(errors.view(-1, args.frame_len), time_loss_weights)
+        # batch x 1
         errors = torch.mm(errors.view(batch_size, -1), layer_loss_weights)
         loss = torch.mean(errors)
         loss.backward()
@@ -332,25 +337,10 @@ def train(args) -> nn.Module:
         writer.add_scalar(
             "lr", solver.param_groups[0]["lr"], train_iter)
 
-        yield 0, (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
-
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
             train_iter += 1
-            max_epoch_l2, max_epoch_l2_frames = max(
-                train_loop(frames), key=lambda x: x[0])
-
-        if args.save_max_l2:
-            save_tensor_as_img(
-                max_epoch_l2_frames[1],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame",
-                args,
-            )
-            save_tensor_as_img(
-                max_epoch_l2_frames[2],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed",
-                args,
-            )
+            train_loop(frames)
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)
@@ -358,8 +348,8 @@ def train(args) -> nn.Module:
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             run_eval("eval", eval_loader, model,
                      epoch, args, writer)
-            run_eval("training", train_sequential_loader, model,
-                     epoch, args, writer)
+            # run_eval("training", train_sequential_loader, model,
+                    #  epoch, args, writer)
             scheduler.step()  # type: ignore
             just_resumed = False
 
