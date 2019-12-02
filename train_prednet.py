@@ -94,7 +94,7 @@ def run_eval(
 
     with torch.no_grad():
         for eval_iter, (frame,) in enumerate(eval_loader):
-            pred = model(frame.unsqueeze(dim=1).cuda()).cpu().squeeze()
+            pred = model(frame.unsqueeze(dim=1).cuda()).cpu().squeeze(1)
             frames.append(frame)
             preds.append(pred)
 
