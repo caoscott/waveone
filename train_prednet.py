@@ -309,7 +309,7 @@ def train(args) -> nn.Module:
         model.set_output_mode("error")
         solver.zero_grad()
 
-        seq = torch.stack(frames).cuda()
+        seq = torch.stack(frames, dim=1).cuda()
         errors = model(seq)
         # batch*n_layers x 1
         errors = torch.mm(errors.view(-1, args.frame_len), time_loss_weights)
