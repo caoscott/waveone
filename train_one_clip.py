@@ -240,7 +240,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             torch.tensor(0.), t[0], torch.tensor(0.)))
         return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
     if args.network == "small":
-        small_encoder = SmallEncoder(6, args.bits),
+        small_encoder = SmallEncoder(6, args.bits)
         small_binarizer = SmallBinarizer(not args.binarize_off)
         small_decoder = SmallDecoder(args.bits, 3)
         return WaveoneModel(small_encoder, small_binarizer, small_decoder, args.flow_off)

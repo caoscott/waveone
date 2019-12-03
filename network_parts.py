@@ -342,16 +342,16 @@ class ConvLSTMCell(nn.Module):
         self.weight_ch = nn.Parameter(torch.tensor(  # type: ignore
             3 * out_channels, out_channels // groups, *kernel_size))
         if bias:
-            self.bias_ih = nn.Parameter(
-                torch.tensor(4 * out_channels))  # type: ignore
-            self.bias_hh = nn.Parameter(
-                torch.tensor(4 * out_channels))  # type: ignore
-            self.bias_ch = nn.Parameter(
-                torch.tensor(3 * out_channels))  # type: ignore
+            self.bias_ih = nn.Parameter(  # type: ignore
+                torch.tensor(4 * out_channels))
+            self.bias_hh = nn.Parameter(  # type: ignore
+                torch.tensor(4 * out_channels))
+            self.bias_ch = nn.Parameter(  # type: ignore
+                torch.tensor(3 * out_channels))
         else:
-            self.register_parameter('bias_ih', None)
-            self.register_parameter('bias_hh', None)
-            self.register_parameter('bias_ch', None)
+            self.register_parameter('bias_ih', None)  # type: ignore
+            self.register_parameter('bias_hh', None)  # type: ignore
+            self.register_parameter('bias_ch', None)  # type: ignore
         self.register_buffer('wc_blank', torch.zeros(1, 1, 1, 1))
         self.reset_parameters()
 
