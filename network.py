@@ -61,7 +61,6 @@ class SmallEncoder(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(128, out_ch, 3, stride=2, padding=1),
         )
-        self.use_context = use_context
 
     def forward(  # type: ignore
             self,

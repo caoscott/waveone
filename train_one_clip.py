@@ -18,7 +18,8 @@ from waveone.dataset import get_loaders, get_master_loader
 from waveone.losses import MSSSIM
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
-                             ContextToFlowDecoder, Encoder, UNet, WaveoneModel)
+                             ContextToFlowDecoder, Encoder, SmallBinarizer,
+                             SmallDecoder, SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -238,6 +239,11 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         opt_decoder = LambdaModule(lambda t: (
             torch.tensor(0.), t[0], torch.tensor(0.)))
         return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
+    if args.network == "small":
+        small_encoder = SmallEncoder(6, args.bits),
+        small_binarizer = SmallBinarizer(not args.binarize_off)
+        small_decoder = SmallDecoder(args.bits, 3)
+        return WaveoneModel(small_encoder, small_binarizer, small_decoder, args.flow_off)
     raise ValueError(f"No model type named {args.network}.")
 
 
