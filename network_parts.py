@@ -335,16 +335,19 @@ class ConvLSTMCell(nn.Module):
             k // 2 for k, s, p, d in zip(kernel_size, stride, padding, dilation))
         self.dilation = dilation
         self.groups = groups
-        self.weight_ih = nn.Parameter(torch.Tensor(  # type: ignore
+        self.weight_ih = nn.Parameter(torch.tensor(  # type: ignore
             4 * out_channels, in_channels // groups, *kernel_size))
-        self.weight_hh = nn.Parameter(torch.Tensor(  # type: ignore
+        self.weight_hh = nn.Parameter(torch.tensor(  # type: ignore
             4 * out_channels, out_channels // groups, *kernel_size))
-        self.weight_ch = nn.Parameter(torch.Tensor(  # type: ignore
+        self.weight_ch = nn.Parameter(torch.tensor(  # type: ignore
             3 * out_channels, out_channels // groups, *kernel_size))
         if bias:
-            self.bias_ih = nn.Parameter(torch.Tensor(4 * out_channels))
-            self.bias_hh = nn.Parameter(torch.Tensor(4 * out_channels))
-            self.bias_ch = nn.Parameter(torch.Tensor(3 * out_channels))
+            self.bias_ih = nn.Parameter(
+                torch.tensor(4 * out_channels))  # type: ignore
+            self.bias_hh = nn.Parameter(
+                torch.tensor(4 * out_channels))  # type: ignore
+            self.bias_ch = nn.Parameter(
+                torch.tensor(3 * out_channels))  # type: ignore
         else:
             self.register_parameter('bias_ih', None)
             self.register_parameter('bias_hh', None)
