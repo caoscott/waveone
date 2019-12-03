@@ -23,7 +23,7 @@ parser.add_argument('--normalization', default='batch', type=str,
                     help='Set normalization in networks.')
 parser.add_argument('--network',
                     choices=("unet", "opt", "cae", "waveone",
-                             "waveone-ctx", "prednet"),
+                             "waveone-ctx", "prednet", "small"),
                     help='Set network architecture.')
 
 ######## Learning ########

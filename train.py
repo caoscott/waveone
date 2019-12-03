@@ -18,7 +18,8 @@ from waveone.dataset import get_master_loader
 from waveone.losses import MSSSIM
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
-                             ContextToFlowDecoder, Encoder, UNet, WaveoneModel)
+                             ContextToFlowDecoder, Encoder, SmallBinarizer,
+                             SmallDecoder, SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -45,7 +46,7 @@ def save_tensor_as_img(
         extension: str = "png",
 ) -> None:
     output_dir = os.path.join(args.out_dir, args.save_model_name)
-    save_image(t + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
+    save_image(t / 2 + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
 
 ############### Eval ###################
 
@@ -56,7 +57,7 @@ def eval_scores(
         prefix: str,
 ) -> Dict[str, torch.Tensor]:
     l1_loss_fn = nn.L1Loss(reduction="mean")
-    msssim_fn = MSSSIM(val_range=1, normalize=True)
+    msssim_fn = MSSSIM(val_range=2, normalize=True)
 
     assert len(frames1) == len(frames2)
     frame_len = len(frames1)
@@ -73,7 +74,7 @@ def get_loss_fn(loss_type: str) -> nn.Module:
     assert loss_type in ["l1", "l2", "msssim"]
     return nn.MSELoss(reduction="mean") if loss_type == 'l2' \
         else nn.L1Loss(reduction="mean") if loss_type == 'l1' \
-        else MSSSIM(val_range=1, normalize=True, negative=True)
+        else MSSSIM(val_range=2, normalize=True, negative=True)
 
 
 def run_eval(
@@ -238,6 +239,11 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         opt_decoder = LambdaModule(lambda t: (
             torch.tensor(0.), t[0], torch.tensor(0.)))
         return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
+    if args.network == "small":
+        small_encoder = SmallEncoder(6, args.bits),
+        small_binarizer = SmallBinarizer(not args.binarize_off)
+        small_decoder = SmallDecoder(args.bits, 3)
+        return WaveoneModel(small_encoder, small_binarizer, small_decoder, args.flow_off)
     raise ValueError(f"No model type named {args.network}.")
 
 

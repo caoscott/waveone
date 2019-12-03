@@ -51,6 +51,69 @@ class Encoder(nn.Module):
         return self.encode(frames_x + context_x)
 
 
+class SmallEncoder(nn.Module):
+    def __init__(self, in_ch: int, out_ch: int) -> None:
+        super().__init__()
+        self.encode = nn.Sequential(
+            nn.Conv2d(in_ch, 128, 3, stride=2, padding=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(128, 128, 3, stride=2, padding=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(128, out_ch, 3, stride=2, padding=1),
+        )
+        self.use_context = use_context
+
+    def forward(  # type: ignore
+            self,
+            frame1: torch.Tensor,
+            frame2: torch.Tensor,
+            context_vec: torch.Tensor
+    ) -> torch.Tensor:
+        # frames_x = torch.cat(
+        #     (self.encode_frame1(frame1), self.encode_frame2(frame2)),
+        #     dim=1
+        # )
+        x = frame2 - frame1
+        return self.encode(x)
+
+
+class SmallBinarizer(nn.Module):
+    def __init__(
+        self,
+        use_binarizer: bool = True
+    ) -> None:
+        super().__init__()
+        self.sign = Sign()
+        self.tanh = nn.Tanh()
+        self.use_binarizer = use_binarizer
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
+        x = self.tanh(x)
+        if self.use_binarizer:
+            return self.sign(x)
+        else:
+            return x
+
+
+class SmallDecoder(nn.Module):
+    def __init__(self, in_ch: int, out_ch: int) -> None:
+        super().__init__()
+        self.residual = nn.Sequential(
+            nn.ConvTranspose2d(in_ch, 128, 2, stride=2),
+            nn.LeakyReLU(inplace=True),
+            nn.ConvTranspose2d(128, 128, 2, stride=2),
+            nn.LeakyReLU(inplace=True),
+            nn.ConvTranspose2d(128, out_ch, 2, stride=2),
+            nn.Tanh(),
+        )
+
+    def forward(  # type: ignore
+            self,
+            x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return 0., self.residual(x) * 2, 0.  # type: ignore
+
+
 # class FeatureEncoder(nn.Module):
 #     def __init__(self, out_ch: int, use_context: bool, shrink: int = 1) -> None:
 #         super().__init__()
@@ -102,7 +165,7 @@ class BitToFlowDecoder(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x, context_vec = input_tuple
         x = self.ups(x)
-        r = self.residual(x)  # .clamp(-1., 1.)
+        r = self.residual(x) * 2
         identity_theta = torch.tensor(
             BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
         f = self.flow(x).permute(0, 2, 3, 1)
@@ -143,7 +206,7 @@ class WaveoneModel(nn.Module):
         reconstructed_frame2 = flow_frame + residuals
         if self.training is False:  # type: ignore
             reconstructed_frame2 = torch.clamp(
-                reconstructed_frame2, min=-0.5, max=0.5)
+                reconstructed_frame2, min=-1., max=1.)
         return codes, flows, residuals, flow_frame, reconstructed_frame2
 
 
@@ -189,7 +252,7 @@ class ContextToFlowDecoder(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         _, context = input_tuple
         x = torch.cat(input_tuple, dim=1)
-        r = self.residual(x)
+        r = self.residual(x) * 2
         identity_theta = torch.tensor(
             ContextToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
         # f = self.flow(x).permute(0, 2, 3, 1) + \
@@ -246,7 +309,7 @@ class AutoencoderUNet(nn.Module):
         y3 = self.up3(y2, x2)
         y4 = self.up4(y3)
         y5 = self.outconv(y4)
-        return self.tanh(y5)
+        return self.tanh(y5) * 2
 
 
 class UNet(nn.Module):
@@ -320,7 +383,7 @@ class CAE(nn.Module):
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
@@ -332,7 +395,7 @@ class CAE(nn.Module):
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
@@ -344,7 +407,7 @@ class CAE(nn.Module):
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
@@ -364,7 +427,7 @@ class CAE(nn.Module):
         self.d_up_conv_1 = nn.Sequential(
             nn.Conv2d(in_channels=32, out_channels=64,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.ConvTranspose2d(in_channels=64, out_channels=128,
@@ -376,7 +439,7 @@ class CAE(nn.Module):
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
@@ -388,7 +451,7 @@ class CAE(nn.Module):
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
@@ -400,7 +463,7 @@ class CAE(nn.Module):
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.Conv2d(in_channels=128, out_channels=128,
@@ -411,7 +474,7 @@ class CAE(nn.Module):
         self.d_up_conv_2 = nn.Sequential(
             nn.Conv2d(in_channels=128, out_channels=32,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ZeroPad2d((1, 1, 1, 1)),
             nn.ConvTranspose2d(in_channels=32, out_channels=256,
@@ -422,7 +485,7 @@ class CAE(nn.Module):
         self.d_up_conv_3 = nn.Sequential(
             nn.Conv2d(in_channels=256, out_channels=16,
                       kernel_size=(3, 3), stride=(1, 1)),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
 
             nn.ReflectionPad2d((2, 2, 2, 2)),
             nn.Conv2d(in_channels=16, out_channels=3,
@@ -467,7 +530,7 @@ class CAE(nn.Module):
         uc2 = self.d_up_conv_2(dblock3)
         dec = self.d_up_conv_3(uc2)
 
-        return dec
+        return dec * 2
 
 
 class PredNet(nn.Module):

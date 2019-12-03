@@ -45,7 +45,7 @@ def save_tensor_as_img(
         extension: str = "png",
 ) -> None:
     output_dir = os.path.join(args.out_dir, args.save_model_name)
-    save_image(t + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
+    save_image(t / 2 + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
 
 ############### Eval ###################
 
@@ -56,7 +56,7 @@ def eval_scores(
         prefix: str,
 ) -> Dict[str, torch.Tensor]:
     l1_loss_fn = nn.L1Loss(reduction="mean")
-    msssim_fn = MSSSIM(val_range=1, normalize=True)
+    msssim_fn = MSSSIM(val_range=2, normalize=True)
 
     assert len(frames1) == len(frames2)
     frame_len = len(frames1)
@@ -73,7 +73,7 @@ def get_loss_fn(loss_type: str) -> nn.Module:
     assert loss_type in ["l1", "l2", "msssim"]
     return nn.MSELoss(reduction="mean") if loss_type == 'l2' \
         else nn.L1Loss(reduction="mean") if loss_type == 'l1' \
-        else MSSSIM(val_range=1, normalize=True, negative=True)
+        else MSSSIM(val_range=2, normalize=True, negative=True)
 
 
 def run_eval(
