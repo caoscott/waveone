@@ -38,7 +38,7 @@ class double_conv(nn.Module):
 
     def get_norm(self, norm: str, ch: int) -> nn.Module:
         if norm == "off":
-            return nn.Identity()
+            return nn.Identity()  # type: ignore
         if norm == "batch":
             return nn.BatchNorm2d(ch)
         if norm == "group":
@@ -248,7 +248,7 @@ class GDN(nn.Module):
 
         # Create beta param
         beta = np.sqrt(torch.ones(ch)+self.pedestal)
-        self.beta = nn.Parameter(beta)
+        self.beta = nn.Parameter(beta)  # type: ignore
 
         # Create gamma param
         eye = torch.eye(ch)
@@ -256,7 +256,7 @@ class GDN(nn.Module):
         g = g + self.pedestal
         gamma = torch.sqrt(g)
 
-        self.gamma = nn.Parameter(gamma)
+        self.gamma = nn.Parameter(gamma)  # type: ignore
         self.pedestal = self.pedestal
 
     def forward(self,  # type: ignore
@@ -270,11 +270,11 @@ class GDN(nn.Module):
         _, ch, _, _ = inputs.size()
 
         # Beta bound and reparam
-        beta = LowerBound.apply(self.beta, self.beta_bound)
+        beta = LowerBound.apply(self.beta, self.beta_bound)  # type: ignore
         beta = beta**2 - self.pedestal
 
         # Gamma bound and reparam
-        gamma = LowerBound.apply(self.gamma, self.gamma_bound)
+        gamma = LowerBound.apply(self.gamma, self.gamma_bound)  # type: ignore
         gamma = gamma**2 - self.pedestal
         gamma = gamma.view(ch, ch, 1, 1)
 
@@ -311,11 +311,11 @@ class ConvLSTMCell(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
-                 kernel_size: int,
-                 stride: int = 1,
-                 padding: int = 1,
-                 dilation: int = 1,
-                 groups: int = 1,
+                 kernel_size,
+                 stride=1,
+                 padding=1,
+                 dilation=1,
+                 groups=1,
                  bias: bool = True) -> None:
         super(ConvLSTMCell, self).__init__()
         if in_channels % groups != 0:
@@ -335,11 +335,11 @@ class ConvLSTMCell(nn.Module):
             k // 2 for k, s, p, d in zip(kernel_size, stride, padding, dilation))
         self.dilation = dilation
         self.groups = groups
-        self.weight_ih = nn.Parameter(torch.Tensor(
+        self.weight_ih = nn.Parameter(torch.Tensor(  # type: ignore
             4 * out_channels, in_channels // groups, *kernel_size))
-        self.weight_hh = nn.Parameter(torch.Tensor(
+        self.weight_hh = nn.Parameter(torch.Tensor(  # type: ignore
             4 * out_channels, out_channels // groups, *kernel_size))
-        self.weight_ch = nn.Parameter(torch.Tensor(
+        self.weight_ch = nn.Parameter(torch.Tensor(  # type: ignore
             3 * out_channels, out_channels // groups, *kernel_size))
         if bias:
             self.bias_ih = nn.Parameter(torch.Tensor(4 * out_channels))
