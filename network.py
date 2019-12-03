@@ -108,8 +108,9 @@ class SmallDecoder(nn.Module):
 
     def forward(  # type: ignore
             self,
-            x: torch.Tensor
+            input_tuple: Tuple[torch.Tensor, torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        x, _ = input_tuple
         return 0., self.residual(x) * 2, 0.  # type: ignore
 
 
