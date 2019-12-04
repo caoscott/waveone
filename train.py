@@ -383,7 +383,11 @@ def train(args) -> nn.Module:
                 yield 0, (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
 
             log_flow_context_residuals(
-                writer, flows, torch.tensor(context_vec), torch.abs(frame2 - frame1))
+                writer,
+                model_out["flow_out"], 
+                torch.tensor(context_vec), 
+                torch.abs(frame2 - frame1),
+            )
 
             frame1 = reconstructed_frame2.detach()
             # frame1 = frame2
