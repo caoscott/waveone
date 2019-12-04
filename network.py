@@ -54,7 +54,8 @@ class SmallEncoder(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.encode = nn.Sequential(
-            nn.Conv2d(in_ch // 2 + 2, 128, 3, stride=2, padding=1),
+            nn.Conv2d(in_ch // 2, 128, 3, stride=2, padding=1),
+            # nn.Conv2d(in_ch // 2 + 2, 128, 3, stride=2, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(128, 128, 3, stride=2, padding=1),
             nn.LeakyReLU(inplace=True),
@@ -72,13 +73,13 @@ class SmallEncoder(nn.Module):
         #     dim=1
         # )
         x = frame2 - frame1
-        b, _, h, w = x.size()
-        x_h = torch.linspace(-1., 1., h).reshape(1, 1, h,
-                                                 1).expand(b, 1, h, w).cuda()
-        x_w = torch.linspace(-1., 1., w).reshape(1, 1, 1,
-                                                 w).expand(b, 1, h, w).cuda()
+        # b, _, h, w = x.size()
+        # x_h = torch.linspace(-1., 1., h).reshape(1, 1, h,
+        #                                          1).expand(b, 1, h, w).cuda()
+        # x_w = torch.linspace(-1., 1., w).reshape(1, 1, 1,
+        #                                          w).expand(b, 1, h, w).cuda()
 
-        x = torch.cat((x, x_h, x_w), dim=1)
+        # x = torch.cat((x, x_h, x_w), dim=1)
         return self.encode(x)
 
 
@@ -107,21 +108,22 @@ class SmallDecoder(nn.Module):
 
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.residual = nn.Sequential(
+        self.ups = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
+        )
+        self.residual = nn.Sequential(
             nn.ConvTranspose2d(128, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
             nn.ConvTranspose2d(128, out_ch, 2, stride=2),
             nn.Tanh(),
         )
         self.flow = nn.Sequential(
-            nn.ConvTranspose2d(in_ch, 128, 2, stride=2),
+            nn.ConvTranspose2d(128, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
             nn.ConvTranspose2d(128, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
-            nn.ConvTranspose2d(128, 2, 2, stride=2),
-            nn.Tanh(),
+            nn.Conv2d(128, 2, 1),
         )
 
     def forward(  # type: ignore
@@ -129,19 +131,22 @@ class SmallDecoder(nn.Module):
             input_tuple: Tuple[torch.Tensor, torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x, context_vec = input_tuple
+        x = self.ups(x)
         f = self.flow(x).permute(0, 2, 3, 1)
         r = self.residual(x) * 2
 
         assert f.shape[-1] == 2
 
-        # grid_normalize = torch.tensor(
-            # f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
+        grid_normalize = torch.tensor(
+            f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
-        # f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
-        #     identity_theta, r.shape, align_corners=False)
-        f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-                                   align_corners=False)
+        f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
+            identity_theta, r.shape, align_corners=False)
+        # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
+                                #    align_corners=False)
+        if self.training:
+            f_grid = f_grid.clamp(-1., 1.)
 
         return f_grid, r, context_vec  # type: ignore
 
