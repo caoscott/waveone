@@ -114,6 +114,7 @@ class SmallDecoder(nn.Module):
             nn.ConvTranspose2d(128, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
             nn.ConvTranspose2d(128, 2, 2, stride=2),
+            nn.Tanh(),
         )
 
     def forward(  # type: ignore
@@ -121,17 +122,25 @@ class SmallDecoder(nn.Module):
             input_tuple: Tuple[torch.Tensor, torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x, context_vec = input_tuple
-        f = self.flow(x).permute(0, 2, 3, 1)
-        r = self.residual(x) * 2
+        b, _, h, w = x.size()
+        x_h = torch.linspace(-1., 1., h).reshape(1, 1, h, 1).expand(b, 1, h, w).cuda()
+        x_w = torch.linspace(-1., 1., w).reshape(1, 1, 1, w).expand(b, 1, h, w).cuda()
+
+        z = torch.cat((x, x_h, x_w), dim=1)
+
+        f = self.flow(z).permute(0, 2, 3, 1)
+        r = self.residual(z) * 2
 
         assert f.shape[-1] == 2
 
-        grid_normalize = torch.tensor(
-            f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
+        # grid_normalize = torch.tensor(
+            # f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
-        f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=False)
+        # f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
+        #     identity_theta, r.shape, align_corners=False)
+        f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
+                                   align_corners=False)
 
         return f_grid, r, context_vec  # type: ignore
 
@@ -192,12 +201,12 @@ class BitToFlowDecoder(nn.Module):
             BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
         f = self.flow(x).permute(0, 2, 3, 1)
         assert f.shape[-1] == 2
-        grid_normalize = torch.tensor(
-            f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
-        f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=False)
-        # f = F.affine_grid(identity_theta, r.shape,  # type: ignore
-        #                   align_corners=False)
+        # grid_normalize = torch.tensor(
+            # f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
+        # f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
+            # identity_theta, r.shape, align_corners=False)
+        f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
+                                   align_corners=False)
         return f_grid, r, context_vec
 
 
