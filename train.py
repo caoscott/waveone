@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
 from waveone.dataset import get_master_loader
-from waveone.losses import MSSSIM
+from waveone.losses import MSSSIM, TotalVariation
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
                              ContextToFlowDecoder, Encoder, SmallBinarizer,
@@ -289,6 +289,7 @@ def train(args) -> nn.Module:
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
     reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
     flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
+    tv = TotalVariation().cuda()
 
     def log_flow_context_residuals(
             writer: SummaryWriter,
@@ -355,23 +356,26 @@ def train(args) -> nn.Module:
         for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
-            _, flows, residuals, flow_frame, reconstructed_frame2 = model(
+            model_out = model(
                 frame1, frame2
             )
-            flow_frames.append(flow_frame.cpu())
-            reconstructed_frames.append(reconstructed_frame2.cpu())
-            loss += reconstructed_loss_fn(frame2, reconstructed_frame2) + (
-                0 if args.flow_off else flow_loss_fn(frame2, flow_frame))
+            loss += reconstructed_loss_fn(frame2,
+                                          model_out["reconstructed_frame"]) \
+                + 0 if args.flow_off else flow_loss_fn(frame2, model_out["flow_frame"]) \
+                + 1e-4 * tv(model_out["flow_out"])
+            flow_frames.append(model_out["flow_frame"].cpu())
+            reconstructed_frames.append(model_out["reconstructed_frame"].cpu())
 
             if args.save_max_l2:
                 with torch.no_grad():
-                    batch_l2 = ((frame2 - frame1 - residuals) ** 2).mean(
+                    batch_l2 = ((frame2 - frame1 - model_out["residuals"]) ** 2).mean(
                         dim=-1).mean(dim=-1).mean(dim=-1).cpu()
                     max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
                     max_batch_l2_frames = (
                         frame1[max_batch_l2_idx].cpu(),
                         frame2[max_batch_l2_idx].cpu(),
-                        reconstructed_frame2[max_batch_l2_idx].detach().cpu(),
+                        model_out["reconstructed_frame"][max_batch_l2_idx].detach(
+                        ).cpu(),
                     )
                     max_l2: float = max_batch_l2.item()  # type: ignore
                     yield max_l2, max_batch_l2_frames

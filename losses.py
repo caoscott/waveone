@@ -212,3 +212,8 @@ class CharbonnierLoss(torch.nn.Module):
 #         mse = self.mse_loss(img1, img2)
 #         return torch.clamp(
 #             torch.mul(torch.log10(255. * 2), 10.), 0., 99.99)[0]
+
+class TotalVariation(nn.Module):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
+        return (torch.sum(torch.abs(x[:, :-1, :, :] - x[:, 1:, :, :])) +
+                torch.sum(torch.abs(x[:, :, :-1, :] - x[:, :, 1:, :])))

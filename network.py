@@ -129,7 +129,7 @@ class SmallDecoder(nn.Module):
     def forward(  # type: ignore
             self,
             input_tuple: Tuple[torch.Tensor, torch.Tensor],
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Dict[str, torch.Tensor]:
         x, context_vec = input_tuple
         x = self.ups(x)
         f = self.flow(x).permute(0, 2, 3, 1)
@@ -141,14 +141,19 @@ class SmallDecoder(nn.Module):
             f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
-        f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
+        f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
             identity_theta, r.shape, align_corners=False)
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
                                 #    align_corners=False)
-        if self.training:
+        if self.training is False:
             f_grid = f_grid.clamp(-1., 1.)
 
-        return f_grid, r, context_vec  # type: ignore
+        return {
+            "flow_out": f,
+            "flow_grid": f_grid,
+            "residuals": r,
+            "context_vec": context_vec
+        }
 
 
 # class FeatureEncoder(nn.Module):
@@ -199,7 +204,7 @@ class BitToFlowDecoder(nn.Module):
     def forward(  # type: ignore
         self,
         input_tuple: Tuple[torch.Tensor, torch.Tensor]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Dict[str, torch.Tensor]:
         x, context_vec = input_tuple
         x = self.ups(x)
         r = self.residual(x) * 2
@@ -213,8 +218,12 @@ class BitToFlowDecoder(nn.Module):
             # identity_theta, r.shape, align_corners=False)
         f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
                                    align_corners=False)
-        return f_grid, r, context_vec
-
+        return {
+            "flow_out": f,
+            "flow_grid": f_grid,
+            "residuals": r,
+            "context_vec": context_vec
+        }
 
 class WaveoneModel(nn.Module):
     NAMES = ("encoder", "binarizer", "decoder")
@@ -235,16 +244,21 @@ class WaveoneModel(nn.Module):
             self,
             frame1: torch.Tensor,
             frame2: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Dict[str, torch.Tensor]:
         codes = self.binarizer(self.encoder(frame1, frame2, 0.))
-        flows, residuals, _ = self.decoder((codes, 0.))
+        decoder_out = self.decoder((codes, 0.))
         flow_frame = frame1 if self.flow_off else F.grid_sample(  # type: ignore
-            frame1, flows, align_corners=False)
-        reconstructed_frame2 = flow_frame + residuals
+            frame1, decoder_out["flow_grid"], align_corners=False)
+        reconstructed_frame2 = flow_frame + decoder_out["residuals"]
         if self.training is False:  # type: ignore
             reconstructed_frame2 = torch.clamp(
                 reconstructed_frame2, min=-1., max=1.)
-        return codes, flows, residuals, flow_frame, reconstructed_frame2
+        return {
+            **decoder_out,
+            "codes": codes,
+            "flow_frame": flow_frame,
+            "reconstructed_frame": reconstructed_frame2,
+        }
 
 
 class BitToContextDecoder(nn.Module):
