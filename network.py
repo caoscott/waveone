@@ -7,9 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
-from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, double_conv,
-                                   down, inconv, outconv, revnet_block, up,
-                                   upconv)
+from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
+                                   outconv, revnet_block, up, upconv)
 
 
 class Encoder(nn.Module):
@@ -94,7 +93,11 @@ class SmallBinarizer(nn.Module):
             return x
 
 
+IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
+
+
 class SmallDecoder(nn.Module):
+
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.residual = nn.Sequential(
@@ -105,13 +108,32 @@ class SmallDecoder(nn.Module):
             nn.ConvTranspose2d(128, out_ch, 2, stride=2),
             nn.Tanh(),
         )
+        self.flow = nn.Sequential(
+            nn.ConvTranspose2d(in_ch, 128, 2, stride=2),
+            nn.LeakyReLU(inplace=True),
+            nn.ConvTranspose2d(128, 128, 2, stride=2),
+            nn.LeakyReLU(inplace=True),
+            nn.ConvTranspose2d(128, 2, 2, stride=2),
+        )
 
     def forward(  # type: ignore
             self,
             input_tuple: Tuple[torch.Tensor, torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        x, _ = input_tuple
-        return 0., self.residual(x) * 2, 0.  # type: ignore
+        x, context_vec = input_tuple
+        f = self.flow(x).permute(0, 2, 3, 1)
+        r = self.residual(x) * 2
+
+        assert f.shape[-1] == 2
+
+        grid_normalize = torch.tensor(
+            f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
+        identity_theta = torch.tensor(
+            IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
+        f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
+            identity_theta, r.shape, align_corners=False)
+
+        return f_grid, r, context_vec  # type: ignore
 
 
 # class FeatureEncoder(nn.Module):
