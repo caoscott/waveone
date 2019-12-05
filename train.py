@@ -4,7 +4,6 @@ import os
 from collections import defaultdict
 from typing import Dict, Iterator, List, Tuple, Union
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -347,23 +346,38 @@ def train(args) -> nn.Module:
         solver.zero_grad()
 
         context_vec = 0.  # .cuda()
-        reconstructed_frames = []
-        flow_frames = []
+        reconstructed_frames: List[List[torch.Tensor]] = [[] for _ in range(3)]
+        flow_frames: List[List[torch.Tensor]] = [[] for _ in range(3)]
         loss: torch.Tensor = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
         for frame2 in frames[1:]:
             frame2 = frame2.cuda()
 
-            model_out = model(
-                frame1, frame2
-            )
-            loss += reconstructed_loss_fn(frame2,
-                                          model_out["reconstructed_frame"]) \
-                + 0 if args.flow_off else flow_loss_fn(frame2, model_out["flow_frame"]) \
-                + 1e-4 * tv(model_out["flow_out"])
-            flow_frames.append(model_out["flow_frame"].cpu())
-            reconstructed_frames.append(model_out["reconstructed_frame"].cpu())
+            model_out = model(frame1, frame2)
+            flow_out = model_out["flow_out"]
+            flow_frame = model_out["flow_frame"]
+            reconstructed_frame = model_out["reconstructed_frame"]
+
+            for i in range(3):
+                loss_i = reconstructed_loss_fn(frame2, reconstructed_frame) \
+                    + (0 if args.flow_off
+                       else (flow_loss_fn(frame2, flow_frame)
+                             + args.weight_decay * tv(flow_out)))
+                loss += loss_i
+
+                writer.add_scalar(
+                    f"training_loss_{i}",
+                    loss_i,
+                    train_iter,
+                )
+
+                flow_frames[i].append(flow_frame.cpu())
+                reconstructed_frames[i].append(reconstructed_frame.cpu())
+
+                flow_out = F.avg_pool2d(flow_out, 2, 2)
+                flow_frame = F.avg_pool2d(flow_frame, 2, 2)
+                reconstructed_frame = F.avg_pool2d(reconstructed_frame, 2, 2)
 
             if args.save_max_l2:
                 with torch.no_grad():
@@ -396,7 +410,7 @@ def train(args) -> nn.Module:
             solver.step()
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:], flow_frames, "train_flow"),
+            **eval_scores(frames[1:], flow_frames[0], "train_flow"),
             **eval_scores(frames[1:], reconstructed_frames,
                           "train_reconstructed"),
         }
