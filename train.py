@@ -414,20 +414,7 @@ def train(args) -> nn.Module:
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
             train_iter += 1
-            max_epoch_l2, max_epoch_l2_frames = max(
-                train_loop(frames), key=lambda x: x[0])
-
-        if args.save_max_l2:
-            save_tensor_as_img(
-                max_epoch_l2_frames[1],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame",
-                args,
-            )
-            save_tensor_as_img(
-                max_epoch_l2_frames[2],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed",
-                args,
-            )
+            train_loop(frames)
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)
