@@ -375,10 +375,11 @@ def train(args) -> nn.Module:
                 flow_frames[i].append(flow_frame.cpu())
                 reconstructed_frames[i].append(reconstructed_frame.cpu())
 
-                print(frame2.shape)
                 frame2 = F.avg_pool2d(frame2, 2, 2)
-                flow_out = F.avg_pool2d(flow_out, 2, 2)
-                flow_frame = F.avg_pool2d(flow_frame, 2, 2)
+                flow_out = F.avg_pool2d(flow_out.permute(
+                    0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
+                flow_frame = F.avg_pool2d(flow_frame.permute(
+                    0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
                 reconstructed_frame = F.avg_pool2d(reconstructed_frame, 2, 2)
 
             log_flow_context_residuals(
