@@ -267,7 +267,7 @@ def downsampled_loss(
         flow_loss_fn: nn.Module,
         reconstructed_loss_fn: nn.Module,
         cycle_len: int,
-) -> Tuple[torch.Tensor, List[float], torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, List[float], List[torch.Tensor], List[torch.Tensor]]:
     flow = model_out["flow"]
     flow_frame = model_out["flow_frame"]
     reconstructed_frame = model_out["reconstructed_frame"]
