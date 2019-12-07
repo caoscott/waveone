@@ -256,8 +256,6 @@ def downsampled_loss(
         cycle_len: int,
 ) -> Tuple[torch.Tensor, List[float], torch.Tensor, torch.Tensor]:
     flow = model_out["flow"]
-    flow_frame = model_out["flow_frame"]
-    reconstructed_frame = model_out["reconstructed_frame"]
 
     downsampled_losses = []
 
@@ -265,7 +263,7 @@ def downsampled_loss(
 
     for i in range(cycle_len):
         loss_i = reconstructed_loss_fn(frame2, reconstructed_frame) \
-            + flow_loss_fn(frame2, flow_frame) + tv()
+            + flow_loss_fn(frame1, frame2, flow)
         loss += loss_i
 
         downsampled_losses.append(loss_i.item())
@@ -274,9 +272,19 @@ def downsampled_loss(
         frame2 = F.avg_pool2d(frame2, 2, 2)
         flow = F.avg_pool2d(flow.permute(
             0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
-        flow_frame = interp_flow(frame1, flow)
 
     return loss, downsampled_losses,  # type: ignore
+
+
+def get_flow_loss_fn_cuda(args: argparse.Namespace) -> nn.Module:
+    if args.flow_off is True:
+        return LambdaModule(lambda x, y, z, w: 0.)
+    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
+    tv = TotalVariation().cuda()
+    return LambdaModule(
+        lambda frame1, frame2, flow: flow_loss_fn(
+            interp_flow(frame1, flow), frame2) + args.weight_decay * tv(flow)
+    ).cuda()
 
 
 def train(args) -> nn.Module:
@@ -320,7 +328,7 @@ def train(args) -> nn.Module:
     milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
     reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
-    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
+    flow_loss_fn = get_flow_loss_fn_cuda(args)
 
     def log_flow_context_residuals(
             writer: SummaryWriter,
