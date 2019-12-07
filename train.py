@@ -239,7 +239,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "flow": 0.,
             "flow_grid": 0.,
             "residuals": t[0],
-            "context_vec": context_vec
+            "context_vec": t[1],
         })
         return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
     if args.network == "small":
