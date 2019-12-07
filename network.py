@@ -7,10 +7,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
-from train import interp_flow
 from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
                                    outconv, revnet_block, up, upconv)
 
+IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
+
+
+def interp_flow(frame: torch.Tensor, flow: torch.Tensor) -> torch.Tensor:
+    grid_normalize = torch.tensor(
+        flow.shape[1: 3]).reshape(1, 1, 1, 2).to(frame.device) / 2
+    identity_theta = torch.tensor(
+        IDENTITY_TRANSFORM * frame.shape[0]).to(frame.device)
+    f_grid = flow / grid_normalize + F.affine_grid(  # type: ignore
+        identity_theta, frame.shape, align_corners=False)
+    return F.grid_sample(  # type: ignore
+        frame, f_grid, align_corners=False)
 
 class Encoder(nn.Module):
     def __init__(self, in_ch: int, out_ch: int, use_context: bool) -> None:
@@ -100,9 +111,6 @@ class SmallBinarizer(nn.Module):
             return self.sign(x)
         else:
             return x
-
-
-IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
 
 
 class SmallDecoder(nn.Module):
