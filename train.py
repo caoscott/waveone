@@ -291,8 +291,7 @@ def downsampled_loss(
         flow = F.avg_pool2d(flow.permute(
             0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
 
-    return (loss, downsampled_losses,  # type: ignore
-            flow_frames[0], reconstructed_frames[0])
+    return loss, downsampled_losses, flow_frames[0], reconstructed_frames[0]
 
 
 def get_flow_loss_fn_cuda(args: argparse.Namespace) -> nn.Module:
