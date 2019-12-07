@@ -4,6 +4,7 @@ import os
 from collections import defaultdict
 from typing import Dict, Iterator, List, Tuple, Union
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -352,27 +353,29 @@ def train(args) -> nn.Module:
         flow_frames = []
         loss: torch.Tensor = 0.  # type: ignore
 
-        frame1 = frames[0].cuda()
-        for frame2 in frames[1:]:
-            frame2 = frame2.cuda()
+        for _frames in (frames, np.flip(frames)):
+            frame1 = _frames[0].cuda()
+            for frame2 in _frames[1:]:
+                frame2 = frame2.cuda()
 
-            model_out = model(frame1, frame2)
-            loss += reconstructed_loss_fn(frame2, model_out["reconstructed_frame"]) \
-                + (0 if args.flow_off
-                    else (flow_loss_fn(frame2, model_out["flow_frame"])
-                          + 0.05 * tv(model_out["flow"])))
+                model_out = model(frame1, frame2)
+                loss += reconstructed_loss_fn(frame2, model_out["reconstructed_frame"]) \
+                    + (0 if args.flow_off
+                        else (flow_loss_fn(frame2, model_out["flow_frame"])
+                              + 0.01 * tv(model_out["flow"])))
 
-            flow_frames.append(model_out["flow_frame"].cpu())
-            reconstructed_frames.append(model_out["reconstructed_frame"].cpu())
+                flow_frames.append(model_out["flow_frame"].cpu())
+                reconstructed_frames.append(
+                    model_out["reconstructed_frame"].cpu())
 
-            log_flow_context_residuals(
-                writer,
-                model_out["flow"],
-                torch.tensor(context_vec),
-                torch.abs(frame2 - frame1)
-            )
+                log_flow_context_residuals(
+                    writer,
+                    model_out["flow"],
+                    torch.tensor(context_vec),
+                    torch.abs(frame2 - frame1)
+                )
 
-            frame1 = model_out["reconstructed_frame"].detach()
+                frame1 = model_out["reconstructed_frame"]
 
         if args.network != "opt":
             loss.backward()
