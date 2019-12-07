@@ -353,7 +353,7 @@ def train(args) -> nn.Module:
         flow_frames = []
         loss: torch.Tensor = 0.  # type: ignore
 
-        for _frames in (frames, np.flip(frames)):
+        for _frames in (frames, list(reversed(frames))):
             frame1 = _frames[0].cuda()
             for frame2 in _frames[1:]:
                 frame2 = frame2.cuda()
@@ -377,6 +377,7 @@ def train(args) -> nn.Module:
 
                 frame1 = model_out["reconstructed_frame"]
 
+        loss /= len(frames) - 1
         if args.network != "opt":
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
@@ -390,7 +391,7 @@ def train(args) -> nn.Module:
 
         writer.add_scalar(
             "training_loss",
-            loss.item() / (len(frames)-1),
+            loss.item(),
             train_iter,
         )
         writer.add_scalar(
