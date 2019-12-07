@@ -256,30 +256,24 @@ def downsampled_loss(
         cycle_len: int,
 ) -> Tuple[torch.Tensor, List[float], torch.Tensor, torch.Tensor]:
     flow = model_out["flow"]
-    flow_frame = model_out["flow_frame"]
-    reconstructed_frame = model_out["reconstructed_frame"]
+
     downsampled_losses = []
 
     loss = 0.  # type: ignore
-    flow_frames = []
-    reconstructed_frames = []
 
     for i in range(cycle_len):
         loss_i = reconstructed_loss_fn(frame2, reconstructed_frame) \
-            + flow_loss_fn(frame2, flow, flow_frame)
+            + flow_loss_fn(frame1, frame2, flow)
         loss += loss_i
 
         downsampled_losses.append(loss_i.item())
-        flow_frames.append(flow_frame.cpu())
-        reconstructed_frames.append(reconstructed_frame.cpu())
 
         frame1 = F.avg_pool2d(frame1, 2, 2)
         frame2 = F.avg_pool2d(frame2, 2, 2)
         flow = F.avg_pool2d(flow.permute(
             0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
 
-    return (loss, downsampled_losses,  # type: ignore
-            flow_frames[0], reconstructed_frames[0])
+    return loss, downsampled_losses,  # type: ignore
 
 
 def get_flow_loss_fn_cuda(args: argparse.Namespace) -> nn.Module:
@@ -401,12 +395,13 @@ def train(args) -> nn.Module:
             frame2 = frame2.cuda()
 
             model_out = model(frame1, frame2)
-            loss, downsampled_losses, flow_frame, reconstructed_frame = downsampled_loss(
+            loss, downsampled_losses = downsampled_loss(
                 frame1, frame2, model_out, flow_loss_fn,
                 reconstructed_loss_fn, 1 if args.flow_off else 3
             )
-            flow_frames.append(flow_frame)
-            reconstructed_frames.append(reconstructed_frame)
+            total_loss += loss
+            flow_frames.append(model_out["flow_frame"])
+            reconstructed_frames.append(model_out["reconstructed_frame"])
             writer.add_scalar(f"{frame_idx}_training_loss",
                               loss.item(), train_iter)
             for loss_idx, loss_i in enumerate(downsampled_losses):
