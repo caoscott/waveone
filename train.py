@@ -296,7 +296,7 @@ def downsampled_loss(
 
 def get_flow_loss_fn_cuda(args: argparse.Namespace) -> nn.Module:
     if args.flow_off is True:
-        return LambdaModule(lambda x, _, _, _: 0.)
+        return LambdaModule(lambda x, y, z, w: 0.)
     flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
     tv = TotalVariation().cuda()
     return LambdaModule(
