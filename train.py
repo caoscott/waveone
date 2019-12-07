@@ -18,8 +18,7 @@ from waveone.losses import MSSSIM, TotalVariation
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
                              ContextToFlowDecoder, Encoder, SmallBinarizer,
-                             SmallDecoder, SmallEncoder, UNet, WaveoneModel,
-                             interp_flow)
+                             SmallDecoder, SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -245,6 +244,20 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         small_decoder = SmallDecoder(args.bits, 3)
         return WaveoneModel(small_encoder, small_binarizer, small_decoder, args.flow_off)
     raise ValueError(f"No model type named {args.network}.")
+
+
+IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
+
+
+def interp_flow(frame: torch.Tensor, flow: torch.Tensor) -> torch.Tensor:
+    grid_normalize = torch.tensor(
+        flow.shape[1: 3]).reshape(1, 1, 1, 2).to(frame.device) / 2
+    identity_theta = torch.tensor(
+        IDENTITY_TRANSFORM * frame.shape[0]).to(frame.device)
+    f_grid = flow / grid_normalize + F.affine_grid(  # type: ignore
+        identity_theta, frame.shape, align_corners=False)
+    return F.grid_sample(  # type: ignore
+        frame, f_grid, align_corners=False)
 
 
 def downsampled_loss(
