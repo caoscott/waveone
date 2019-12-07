@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # full assembly of the sub-parts to form the complete net
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import torch
 import torch.nn as nn
