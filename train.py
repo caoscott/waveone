@@ -411,7 +411,7 @@ def train(args) -> nn.Module:
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
             **eval_scores(frames[1:], flow_frames[0], "train_flow"),
-            **eval_scores(frames[1:], reconstructed_frames[0],
+            **eval_scores(frames[1:], reconstructed_frames,
                           "train_reconstructed"),
         }
 
