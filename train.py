@@ -104,12 +104,14 @@ def run_eval(
             frame2 = torch.cat((frame, frame), dim=0)
             assert frame1.shape == frame2.shape
             assert frame1.shape[0] == 2
-            model_out = model(frame1, frame2)
-            reconstructed_frame_cpu = model_out["reconstructed_frame"].cpu()
-            flow_frame_cpu = model_out["flow_frame"].cpu()
+            _, _, _, flow_frame, reconstructed_frame2 = model(
+                frame1, frame2
+            )
+            reconstructed_frame2_cpu = reconstructed_frame2.cpu()
+            flow_frame_cpu = flow_frame.cpu()
 
-            reconstructed_frames.append(reconstructed_frame_cpu[:1])
-            reconstructed_frames_vcii.append(reconstructed_frame_cpu[1:])
+            reconstructed_frames.append(reconstructed_frame2_cpu[:1])
+            reconstructed_frames_vcii.append(reconstructed_frame2_cpu[1:])
             flow_frames.append(flow_frame_cpu[:1])
             flow_frames_vcii.append(flow_frame_cpu[1:])
             if args.save_out_img:
@@ -134,9 +136,7 @@ def run_eval(
                 )
 
             # Update frame1.
-            frame1 = torch.cat(
-                (model_out["reconstructed_frame"][:1], frame), dim=0
-            )
+            frame1 = torch.cat((reconstructed_frame2[0: 1], frame), dim=0)
             assert frame1.shape == frame2.shape
             assert frame1.shape[0] == 2
 
@@ -381,6 +381,8 @@ def train(args) -> nn.Module:
         total_loss: torch.Tensor = 0.  # type: ignore
         flow_frames = []
         reconstructed_frames = []
+        reconstructed_frame2 = None
+        loss: torch.Tensor = 0.  # type: ignore
 
         frame1 = frames[0].cuda()
         for frame_idx, frame2 in enumerate(frames[1:]):
@@ -407,7 +409,8 @@ def train(args) -> nn.Module:
                 torch.abs(frame2 - frame1)
             )
 
-            frame1 = model_out["reconstructed_frame"].detach()
+            frame1 = reconstructed_frame2.detach()
+            # frame1 = frame2
 
             del loss
 
