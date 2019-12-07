@@ -339,9 +339,7 @@ def train(args) -> nn.Module:
         resume(args, model)
         just_resumed = True
 
-    def train_loop(
-            frames: List[torch.Tensor],
-    ) -> Iterator[Tuple[float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]]:
+    def train_loop(frames: List[torch.Tensor]) -> None:
         model.train()
         solver.zero_grad()
 
@@ -379,22 +377,6 @@ def train(args) -> nn.Module:
                 flow_frame = F.avg_pool2d(flow_frame, 2, 2)
                 reconstructed_frame = F.avg_pool2d(reconstructed_frame, 2, 2)
 
-            if args.save_max_l2:
-                with torch.no_grad():
-                    batch_l2 = ((frame2 - frame1 - model_out["residuals"]) ** 2).mean(
-                        dim=-1).mean(dim=-1).mean(dim=-1).cpu()
-                    max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
-                    max_batch_l2_frames = (
-                        frame1[max_batch_l2_idx].cpu(),
-                        frame2[max_batch_l2_idx].cpu(),
-                        model_out["reconstructed_frame"][max_batch_l2_idx].detach(
-                        ).cpu(),
-                    )
-                    max_l2: float = max_batch_l2.item()  # type: ignore
-                    yield max_l2, max_batch_l2_frames
-            else:
-                yield 0, (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
-
             log_flow_context_residuals(
                 writer,
                 model_out["flow_out"],
@@ -429,20 +411,7 @@ def train(args) -> nn.Module:
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
             train_iter += 1
-            max_epoch_l2, max_epoch_l2_frames = max(
-                train_loop(frames), key=lambda x: x[0])
-
-        if args.save_max_l2:
-            save_tensor_as_img(
-                max_epoch_l2_frames[1],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_frame",
-                args,
-            )
-            save_tensor_as_img(
-                max_epoch_l2_frames[2],
-                f"{max_epoch_l2 :.6f}_{epoch}_max_l2_reconstructed",
-                args,
-            )
+            train_loop(frames)
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)

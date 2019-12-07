@@ -77,7 +77,5 @@ parser.add_argument('--checkpoint-epochs', type=int, default=20,
                     help='Model checkpoint period.')
 parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
-parser.add_argument('--save-max-l2', action='store_true',
-                    help='If true, save max l2 images for train epoch.')
 parser.add_argument('--plot-codes', action='store_true',
                     help='If true, plot encoded bits from binarizer.')
