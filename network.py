@@ -142,7 +142,6 @@ class SmallDecoder(nn.Module):
         x, context_vec = input_tuple
         x = self.ups(x)
         f = self.flow(x).permute(0, 2, 3, 1)
-        print(x.shape, f.shape)
         r = self.residual(x) * 2
 
         assert f.shape[-1] == 2
