@@ -425,7 +425,7 @@ def train(args) -> nn.Module:
             del loss
 
         if args.network != "opt":
-            loss.backward()
+            total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             solver.step()
         scores = {
@@ -437,7 +437,7 @@ def train(args) -> nn.Module:
 
         writer.add_scalar(
             "training_loss",
-            loss.item() / (len(frames)-1),
+            total_loss.item() / (len(frames)-1),
             train_iter,
         )
         writer.add_scalar(
