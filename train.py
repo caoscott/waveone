@@ -341,7 +341,7 @@ def train(args) -> nn.Module:
 
     def train_loop(
             frames: List[torch.Tensor],
-    ) -> None:
+    ) -> Iterator[Tuple[float, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]]:
         model.train()
         solver.zero_grad()
 
@@ -375,10 +375,25 @@ def train(args) -> nn.Module:
                 flow_frames[i].append(flow_frame.cpu())
                 reconstructed_frames[i].append(reconstructed_frame.cpu())
 
-                frame2 = F.avg_pool2d(frame2, 2, 2)
                 flow_out = F.avg_pool2d(flow_out, 2, 2)
                 flow_frame = F.avg_pool2d(flow_frame, 2, 2)
                 reconstructed_frame = F.avg_pool2d(reconstructed_frame, 2, 2)
+
+            if args.save_max_l2:
+                with torch.no_grad():
+                    batch_l2 = ((frame2 - frame1 - model_out["residuals"]) ** 2).mean(
+                        dim=-1).mean(dim=-1).mean(dim=-1).cpu()
+                    max_batch_l2, max_batch_l2_idx = torch.max(batch_l2, dim=0)
+                    max_batch_l2_frames = (
+                        frame1[max_batch_l2_idx].cpu(),
+                        frame2[max_batch_l2_idx].cpu(),
+                        model_out["reconstructed_frame"][max_batch_l2_idx].detach(
+                        ).cpu(),
+                    )
+                    max_l2: float = max_batch_l2.item()  # type: ignore
+                    yield max_l2, max_batch_l2_frames
+            else:
+                yield 0, (torch.tensor(0.), torch.tensor(0.), torch.tensor(0.))
 
             log_flow_context_residuals(
                 writer,
