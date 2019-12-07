@@ -353,7 +353,7 @@ def train(args) -> nn.Module:
         flow_frames = []
         loss: torch.Tensor = 0.  # type: ignore
 
-        for _frames in (frames, list(reversed(frames))):
+        for _frames in (frames, frames[::-1]):
             frame1 = _frames[0].cuda()
             for frame2 in _frames[1:]:
                 frame2 = frame2.cuda()
@@ -384,8 +384,8 @@ def train(args) -> nn.Module:
             solver.step()
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:], flow_frames, "train_flow"),
-            **eval_scores(frames[1:], reconstructed_frames,
+            **eval_scores(frames[1:] + frames[-2::-1], flow_frames, "train_flow"),
+            **eval_scores(frames[1:] + frames[-2::-1], reconstructed_frames,
                           "train_reconstructed"),
         }
 
