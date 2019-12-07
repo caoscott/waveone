@@ -367,7 +367,7 @@ def train(args) -> nn.Module:
 
             log_flow_context_residuals(
                 writer,
-                model_out["flow_out"],
+                model_out["flow"],
                 torch.tensor(context_vec),
                 torch.abs(frame2 - frame1)
             )
