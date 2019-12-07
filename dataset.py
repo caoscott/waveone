@@ -175,7 +175,7 @@ class ImageList(data.Dataset):
         if self.sampling_range:
             idx_sampling_range = min(self.sampling_range, len(self.imgs)-index)
             offsets = np.random.permutation(idx_sampling_range)[:self.frame_len]
-            imgs = [self.imgs[index + offset] for offset in offsets]
+            imgs = [self.imgs[index + offset] for offset in np.sort(offsets)]
         else:
             imgs = self.imgs[index: index+self.frame_len]
 

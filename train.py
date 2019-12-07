@@ -235,8 +235,12 @@ def get_model(args: argparse.Namespace) -> nn.Module:
     if args.network == "opt":
         opt_encoder = LambdaModule(lambda f1, f2, _: f2 - f1)
         opt_binarizer = nn.Identity()  # type: ignore
-        opt_decoder = LambdaModule(lambda t: (
-            torch.tensor(0.), t[0], torch.tensor(0.)))
+        opt_decoder = LambdaModule(lambda t: {
+            "flow": 0.,
+            "flow_grid": 0.,
+            "residuals": t[0],
+            "context_vec": context_vec
+        })
         return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
     if args.network == "small":
         small_encoder = SmallEncoder(6, args.bits)
