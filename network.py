@@ -149,7 +149,7 @@ class SmallDecoder(nn.Module):
             f_grid = f_grid.clamp(-1., 1.)
 
         return {
-            "flow_out": f,
+            "flow": f,
             "flow_grid": f_grid,
             "residuals": r,
             "context_vec": context_vec
@@ -219,7 +219,7 @@ class BitToFlowDecoder(nn.Module):
         f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
                                    align_corners=False)
         return {
-            "flow_out": f,
+            "flow": f,
             "flow_grid": f_grid,
             "residuals": r,
             "context_vec": context_vec
