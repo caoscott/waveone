@@ -375,7 +375,6 @@ def train(args) -> nn.Module:
                 flow_frames[i].append(flow_frame.cpu())
                 reconstructed_frames[i].append(reconstructed_frame.cpu())
 
-                print(frame2.shape)
                 frame2 = F.avg_pool2d(frame2, 2, 2)
                 flow_out = F.avg_pool2d(flow_out, 2, 2)
                 flow_frame = F.avg_pool2d(flow_frame, 2, 2)
