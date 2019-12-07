@@ -246,6 +246,65 @@ def get_model(args: argparse.Namespace) -> nn.Module:
     raise ValueError(f"No model type named {args.network}.")
 
 
+IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
+
+
+def interp_flow(frame: torch.Tensor, flow: torch.Tensor) -> torch.Tensor:
+    grid_normalize = torch.tensor(
+        flow.shape[1: 3]).reshape(1, 1, 1, 2).to(frame.device) / 2
+    identity_theta = torch.tensor(
+        IDENTITY_TRANSFORM * frame.shape[0]).to(frame.device)
+    f_grid = flow / grid_normalize + F.affine_grid(  # type: ignore
+        identity_theta, frame.shape, align_corners=False)
+    return F.grid_sample(  # type: ignore
+        frame, f_grid, align_corners=False)
+
+
+def downsampled_loss(
+        frame1: torch.Tensor,
+        frame2: torch.Tensor,
+        model_out: Dict[str, torch.Tensor],
+        flow_loss_fn: nn.Module,
+        reconstructed_loss_fn: nn.Module,
+        cycle_len: int,
+) -> Tuple[torch.Tensor, List[float], List[List[torch.Tensor]], List[List[torch.Tensor]]]:
+    flow = model_out["flow"]
+    flow_frame = model_out["flow_frame"]
+    reconstructed_frame = model_out["reconstructed_frame"]
+    downsampled_losses = []
+
+    loss = 0.  # type: ignore
+    flow_frames = []
+    reconstructed_frames = []
+
+    for i in range(cycle_len):
+        loss_i = reconstructed_loss_fn(frame2, reconstructed_frame) \
+            + flow_loss_fn(frame2, flow, flow_frame)
+        loss += loss_i
+
+        downsampled_losses.append(loss_i.item())
+        flow_frames.append(flow_frame.cpu())
+        reconstructed_frames.append(reconstructed_frame.cpu())
+
+        frame1 = F.avg_pool2d(frame1, 2, 2)
+        frame2 = F.avg_pool2d(frame2, 2, 2)
+        flow = F.avg_pool2d(flow.permute(
+            0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
+
+    return loss, downsampled_losses, flow_frames[0], reconstructed_frames[0]
+
+
+def get_flow_loss_fn_cuda(args: argparse.Namespace) -> nn.Module:
+    if args.flow_off is True:
+        return LambdaModule(lambda x, _, _, _: 0.)
+    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
+    tv = TotalVariation().cuda()
+    return LambdaModule(
+        lambda frame1, frame2, flow: flow_loss_fn(
+            interp_flow(frame1, flow), frame2) + args.weight_decay * tv(flow)
+    ).cuda()
+
+
 def train(args) -> nn.Module:
     output_dir = os.path.join(args.out_dir, args.save_model_name)
     model_dir = os.path.join(args.model_dir, args.save_model_name)
@@ -287,8 +346,7 @@ def train(args) -> nn.Module:
     milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     scheduler = LS.MultiStepLR(solver, milestones=milestones, gamma=0.5)
     reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
-    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
-    tv = TotalVariation().cuda()
+    flow_loss_fn = get_flow_loss_fn_cuda(args)
 
     def log_flow_context_residuals(
             writer: SummaryWriter,
@@ -346,50 +404,37 @@ def train(args) -> nn.Module:
         solver.zero_grad()
 
         context_vec = 0.  # .cuda()
-        reconstructed_frames: List[List[torch.Tensor]] = [[] for _ in range(3)]
-        flow_frames: List[List[torch.Tensor]] = [[] for _ in range(3)]
-        loss: torch.Tensor = 0.  # type: ignore
+        total_loss: torch.Tensor = 0.  # type: ignore
+        flow_frames = []
+        reconstructed_frames = []
 
         frame1 = frames[0].cuda()
-        for frame2 in frames[1:]:
+        for frame_idx, frame2 in enumerate(frames[1:]):
             frame2 = frame2.cuda()
 
             model_out = model(frame1, frame2)
-            flow_out = model_out["flow_out"]
-            flow_frame = model_out["flow_frame"]
-            reconstructed_frame = model_out["reconstructed_frame"]
-
-            for i in range(3):
-                loss_i = reconstructed_loss_fn(frame2, reconstructed_frame) \
-                    + (0 if args.flow_off
-                       else (flow_loss_fn(frame2, flow_frame)
-                             + args.weight_decay * tv(flow_out)))
-                loss += loss_i
-
+            loss, downsampled_losses, flow_frame, reconstructed_frame = downsampled_loss(
+                frame1, frame2, model_out, flow_loss_fn,
+                reconstructed_loss_fn, 1 if args.flow_off else 3
+            )
+            flow_frames.append(flow_frame)
+            reconstructed_frames.append(reconstructed_frame)
+            writer.add_scalar(f"{frame_idx}_training_loss",
+                              loss.item(), train_iter)
+            for loss_idx, loss_i in enumerate(downsampled_losses):
                 writer.add_scalar(
-                    f"training_loss_{i}",
-                    loss_i,
-                    train_iter,
-                )
-
-                flow_frames[i].append(flow_frame.cpu())
-                reconstructed_frames[i].append(reconstructed_frame.cpu())
-
-                frame2 = F.avg_pool2d(frame2, 2, 2)
-                flow_out = F.avg_pool2d(flow_out.permute(
-                    0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
-                flow_frame = F.avg_pool2d(flow_frame.permute(
-                    0, 3, 1, 2), 2, 2).permute(0, 2, 3, 1)
-                reconstructed_frame = F.avg_pool2d(reconstructed_frame, 2, 2)
+                    f"{frame_idx}_training_loss_{loss_idx}", loss_i, train_iter)
 
             log_flow_context_residuals(
                 writer,
-                model_out["flow_out"],
+                model_out["flow"],
                 torch.tensor(context_vec),
                 torch.abs(frame2 - frame1)
             )
 
             frame1 = model_out["reconstructed_frame"].detach()
+
+            del loss
 
         if args.network != "opt":
             loss.backward()
@@ -397,8 +442,8 @@ def train(args) -> nn.Module:
             solver.step()
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:], flow_frames[0], "train_flow"),
-            **eval_scores(frames[1:], reconstructed_frames[0],
+            **eval_scores(frames[1:], flow_frames, "train_flow"),
+            **eval_scores(frames[1:], reconstructed_frames,
                           "train_reconstructed"),
         }
 

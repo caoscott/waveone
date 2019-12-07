@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
+from train import interp_flow
 from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
                                    outconv, revnet_block, up, upconv)
 
@@ -121,9 +122,9 @@ class SmallDecoder(nn.Module):
         self.flow = nn.Sequential(
             nn.ConvTranspose2d(128, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
-            nn.ConvTranspose2d(128, 128, 2, stride=2),
+            nn.ConvTranspose2d(128, 64, 2, stride=2),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(128, 2, 1),
+            nn.Conv2d(64, 2, 3),
         )
 
     def forward(  # type: ignore
@@ -137,20 +138,8 @@ class SmallDecoder(nn.Module):
 
         assert f.shape[-1] == 2
 
-        grid_normalize = torch.tensor(
-            f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
-        identity_theta = torch.tensor(
-            IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
-        f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=False)
-        # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-                                #    align_corners=False)
-        if self.training is False:
-            f_grid = f_grid.clamp(-1., 1.)
-
         return {
-            "flow_out": f,
-            "flow_grid": f_grid,
+            "flow": f,
             "residuals": r,
             "context_vec": context_vec
         }
@@ -216,11 +205,8 @@ class BitToFlowDecoder(nn.Module):
             # f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
         # f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
             # identity_theta, r.shape, align_corners=False)
-        f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-                                   align_corners=False)
         return {
-            "flow_out": f,
-            "flow_grid": f_grid,
+            "flow": f,
             "residuals": r,
             "context_vec": context_vec
         }
@@ -247,8 +233,8 @@ class WaveoneModel(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         codes = self.binarizer(self.encoder(frame1, frame2, 0.))
         decoder_out = self.decoder((codes, 0.))
-        flow_frame = frame1 if self.flow_off else F.grid_sample(  # type: ignore
-            frame1, decoder_out["flow_grid"], align_corners=False)
+        flow_frame = frame1 if self.flow_off else \
+            interp_flow(frame1, decoder_out["flow"])
         reconstructed_frame2 = flow_frame + decoder_out["residuals"]
         if self.training is False:  # type: ignore
             reconstructed_frame2 = torch.clamp(
