@@ -375,6 +375,8 @@ def train(args) -> nn.Module:
                 )
 
                 frame1 = model_out["reconstructed_frame"]
+                if args.detach:
+                    frame1 = frame1.detach()
 
         loss /= len(frames) - 1
         if args.network != "opt":

@@ -52,6 +52,9 @@ parser.add_argument('--sampling-range', type=int, default=5,
                          'training. 0 means picking the exact next frame in sequential order')
 parser.add_argument('--frame-len', type=int, default=3,
                     help='Number of next frames to actually pick for training.')
+parser.add_argument('--detach', action='store_true',
+                    help='Detach gradients from previous frame when training from sequence of '
+                         'frames. Used to make training more efficient.')
 
 # To save computation, we compute objective for multiple
 # crops for each forward pass.
