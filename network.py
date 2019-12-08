@@ -53,8 +53,16 @@ class Encoder(nn.Module):
 class SmallEncoder(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
+        self.encode_frame1 = nn.Sequential(
+            nn.Conv2d(in_ch // 2, 64, 3, stride=1, padding=1),
+            nn.LeakyReLU(inplace=True),
+        )
+        self.encode_frame2 = nn.Sequential(
+            nn.Conv2d(in_ch // 2, 32, 3, stride=1, padding=1),
+            nn.LeakyReLU(inplace=True),
+        )
         self.encode = nn.Sequential(
-            nn.Conv2d(in_ch // 2, 128, 3, stride=2, padding=1),
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),
             # nn.Conv2d(in_ch // 2 + 2, 128, 3, stride=2, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(128, 128, 3, stride=2, padding=1),
@@ -72,7 +80,10 @@ class SmallEncoder(nn.Module):
         #     (self.encode_frame1(frame1), self.encode_frame2(frame2)),
         #     dim=1
         # )
-        x = frame2 - frame1
+        x = torch.cat(
+            (self.encode_frame1(frame1), self.encode_frame2(frame2)),
+            dim=1
+        )
         # b, _, h, w = x.size()
         # x_h = torch.linspace(-1., 1., h).reshape(1, 1, h,
         #                                          1).expand(b, 1, h, w).cuda()
