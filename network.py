@@ -54,7 +54,7 @@ class SmallEncoder(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.encode_frame1 = nn.Sequential(
-            nn.Conv2d(in_ch // 2, 64, 3, stride=1, padding=1),
+            nn.Conv2d(in_ch // 2, 32, 3, stride=1, padding=1),
             nn.LeakyReLU(inplace=True),
         )
         self.encode_frame2 = nn.Sequential(
