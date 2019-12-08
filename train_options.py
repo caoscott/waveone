@@ -35,10 +35,10 @@ parser.add_argument('--clip', type=float, default=0.5,
                     help='Gradient clipping.')
 parser.add_argument('--weight-decay', type=float,
                     default=1e-4, help='Weight decay')
-parser.add_argument('--schedule', default='100,200', type=str,
-                    help='Schedule milestones.')
-parser.add_argument('--gamma', type=float, default=0.5,
-                    help='LR decay factor.')
+# parser.add_argument('--schedule', default='100,200', type=str,
+# help='Schedule milestones.')
+# parser.add_argument('--gamma', type=float, default=0.5,
+# help='LR decay factor.')
 parser.add_argument('--batch-size', type=int, default=16,
                     help='Batch size.')
 parser.add_argument('--eval-batch-size', type=int, default=1,
