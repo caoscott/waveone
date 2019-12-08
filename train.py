@@ -14,7 +14,7 @@ import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
-from waveone.dataset import get_master_loader
+from waveone.dataset import get_loaders, get_master_loader
 from waveone.losses import MSSSIM, TotalVariation
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
@@ -266,13 +266,13 @@ def train(args) -> nn.Module:
         sampling_range=args.sampling_range,
         args=args,
     )
-    train_sequential_loader = get_master_loader(
+    train_sequential_loader = get_loaders(
         is_train=False,
         root=args.train,
         frame_len=1,
         sampling_range=0,
         args=args,
-    )
+    )[0]
     eval_loader = get_master_loader(
         is_train=False,
         root=args.eval,

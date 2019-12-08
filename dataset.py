@@ -22,12 +22,12 @@ def get_loaders(
         frame_len: int,
         sampling_range: int,
         args: argparse.Namespace,
-) -> Dict[str, data.DataLoader]:
+) -> List[data.DataLoader]:
     print('Creating loaders for %s...' % root)
     id_to_image_lists = get_id_to_image_lists(
         is_train, root, args, frame_len, sampling_range)
-    id_to_loaders: Dict[str, data.DataLoader] = {}
-    for vid_id, image_list in id_to_image_lists.items():
+    vid_loaders = []
+    for image_list in id_to_image_lists.values():
         loader = data.DataLoader(
             image_list,
             batch_size=args.batch_size if is_train else args.eval_batch_size,
@@ -35,12 +35,12 @@ def get_loaders(
             num_workers=2,
             drop_last=is_train,
         )
-        id_to_loaders[vid_id] = loader
+        vid_loaders.append(loader)
         print('Loader for {} images ({} batches) created.'.format(
             len(image_list), len(loader))
         )
 
-    return id_to_loaders
+    return vid_loaders
 
 
 def get_master_loader(
