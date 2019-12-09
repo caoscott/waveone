@@ -262,7 +262,10 @@ class WaveoneModel(nn.Module):
                 frame1, decoder_out["flow_grid"], align_corners=False) \
                     if "flow" in self.train_type \
                         else frame1
-        reconstructed_frame2 = flow_frame + decoder_out["residuals"]
+
+        reconstructed_frame2 = flow_frame + decoder_out["residuals"] \
+            if "residual" in self.train_type \
+            else flow_frame
         if self.training is False:  # type: ignore
             reconstructed_frame2 = torch.clamp(
                 reconstructed_frame2, min=-1., max=1.)
