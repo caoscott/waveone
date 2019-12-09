@@ -389,8 +389,8 @@ def train(args) -> nn.Module:
             solver.step()
         scores = {
             **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:] + frames[-2::-1], flow_frames, "train_flow"),
-            **eval_scores(frames[1:] + frames[-2::-1], reconstructed_frames,
+            **eval_scores(frames[1:], flow_frames, "train_flow"),
+            **eval_scores(frames[1:], reconstructed_frames,
                           "train_reconstructed"),
         }
 
