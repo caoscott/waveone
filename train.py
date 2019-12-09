@@ -228,7 +228,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         decoder = BitToFlowDecoder(args.bits, 3)
         binarizer = Binarizer(args.bits, args.bits,
                               not args.binarize_off)
-        return WaveoneModel(encoder, binarizer, decoder, args.flow_off)
+        return WaveoneModel(encoder, binarizer, decoder, args.train_type)
     if args.network == "cae":
         return CAE()
     if args.network == "unet":
@@ -242,12 +242,12 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "residuals": t[0],
             "context_vec": t[1],
         })
-        return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, flow_off=True)
+        return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, train_type="residual")
     if args.network == "small":
         small_encoder = SmallEncoder(6, args.bits)
         small_binarizer = SmallBinarizer(not args.binarize_off)
         small_decoder = SmallDecoder(args.bits, 3)
-        return WaveoneModel(small_encoder, small_binarizer, small_decoder, args.flow_off)
+        return WaveoneModel(small_encoder, small_binarizer, small_decoder, args.train_type)
     raise ValueError(f"No model type named {args.network}.")
 
 
@@ -300,7 +300,7 @@ def train(args) -> nn.Module:
             context_vec: torch.Tensor,
             residuals: torch.Tensor,
     ) -> None:
-        if args.network != "opt" and args.flow_off is False:
+        if args.network != "opt" and "flow" in args.train_type:
             flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
             flows_max = flows.max(dim=0).values.max(  # type: ignore
                 dim=0).values.max(dim=0).values  # type: ignore
