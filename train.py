@@ -360,10 +360,12 @@ def train(args) -> nn.Module:
             frame2 = frame2.cuda()
 
             model_out = model(frame1, frame2)
-            loss += reconstructed_loss_fn(frame2, model_out["reconstructed_frame"]) \
-                + (0 if args.flow_off
-                    else (flow_loss_fn(frame2, model_out["flow_frame"])
-                          + 0.01 * tv(model_out["flow"])))
+            if "flow" in args.train_type:
+                loss += (flow_loss_fn(frame2, model_out["flow_frame"])
+                         + 0.01 * tv(model_out["flow"]))
+            if "residual" in args.train_type:
+                loss += reconstructed_loss_fn(frame2,
+                                              model_out["reconstructed_frame"])
 
             flow_frames.append(model_out["flow_frame"].cpu())
             reconstructed_frames.append(
