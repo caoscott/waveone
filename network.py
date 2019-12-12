@@ -259,9 +259,10 @@ class WaveoneModel(nn.Module):
         codes = self.binarizer(self.encoder(frame1, frame2, 0.))
         decoder_out = self.decoder((codes, 0.))
         flow_frame = F.grid_sample(  # type: ignore
-                frame1, decoder_out["flow_grid"], align_corners=False) \
-                    if "flow" in self.train_type \
-                        else frame1
+            frame1, decoder_out["flow_grid"], 
+            align_corners=False, 
+            padding_mode="border",
+        ) if "flow" in self.train_type else frame1
 
         reconstructed_frame2 = flow_frame + decoder_out["residuals"] \
             if "residual" in self.train_type \
