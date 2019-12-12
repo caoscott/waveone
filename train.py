@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
 from waveone.dataset import get_loaders, get_master_loader
-from waveone.losses import MSSSIM, TotalVariation
+from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
                              ContextToFlowDecoder, Encoder, SmallBinarizer,
@@ -71,10 +71,14 @@ def eval_scores(
 
 
 def get_loss_fn(loss_type: str) -> nn.Module:
-    assert loss_type in ["l1", "l2", "msssim"]
-    return nn.MSELoss(reduction="mean") if loss_type == 'l2' \
-        else nn.L1Loss(reduction="mean") if loss_type == 'l1' \
-        else MSSSIM(val_range=2, normalize=True, negative=True)
+    if loss_type == 'l2':
+        return nn.MSELoss(reduction="mean")
+    if loss_type == 'l1':
+        return nn.L1Loss(reduction="mean")
+    if loss_type == "msssim":
+        return MSSSIM(val_range=2, normalize=True, negative=True)
+    if loss_type == "charbonnier":
+        return CharbonnierLoss()
 
 
 def run_eval(
@@ -85,6 +89,8 @@ def run_eval(
         args: argparse.Namespace,
         writer: SummaryWriter,
         fgsm: bool = False,
+
+
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     model.eval()
 
@@ -361,8 +367,10 @@ def train(args) -> nn.Module:
 
             model_out = model(frame1, frame2)
             if "flow" in args.train_type:
-                loss += (flow_loss_fn(frame2, model_out["flow_frame"])
-                         + 0.01 * tv(model_out["flow"]))
+                loss += (
+                    flow_loss_fn(frame2, model_out["flow_frame"])
+                    #  + 0.01 * tv(model_out["flow"])
+                )
             if "residual" in args.train_type:
                 loss += reconstructed_loss_fn(frame2,
                                               model_out["reconstructed_frame"])
