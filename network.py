@@ -143,7 +143,7 @@ class SmallDecoder(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         x, context_vec = input_tuple
         x = self.ups(x)
-        f = self.flow(x).permute(0, 2, 3, 1)
+        f = self.flow(x).permute(0, 2, 3, 1) * 25
         r = self.residual(x) * 2
 
         assert f.shape[-1] == 2
@@ -152,7 +152,7 @@ class SmallDecoder(nn.Module):
             f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, 2).to(x.device)
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
-        f_grid = f / grid_normalize * 25 + F.affine_grid(  # type: ignore
+        f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
             identity_theta, r.shape, align_corners=False)
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
                                 #    align_corners=False)
