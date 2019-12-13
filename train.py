@@ -58,7 +58,7 @@ def eval_scores(
 ) -> Dict[str, torch.Tensor]:
     l1_loss_fn = nn.L1Loss(reduction="mean")
     msssim_fn = MSSSIM(val_range=2, normalize=True)
-    scores: Dict[str, torch.Tensor]
+    scores: Dict[str, torch.Tensor] = {}
     f1 = torch.cat(frames1, dim=0)
 
     for prefix, frames2 in dict2.items(): 
