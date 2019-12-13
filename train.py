@@ -88,9 +88,6 @@ def run_eval(
         epoch: int,
         args: argparse.Namespace,
         writer: SummaryWriter,
-        fgsm: bool = False,
-
-
 ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     model.eval()
 
@@ -141,7 +138,8 @@ def run_eval(
 
             # Update frame1.
             frame1 = torch.cat(
-                (model_out["reconstructed_frame"][:1], frame), dim=0
+                (frame if (eval_iter+1) % args.iframe_iters 
+                else model_out["reconstructed_frame"][:1], frame), dim=0
             )
             assert frame1.shape == frame2.shape
             assert frame1.shape[0] == 2

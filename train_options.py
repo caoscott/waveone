@@ -48,14 +48,6 @@ parser.add_argument('--reconstructed-loss', choices=['l1', 'l2', 'msssim'],
                     help='Choose loss type for overall reconstruction.', default='msssim')
 parser.add_argument('--flow-loss', choices=['l1', 'l2', 'msssim'],
                     help='Choose loss type for flow. No-op for --flow-off', default='l1')
-parser.add_argument('--sampling-range', type=int, default=5,
-                    help='Number of frames in future to sample from for next frame during '
-                         'training. 0 means picking the exact next frame in sequential order')
-parser.add_argument('--frame-len', type=int, default=3,
-                    help='Number of next frames to actually pick for training.')
-parser.add_argument('--detach', action='store_true',
-                    help='Detach gradients from previous frame when training from sequence of '
-                         'frames. Used to make training more efficient.')
 
 # To save computation, we compute objective for multiple
 # crops for each forward pass.
@@ -83,3 +75,14 @@ parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
 parser.add_argument('--plot-codes', action='store_true',
                     help='If true, plot encoded bits from binarizer.')
+parser.add_argument('--iframe-iter', type=int, default=1000,
+                    help='Set # of eval iterations for saving iframe.')
+parser.add_argument('--sampling-range', type=int, default=5,
+                    help='Number of frames in future to sample from for next frame during '
+                         'training. 0 means picking the exact next frame in sequential order')
+parser.add_argument('--frame-len', type=int, default=3,
+                    help='Number of next frames to actually pick for training.')
+parser.add_argument('--detach', action='store_true',
+                    help='Detach gradients from previous frame when training from sequence of '
+                         'frames. Used to make training more efficient.')
+
