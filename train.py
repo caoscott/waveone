@@ -139,7 +139,7 @@ def run_eval(
 
             # Update frame1.
             frame1 = torch.cat(
-                (frame if (eval_iter+1) % args.iframe_iters 
+                (frame if (eval_iter+1) % args.iframe_iter == 0 
                 else model_out["reconstructed_frame"][:1], frame), dim=0
             )
             assert frame1.shape == frame2.shape
