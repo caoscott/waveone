@@ -79,6 +79,7 @@ def get_loss_fn(loss_type: str) -> nn.Module:
         return MSSSIM(val_range=2, normalize=True, negative=True)
     if loss_type == "charbonnier":
         return CharbonnierLoss()
+    raise ValueError(f"{loss_type} is not an appropriate loss.")
 
 
 def run_eval(
