@@ -294,7 +294,7 @@ def train(args) -> nn.Module:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    scheduler = LS.StepLR(solver, step_size=50, gamma=0.5)
+    scheduler = LS.StepLR(solver, step_size=40, gamma=0.5)
     reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
     flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
     tv = TotalVariation().cuda()
