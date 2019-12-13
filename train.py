@@ -141,7 +141,7 @@ def run_eval(
             assert frame1.shape[0] == 2
 
         total_scores: Dict[str, torch.Tensor] = {
-            **eval_scores(frames[:-1], frames[1:], f"{eval_name}_baseline"),
+            **eval_scores(frames[:-1], {"": frames[1:]}, f"{eval_name}_baseline"),
             **eval_scores(frames[1:], flow_frames, f"{eval_name}_flow"),
             **eval_scores(frames[1:], reconstructed_frames, f"{eval_name}_reconstructed"),
         }
@@ -363,9 +363,9 @@ def train(args) -> nn.Module:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             solver.step()
         scores = {
-            **eval_scores(frames[:-1], frames[1:], "train_baseline"),
-            **eval_scores(frames[1:], flow_frames, "train_flow"),
-            **eval_scores(frames[1:], reconstructed_frames,
+            **eval_scores(frames[:-1], {"": frames[1:]}, "train_baseline"),
+            **eval_scores(frames[1:], {"": flow_frames}, "train_flow"),
+            **eval_scores(frames[1:], {"": reconstructed_frames},
                           "train_reconstructed"),
         }
 
