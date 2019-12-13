@@ -53,21 +53,20 @@ def save_tensor_as_img(
 
 def eval_scores(
         frames1: List[torch.Tensor],
-        frames2: List[torch.Tensor],
-        prefix: str,
+        dict2: Dict[str, List[torch.Tensor]],
+        name: str,
 ) -> Dict[str, torch.Tensor]:
     l1_loss_fn = nn.L1Loss(reduction="mean")
     msssim_fn = MSSSIM(val_range=2, normalize=True)
+    scores: Dict[str, torch.Tensor]
+    f1 = torch.cat(frames1, dim=0)
 
-    assert len(frames1) == len(frames2)
-    frame_len = len(frames1)
-    msssim: torch.Tensor = 0.  # type: ignore
-    l1: torch.Tensor = 0.  # type: ignore
-    for frame1, frame2 in zip(frames1, frames2):
-        l1 += l1_loss_fn(frame1, frame2)
-        msssim += msssim_fn(frame1, frame2)
-    return {f"{prefix}_l1": l1/frame_len,
-            f"{prefix}_msssim": msssim/frame_len}
+    for prefix, frames2 in dict2.items(): 
+        f2 = torch.cat(frames2, dim=0)
+        assert f1.shape == f2.shape
+        scores[f"{name}_{prefix}l1"] = l1_loss_fn(f1, f2)
+        scores[f"{name}_{prefix}msssim"] = msssim_fn(f1, f2)
+    return scores
 
 
 def get_loss_fn(loss_type: str) -> nn.Module:
@@ -89,58 +88,54 @@ def run_eval(
         epoch: int,
         args: argparse.Namespace,
         writer: SummaryWriter,
-) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+) -> Dict[str, torch.Tensor]:
     model.eval()
 
     with torch.no_grad():
         eval_iterator = iter(eval_loader)
         frame1 = next(eval_iterator)[0]
         frames = [frame1]
-        reconstructed_frames = []
-        reconstructed_frames_vcii = []
-        flow_frames = []
-        flow_frames_vcii = []
-        frame1 = torch.cat((frame1, frame1), dim=0).cuda()
+        reconstructed_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
+        flow_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
+        frame1 = torch.cat((frame1, frame1, frame1), dim=0).cuda()
 
         for eval_iter, (frame,) in enumerate(eval_iterator):
             frames.append(frame)
             frame = frame.cuda()
-            frame2 = torch.cat((frame, frame), dim=0)
+            frame2 = torch.cat((frame, frame, frame), dim=0)
             assert frame1.shape == frame2.shape
-            assert frame1.shape[0] == 2
+            assert frame1.shape[0] == 3
             model_out = model(frame1, frame2)
+
             reconstructed_frame_cpu = model_out["reconstructed_frame"].cpu()
             flow_frame_cpu = model_out["flow_frame"].cpu()
 
-            reconstructed_frames.append(reconstructed_frame_cpu[:1])
-            reconstructed_frames_vcii.append(reconstructed_frame_cpu[1:])
-            flow_frames.append(flow_frame_cpu[:1])
-            flow_frames_vcii.append(flow_frame_cpu[1:])
             if args.save_out_img:
-                save_tensor_as_img(
-                    frames[-1], f"{eval_name}_{eval_iter}_frame", args
-                )
-                save_tensor_as_img(
-                    flow_frames[-1], f"{eval_name}_{eval_iter}_flow", args
-                )
-                save_tensor_as_img(
-                    flow_frames_vcii[-1], f"{eval_name}_{eval_iter}_flow_vcii", args
-                )
-                save_tensor_as_img(
-                    reconstructed_frames[-1],
-                    f"{eval_name}_{eval_iter}_reconstructed",
-                    args
-                )
-                save_tensor_as_img(
-                    reconstructed_frames_vcii[-1],
-                    f"{eval_name}_{eval_iter}_reconstructed_vcii",
-                    args
-                )
+                for frame_i, prefix in enumerate(("", "vcii_", "iframe_")):
+                    flow_i = flow_frame_cpu[frame_i].unsqueeze(0)
+                    reconstructed_i = reconstructed_frame_cpu[frame_i].unsqueeze(0)
+                    flow_frames[prefix].append(flow_i)
+                    reconstructed_frames[prefix].append(reconstructed_i)
+                    save_tensor_as_img(
+                        frames[-1], f"{prefix}{eval_name}_{eval_iter}_frame", args
+                    )
+                    save_tensor_as_img(
+                        flow_i, f"{prefix}{eval_name}_{eval_iter}_flow", args
+                    )
+                    save_tensor_as_img(
+                        reconstructed_i,
+                        f"{prefix}{eval_name}_{eval_iter}_reconstructed",
+                        args
+                    )
 
             # Update frame1.
             frame1 = torch.cat(
-                (frame if (eval_iter+1) % args.iframe_iter == 0 
-                else model_out["reconstructed_frame"][:1], frame), dim=0
+                (
+                model_out["reconstructed_frame"][:1],
+                frame,
+                frame if (eval_iter+1) % args.iframe_iter == 0 
+                else model_out["reconstructed_frame"][2:],
+                ), dim=0
             )
             assert frame1.shape == frame2.shape
             assert frame1.shape[0] == 2
@@ -148,24 +143,13 @@ def run_eval(
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(frames[:-1], frames[1:], f"{eval_name}_baseline"),
             **eval_scores(frames[1:], flow_frames, f"{eval_name}_flow"),
-            **eval_scores(frames[1:], reconstructed_frames,
-                          f"{eval_name}_reconstructed"),
-            # **eval_scores(frames[:-1], frames[1:], "vcii_eval_baseline"),
-            **eval_scores(frames[1:], flow_frames_vcii, f"{eval_name}_vcii_flow"),
-            **eval_scores(frames[1:], reconstructed_frames_vcii,
-                          f"{eval_name}_vcii_reconstructed"),
+            **eval_scores(frames[1:], reconstructed_frames, f"{eval_name}_reconstructed"),
         }
 
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
         print_scores(total_scores)
-        score_diffs = get_score_diffs(
-            total_scores,
-            ["flow", "reconstructed", "vcii_flow", "vcii_reconstructed"],
-            [eval_name]
-        )
-        plot_scores(writer, score_diffs, epoch)
-        return total_scores, score_diffs
+        return total_scores
 
 
 def plot_scores(
@@ -175,22 +159,6 @@ def plot_scores(
 ) -> None:
     for key, value in scores.items():
         writer.add_scalar(key, value, train_iter)
-
-
-def get_score_diffs(
-        scores: Dict[str, torch.Tensor],
-        prefixes: List[str],
-        prefix_types: List[str],
-) -> Dict[str, torch.Tensor]:
-    score_diffs = {}
-    for prefix_type in prefix_types:
-        for score_type in ("msssim", "l1"):
-            for prefix in prefixes:
-                baseline_score = scores[f"{prefix_type}_baseline_{score_type}"]
-                prefix_score = scores[f"{prefix_type}_{prefix}_{score_type}"]
-                score_diffs[f"{prefix_type}_{prefix}_{score_type}_diff"
-                            ] = prefix_score - baseline_score
-    return score_diffs
 
 
 def print_scores(scores: Dict[str, torch.Tensor]) -> None:
@@ -409,8 +377,6 @@ def train(args) -> nn.Module:
         writer.add_scalar(
             "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
         plot_scores(writer, scores, train_iter)
-        score_diffs = get_score_diffs(scores, ["reconstructed"], ["train"])
-        plot_scores(writer, score_diffs, train_iter)
 
     for epoch in range(args.max_train_epochs):
         for frames in train_loader:
