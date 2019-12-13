@@ -137,8 +137,6 @@ def run_eval(
                 else model_out["reconstructed_frame"][2:],
                 ), dim=0
             )
-            assert frame1.shape == frame2.shape
-            assert frame1.shape[0] == 2
 
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(frames[:-1], {"": frames[1:]}, f"{eval_name}_baseline"),
