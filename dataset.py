@@ -13,6 +13,64 @@ import torch
 import torch.utils.data as data
 
 
+class ImageList(data.Dataset):
+    def __init__(
+        self,
+        img_fns: List[str],
+        is_train: bool,
+        args: argparse.Namespace,
+        frame_len: int,
+        sampling_range: int,
+    ) -> None:
+        super().__init__()
+        self.img_fns = img_fns
+        self.is_train = is_train
+        self.frame_len = frame_len
+        self.sampling_range = sampling_range
+        self.args = args
+
+        assert frame_len > 0
+        assert sampling_range == 0 or sampling_range >= frame_len
+        assert len(self.img_fns) >= self.frame_len
+
+    def __getitem__(self, index: int) -> List[torch.Tensor]:
+        imgs: List[np.ndarray] = []
+        if self.sampling_range:
+            idx_sampling_range = min(
+                self.sampling_range, len(self.img_fns)-index)
+            offsets = np.random.permutation(idx_sampling_range)[:self.frame_len]
+            imgs = [default_loader(self.img_fns[index + offset])
+                    for offset in np.sort(offsets)]
+        else:
+            imgs = [default_loader(img_fn)
+                    for img_fn in self.img_fns[index: index+self.frame_len]]
+
+        if self.is_train:
+            # imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
+            imgs = flip_cv2(imgs)
+            if self.args.patch:
+                imgs = multi_crop_cv2(imgs, self.args.patch)
+        imgs = [square_cv2(img) for img in imgs]
+
+        frames: List[torch.Tensor] = [np_to_torch(img.astype(np.float64)/255*2 - 1)
+                                      for img in imgs]
+
+        for frame in frames:
+            assert frame.max() <= 1  # type: ignore
+            assert frame.min() >= -1  # type: ignore
+        assert len(frames) == self.frame_len
+
+        return frames
+
+    def set_is_train(self, is_train: bool) -> ImageList:
+        image_list = copy.copy(self)
+        image_list.is_train = is_train
+        return image_list
+
+    def __len__(self) -> int:
+        return len(self.img_fns) - self.frame_len + 1
+
+
 def get_vid_id(filename: str) -> str:
     return "_".join(filename.split("_")[:-1])
 
@@ -137,65 +195,6 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 
 #     def __len__(self) -> int:
 #         return 0
-
-
-class ImageList(data.Dataset):
-    def __init__(
-        self,
-        img_fns: List[str],
-        is_train: bool,
-        args: argparse.Namespace,
-        frame_len: int,
-        sampling_range: int,
-    ) -> None:
-        super().__init__()
-        self.img_fns = img_fns
-        self.is_train = is_train
-        self.frame_len = frame_len
-        self.sampling_range = sampling_range
-        self.args = args
-
-        assert frame_len > 0
-        assert sampling_range == 0 or sampling_range >= frame_len
-        assert len(self.img_fns) >= self.frame_len
-
-    def __getitem__(self, index: int) -> List[torch.Tensor]:
-        imgs: List[np.ndarray] = []
-        if self.sampling_range:
-            idx_sampling_range = min(
-                self.sampling_range, len(self.img_fns)-index)
-            offsets = np.random.permutation(idx_sampling_range)[:self.frame_len]
-            imgs = [default_loader(self.img_fns[index + offset])
-                    for offset in np.sort(offsets)]
-        else:
-            imgs = [default_loader(img_fn)
-                    for img_fn in self.img_fns[index: index+self.frame_len]]
-
-        if self.is_train:
-            # imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
-            imgs = flip_cv2(imgs)
-            if self.args.patch:
-                imgs = multi_crop_cv2(imgs, self.args.patch)
-        imgs = [square_cv2(img) for img in imgs]
-
-        frames: List[torch.Tensor] = [np_to_torch(img.astype(np.float64)/255*2 - 1)
-                                      for img in imgs]
-
-        for frame in frames:
-            assert frame.max() <= 1  # type: ignore
-            assert frame.min() >= -1  # type: ignore
-        assert len(frames) == self.frame_len
-
-        return frames
-
-    def set_is_train(self, is_train: bool) -> ImageList:
-        image_list = copy.copy(self)
-        image_list.is_train = is_train
-        return image_list
-
-    def __len__(self) -> int:
-        return len(self.img_fns) - self.frame_len + 1
-
 
 def get_id_to_image_lists(
         is_train: bool, root: str, args: argparse.Namespace,
