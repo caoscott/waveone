@@ -14,7 +14,7 @@ import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
-from waveone.dataset import get_loaders, get_master_loader
+from waveone.dataset import get_loaders, get_master_loader, get_id_to_image_lists
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
@@ -230,25 +230,31 @@ def train(args) -> nn.Module:
     print(args)
     ############### Data ###############
 
-    train_loader = get_master_loader(
-        is_train=True,
-        root=args.train,
-        frame_len=args.frame_len,
+    train_id_to_image_lists = get_id_to_image_lists(
+        is_train=True, 
+        root=args.train, 
+        args=args, 
+        frame_len=args.frame_len, 
         sampling_range=args.sampling_range,
+    )
+    train_loader = get_master_loader(
+        id_to_image_lists=train_id_to_image_lists,
+        is_train=True,
         args=args,
     )
     train_sequential_loader = get_loaders(
+        id_to_image_lists={
+            "": next(iter(train_id_to_image_lists.values())).set_is_train(False)
+        },
         is_train=False,
-        root=args.train,
-        frame_len=1,
-        sampling_range=0,
         args=args,
     )[0]
+    eval_id_to_image_lists = get_id_to_image_lists(
+        is_train=False, root=args.eval, args=args, frame_len=1, sampling_range=0,
+    )
     eval_loader = get_master_loader(
+        id_to_image_lists=eval_id_to_image_lists,
         is_train=False,
-        root=args.eval,
-        frame_len=1,
-        sampling_range=0,
         args=args,
     )
     writer = SummaryWriter(f"runs/{args.save_model_name}", purge_step=0)
@@ -263,7 +269,7 @@ def train(args) -> nn.Module:
     scheduler = LS.StepLR(solver, step_size=40, gamma=0.5)
     reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
     flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
-    tv = TotalVariation().cuda()
+    # tv = TotalVariation().cuda()
 
     def log_flow_context_residuals(
             writer: SummaryWriter,

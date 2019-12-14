@@ -1,4 +1,5 @@
 import argparse
+import copy
 import glob
 import os
 import os.path
@@ -17,15 +18,10 @@ def get_vid_id(filename: str) -> str:
 
 
 def get_loaders(
+        id_to_image_lists: Dict[str, ImageList],
         is_train: bool,
-        root: str,
-        frame_len: int,
-        sampling_range: int,
         args: argparse.Namespace,
 ) -> List[data.DataLoader]:
-    print('Creating loaders for %s...' % root)
-    id_to_image_lists = get_id_to_image_lists(
-        is_train, root, args, frame_len, sampling_range)
     vid_loaders = []
     for image_list in id_to_image_lists.values():
         loader = data.DataLoader(
@@ -44,15 +40,10 @@ def get_loaders(
 
 
 def get_master_loader(
+        id_to_image_lists: Dict[str, ImageList],
         is_train: bool,
-        root: str,
-        frame_len: int,
-        sampling_range: int,
         args: argparse.Namespace,
 ) -> data.DataLoader:
-    print(f'Creating loader for {root}')
-    id_to_image_lists: Dict[str, ImageList] = get_id_to_image_lists(
-        is_train, root, args, frame_len, sampling_range)
     dataset: data.Dataset = data.ConcatDataset(
         [image_list for _, image_list in id_to_image_lists.items()]
     )
@@ -60,12 +51,10 @@ def get_master_loader(
         dataset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
         shuffle=is_train,
-        num_workers=2,
+        num_workers=4 if is_train else 2,
         drop_last=is_train,
     )
-    print('Loader for {} images ({} batches) created.'.format(
-        len(dataset), len(loader))
-    )
+    print(f'Loader for {len(dataset)} images ({len(loader)} batches) created.')
     return loader
 
 
@@ -133,34 +122,34 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(img).float()
 
 
-class MultiVidDataset(data.Dataset):
-    def __init__(self, id_to_image_lists: Dict[str, data.Dataset]) -> None:
-        super().__init__()
-        self.id_to_image_lists = id_to_image_lists
+# class MultiVidDataset(data.Dataset):
+#     def __init__(self, id_to_image_lists: Dict[str, data.Dataset]) -> None:
+#         super().__init__()
+#         self.id_to_image_lists = id_to_image_lists
 
-    def __getitem__(self, index: int) -> List[torch.Tensor]:
-        # num_of_datasets x frame_len
-        dataset_by_frames = [image_list[index]
-                             for _, image_list in self.id_to_image_lists.items()]
-        # frame_len x num_of_datasets
-        frames_list = zip(*dataset_by_frames)
-        return [torch.cat(frames) for frames in frames_list]
+#     def __getitem__(self, index: int) -> List[torch.Tensor]:
+#         # num_of_datasets x frame_len
+#         dataset_by_frames = [image_list[index]
+#                              for _, image_list in self.id_to_image_lists.items()]
+#         # frame_len x num_of_datasets
+#         frames_list = zip(*dataset_by_frames)
+#         return [torch.cat(frames) for frames in frames_list]
 
-    def __len__(self) -> int:
-        return 0
+#     def __len__(self) -> int:
+#         return 0
 
 
 class ImageList(data.Dataset):
     def __init__(
         self,
-        imgs: List[np.ndarray],
+        img_fns: List[str],
         is_train: bool,
         args: argparse.Namespace,
         frame_len: int,
         sampling_range: int,
     ) -> None:
         super().__init__()
-        self.imgs = imgs
+        self.img_fns = img_fns
         self.is_train = is_train
         self.frame_len = frame_len
         self.sampling_range = sampling_range
@@ -168,16 +157,16 @@ class ImageList(data.Dataset):
 
         assert frame_len > 0
         assert sampling_range == 0 or sampling_range >= frame_len
-        assert len(self.imgs) >= self.frame_len
+        assert len(self.img_fns) >= self.frame_len
 
     def __getitem__(self, index: int) -> List[torch.Tensor]:
         imgs: List[np.ndarray] = []
         if self.sampling_range:
-            idx_sampling_range = min(self.sampling_range, len(self.imgs)-index)
+            idx_sampling_range = min(self.sampling_range, len(self.img_fns)-index)
             offsets = np.random.permutation(idx_sampling_range)[:self.frame_len]
-            imgs = [self.imgs[index + offset] for offset in np.sort(offsets)]
+            imgs = [default_loader(self.img_fns[index + offset]) for offset in np.sort(offsets)]
         else:
-            imgs = self.imgs[index: index+self.frame_len]
+            imgs = [default_loader(img_fn) for img_fn in self.img_fns[index: index+self.frame_len]]
 
         if self.is_train:
             # imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
@@ -196,20 +185,25 @@ class ImageList(data.Dataset):
 
         return frames
 
+    def set_is_train(self, is_train: bool) -> ImageList:
+        image_list = copy.copy(self)
+        image_list.is_train = is_train
+        return image_list
+
     def __len__(self) -> int:
-        return len(self.imgs) - self.frame_len + 1
+        return len(self.img_fns) - self.frame_len + 1
 
 
 def get_id_to_image_lists(
         is_train: bool, root: str, args: argparse.Namespace,
         frame_len: int, sampling_range: int
 ) -> Dict[str, ImageList]:
-    id_to_images: DefaultDict[str, List[np.ndarray]] = defaultdict(list)
+    print(f'Loading {root}')
+    id_to_images: DefaultDict[str, List[str]] = defaultdict(list)
     for filename in sorted(glob.iglob(root + '/*png')):
         if os.path.isfile(filename):
             vid_id = "_".join(filename.split("_")[:-1])
-            img = default_loader(filename)
-            id_to_images[vid_id].append(img)
+            id_to_images[vid_id].append(filename)
     id_to_datasets: Dict[str, ImageList] = {}
     for vid_id, imgs in id_to_images.items():
         id_to_datasets[vid_id] = ImageList(
