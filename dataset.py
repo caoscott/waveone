@@ -207,9 +207,11 @@ def get_id_to_image_lists(
         if os.path.isfile(filename):
             vid_id = "_".join(filename.split("_")[:-1])
             id_to_images[vid_id].append(filename)
+    print(f"Finished loading {root}.")
     id_to_datasets: Dict[str, ImageList] = {}
     for vid_id, imgs in id_to_images.items():
         id_to_datasets[vid_id] = ImageList(
             sorted(imgs), is_train, args, frame_len, sampling_range
         )
+    print(f"Finished creating ImageLists.")
     return id_to_datasets
