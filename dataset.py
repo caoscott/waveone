@@ -205,16 +205,16 @@ def get_id_to_image_lists(
     print(f'Loading {root}')
     id_to_images: DefaultDict[Tuple[str, ...], List[str]] = defaultdict(list)
     for filename in glob.iglob(os.path.join(root, '*.png')):
-        a = time.time()
-        if os.path.isfile(filename):
-            b = time.time()
-            print("isfile:", b - a)
-            vid_id = tuple(filename.split("_")[:-1])
-            c = time.time()
-            print("vid_id:", c - b)
-            id_to_images[vid_id].append(filename)
-            d = time.time()
-            print("dict:", d - c)
+        # a = time.time()
+        # if os.path.isfile(filename):
+            # b = time.time()
+            # print("isfile:", b - a)
+        vid_id = tuple(filename.split("_")[:-1])
+        # c = time.time()
+        # print("vid_id:", c - b)
+        id_to_images[vid_id].append(filename)
+        # d = time.time()
+        # print("dict:", d - c)
     print(f"Finished loading {root}.")
     id_to_datasets: Dict[Tuple[str, ...], ImageList] = {}
     for vid_id, imgs in id_to_images.items():
