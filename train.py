@@ -246,7 +246,7 @@ def train(args) -> nn.Module:
     )
     train_sequential_loader = get_loaders(
         id_to_image_lists={
-            "": next(iter(train_id_to_image_lists.values())).set_is_train(False)
+            (): next(iter(train_id_to_image_lists.values())).set_is_train(False)
         },
         is_train=False,
         args=args,

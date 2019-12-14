@@ -75,7 +75,7 @@ def get_vid_id(filename: str) -> str:
 
 
 def get_loaders(
-        id_to_image_lists: Dict[Tuple[str], ImageList],
+        id_to_image_lists: Dict[Tuple[str, ...], ImageList],
         is_train: bool,
         args: argparse.Namespace,
 ) -> List[data.DataLoader]:
@@ -97,7 +97,7 @@ def get_loaders(
 
 
 def get_master_loader(
-        id_to_image_lists: Dict[Tuple[str], ImageList],
+        id_to_image_lists: Dict[Tuple[str, ...], ImageList],
         is_train: bool,
         args: argparse.Namespace,
 ) -> data.DataLoader:
@@ -200,15 +200,15 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 def get_id_to_image_lists(
         is_train: bool, root: str, args: argparse.Namespace,
         frame_len: int, sampling_range: int
-) -> Dict[Tuple[str], ImageList]:
+) -> Dict[Tuple[str, ...], ImageList]:
     print(f'Loading {root}')
-    id_to_images: DefaultDict[Tuple[str], List[str]] = defaultdict(list)
+    id_to_images: DefaultDict[Tuple[str, ...], List[str]] = defaultdict(list)
     for filename in glob.iglob(os.path.join(root, '*.png')):
         if os.path.isfile(filename):
             vid_id = tuple(filename.split("_")[:-1])
             id_to_images[vid_id].append(filename)
     print(f"Finished loading {root}.")
-    id_to_datasets: Dict[Tuple[str], ImageList] = {}
+    id_to_datasets: Dict[Tuple[str, ...], ImageList] = {}
     for vid_id, imgs in id_to_images.items():
         id_to_datasets[vid_id] = ImageList(
             sorted(imgs), is_train, args, frame_len, sampling_range
