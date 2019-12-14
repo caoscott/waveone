@@ -4,7 +4,7 @@ import glob
 import os
 import random
 from collections import defaultdict
-from typing import DefaultDict, Dict, List
+from typing import DefaultDict, Dict, List, Tuple
 
 import cv2
 import numpy as np
