@@ -2,7 +2,6 @@ import argparse
 import copy
 import glob
 import os
-import os.path
 import random
 from collections import defaultdict
 from typing import DefaultDict, Dict, List
@@ -102,9 +101,11 @@ def get_master_loader(
         is_train: bool,
         args: argparse.Namespace,
 ) -> data.DataLoader:
+    print("Creating ConcatDataset")
     dataset: data.Dataset = data.ConcatDataset(
         [image_list for _, image_list in id_to_image_lists.items()]
     )
+    print("ConcatDataset finished.")
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch_size if is_train else args.eval_batch_size,
@@ -202,7 +203,7 @@ def get_id_to_image_lists(
 ) -> Dict[str, ImageList]:
     print(f'Loading {root}')
     id_to_images: DefaultDict[str, List[str]] = defaultdict(list)
-    for filename in glob.iglob(root + '/*png'):
+    for filename in glob.iglob(os.path.join(root, '*.png')):
         if os.path.isfile(filename):
             vid_id = "_".join(filename.split("_")[:-1])
             id_to_images[vid_id].append(filename)
