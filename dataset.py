@@ -62,7 +62,7 @@ class ImageList(data.Dataset):
 
         return frames
 
-    def set_is_train(self, is_train: bool) -> ImageList:
+    def set_is_train(self, is_train: bool) -> "ImageList":
         image_list = copy.copy(self)
         image_list.is_train = is_train
         return image_list
