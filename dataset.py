@@ -202,13 +202,13 @@ def get_id_to_image_lists(
 ) -> Dict[str, ImageList]:
     print(f'Loading {root}')
     id_to_images: DefaultDict[str, List[str]] = defaultdict(list)
-    for filename in sorted(glob.iglob(root + '/*png')):
+    for filename in glob.iglob(root + '/*png'):
         if os.path.isfile(filename):
             vid_id = "_".join(filename.split("_")[:-1])
             id_to_images[vid_id].append(filename)
     id_to_datasets: Dict[str, ImageList] = {}
     for vid_id, imgs in id_to_images.items():
         id_to_datasets[vid_id] = ImageList(
-            imgs, is_train, args, frame_len, sampling_range
+            sorted(imgs), is_train, args, frame_len, sampling_range
         )
     return id_to_datasets
