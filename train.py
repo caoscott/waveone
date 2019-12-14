@@ -14,7 +14,8 @@ import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
-from waveone.dataset import get_loaders, get_master_loader, get_id_to_image_lists
+from waveone.dataset import (ImageList, get_id_to_image_lists, get_loaders,
+                             get_master_loader)
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
@@ -61,7 +62,7 @@ def eval_scores(
     scores: Dict[str, torch.Tensor] = {}
     f1 = torch.cat(frames1, dim=0)
 
-    for prefix, frames2 in dict2.items(): 
+    for prefix, frames2 in dict2.items():
         f2 = torch.cat(frames2, dim=0)
         assert f1.shape == f2.shape
         scores[f"{name}_{prefix}l1"] = l1_loss_fn(f1, f2)
@@ -113,7 +114,8 @@ def run_eval(
             if args.save_out_img:
                 for frame_i, prefix in enumerate(("", "vcii_", "iframe_")):
                     flow_i = flow_frame_cpu[frame_i].unsqueeze(0)
-                    reconstructed_i = reconstructed_frame_cpu[frame_i].unsqueeze(0)
+                    reconstructed_i = reconstructed_frame_cpu[frame_i].unsqueeze(
+                        0)
                     flow_frames[prefix].append(flow_i)
                     reconstructed_frames[prefix].append(reconstructed_i)
                     save_tensor_as_img(
@@ -131,10 +133,10 @@ def run_eval(
             # Update frame1.
             frame1 = torch.cat(
                 (
-                model_out["reconstructed_frame"][:1],
-                frame,
-                frame if (eval_iter+1) % args.iframe_iter == 0 
-                else model_out["reconstructed_frame"][2:],
+                    model_out["reconstructed_frame"][:1],
+                    frame,
+                    frame if (eval_iter+1) % args.iframe_iter == 0
+                    else model_out["reconstructed_frame"][2:],
                 ), dim=0
             )
 
@@ -231,10 +233,10 @@ def train(args) -> nn.Module:
     ############### Data ###############
 
     train_id_to_image_lists = get_id_to_image_lists(
-        is_train=True, 
-        root=args.train, 
-        args=args, 
-        frame_len=args.frame_len, 
+        is_train=True,
+        root=args.train,
+        args=args,
+        frame_len=args.frame_len,
         sampling_range=args.sampling_range,
     )
     train_loader = get_master_loader(

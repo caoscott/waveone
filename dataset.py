@@ -162,11 +162,14 @@ class ImageList(data.Dataset):
     def __getitem__(self, index: int) -> List[torch.Tensor]:
         imgs: List[np.ndarray] = []
         if self.sampling_range:
-            idx_sampling_range = min(self.sampling_range, len(self.img_fns)-index)
+            idx_sampling_range = min(
+                self.sampling_range, len(self.img_fns)-index)
             offsets = np.random.permutation(idx_sampling_range)[:self.frame_len]
-            imgs = [default_loader(self.img_fns[index + offset]) for offset in np.sort(offsets)]
+            imgs = [default_loader(self.img_fns[index + offset])
+                    for offset in np.sort(offsets)]
         else:
-            imgs = [default_loader(img_fn) for img_fn in self.img_fns[index: index+self.frame_len]]
+            imgs = [default_loader(img_fn)
+                    for img_fn in self.img_fns[index: index+self.frame_len]]
 
         if self.is_train:
             # imgs = contrast_cv2(brightness_cv2(flip_cv2(imgs)))
