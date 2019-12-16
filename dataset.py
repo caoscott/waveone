@@ -134,13 +134,13 @@ def get_master_loader(
     )
     print("ConcatDataset finished.")
     loader = data.DataLoader(
-        image_list,
+        dataset,
         batch_size=args.batch_size,
-        sampler=RandomVidSequenceSampler(image_list, args.frame_len),
+        sampler=RandomVidSequenceSampler(dataset, args.frame_len),
         num_workers=4,
         drop_last=is_train,
     ) if is_train else data.DataLoader(
-        image_list,
+        dataset,
         batch_size=args.eval_batch_size,
         shuffle=False,
         num_workers=2,
