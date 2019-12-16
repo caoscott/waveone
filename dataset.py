@@ -5,7 +5,7 @@ import os
 import random
 import time
 from collections import defaultdict
-from typing import DefaultDict, Dict, List, Tuple
+from typing import DefaultDict, Dict, Iterator, List, Tuple
 
 import cv2
 import numpy as np
@@ -80,7 +80,7 @@ class RandomVidSequenceSampler(data.Sampler):
             dataset) // frame_len - 1 if len(dataset) % frame_len == 0 else len(
             dataset) // frame_len
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[int]:
         start = np.random.randint(self.frame_len + 1 if len(self.dataset) %
                                   self.frame_len == 0 else len(self.dataset) % self.frame_len + 1)
         indices = np.random.permutation(
