@@ -16,7 +16,7 @@ from torchvision.utils import save_image
 
 from waveone.dataset import (ImageList, get_id_to_image_lists, get_loaders,
                              get_master_loader)
-from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation
+from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation, msssim
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
                              ContextToFlowDecoder, Encoder, SmallBinarizer,
