@@ -71,6 +71,26 @@ class ImageList(data.Dataset):
         return len(self.img_fns) - self.frame_len + 1
 
 
+class RandomVidSequenceSampler(data.Sampler):
+    def __init__(self, dataset: data.Dataset, frame_len: int) -> None:
+        super().__init__(dataset)
+        self.dataset = dataset
+        self.frame_len = frame_len
+        self.num_samples = len(
+            dataset) // frame_len - 1 if len(dataset) % frame_len == 0 else len(
+            dataset) // frame_len
+
+    def __iter__(self):
+        start = np.random.randint(self.frame_len + 1 if len(self.dataset) %
+                                  self.frame_len == 0 else len(self.dataset) % self.frame_len + 1)
+        indices = np.random.permutation(
+            np.arange(self.num_samples) * self.frame_len + start)
+        return iter(indices)
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+
 def get_vid_id(filename: str) -> str:
     return "_".join(filename.split("_")[:-1])
 
@@ -84,10 +104,16 @@ def get_loaders(
     for image_list in id_to_image_lists.values():
         loader = data.DataLoader(
             image_list,
-            batch_size=args.batch_size if is_train else args.eval_batch_size,
-            shuffle=is_train,
+            batch_size=args.batch_size,
+            sampler=RandomVidSequenceSampler(image_list, args.frame_len)
             num_workers=2,
             drop_last=is_train,
+        ) if is_train else data.DataLoader(
+            image_list,
+            batch_size=args.eval_batch_size,
+            shuffle=False,
+            num_workers=2,
+            drop_last=False,
         )
         vid_loaders.append(loader)
         print('Loader for {} images ({} batches) created.'.format(
@@ -108,11 +134,17 @@ def get_master_loader(
     )
     print("ConcatDataset finished.")
     loader = data.DataLoader(
-        dataset,
-        batch_size=args.batch_size if is_train else args.eval_batch_size,
-        shuffle=is_train,
-        num_workers=4 if is_train else 2,
+        image_list,
+        batch_size=args.batch_size,
+        sampler=RandomVidSequenceSampler(image_list, args.frame_len)
+        num_workers=4,
         drop_last=is_train,
+    ) if is_train else data.DataLoader(
+        image_list,
+        batch_size=args.eval_batch_size,
+        shuffle=False,
+        num_workers=2,
+        drop_last=False,
     )
     print(f'Loader for {len(dataset)} images ({len(loader)} batches) created.')
     return loader
