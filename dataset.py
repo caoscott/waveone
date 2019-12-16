@@ -105,7 +105,7 @@ def get_loaders(
         loader = data.DataLoader(
             image_list,
             batch_size=args.batch_size,
-            sampler=RandomVidSequenceSampler(image_list, args.frame_len)
+            sampler=RandomVidSequenceSampler(image_list, args.frame_len),
             num_workers=2,
             drop_last=is_train,
         ) if is_train else data.DataLoader(
