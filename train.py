@@ -57,7 +57,6 @@ def eval_scores(
         dict2: Dict[str, List[torch.Tensor]],
         name: str,
 ) -> Dict[str, torch.Tensor]:
-    l1_loss_fn = nn.L1Loss(reduction="mean")
     msssim_fn = MSSSIM(val_range=2, normalize=True)
     scores: Dict[str, torch.Tensor] = {}
     f1 = torch.cat(frames1, dim=0)
@@ -65,8 +64,10 @@ def eval_scores(
     for prefix, frames2 in dict2.items():
         f2 = torch.cat(frames2, dim=0)
         assert f1.shape == f2.shape
-        scores[f"{name}_{prefix}l1"] = l1_loss_fn(f1, f2)
-        scores[f"{name}_{prefix}msssim"] = msssim_fn(f1, f2)
+        scores[f"{name}_{prefix}l1"] = F.l1_loss(f1, f2, reduction="mean")
+        scores[f"{name}_{prefix}msssim"] = msssim(
+            f1, f2, val_range=2, normalize=True,
+        )
     return scores
 
 
@@ -158,7 +159,7 @@ def plot_scores(
         train_iter: int
 ) -> None:
     for key, value in scores.items():
-        writer.add_scalar(key, value, train_iter)
+        writer.add_scalar(key, value.item(), train_iter)
 
 
 def print_scores(scores: Dict[str, torch.Tensor]) -> None:
@@ -333,11 +334,10 @@ def train(args) -> nn.Module:
         reconstructed_frames = []
         flow_frames = []
         loss: torch.Tensor = 0.  # type: ignore
+        frames = [frame.cuda() for frame in frames]
 
-        frame1 = frames[0].cuda()
+        frame1 = frames[0]
         for frame2 in frames[1:]:
-            frame2 = frame2.cuda()
-
             model_out = model(frame1, frame2)
             if "flow" in args.train_type:
                 loss += (
@@ -348,9 +348,9 @@ def train(args) -> nn.Module:
                 loss += reconstructed_loss_fn(frame2,
                                               model_out["reconstructed_frame"])
 
-            flow_frames.append(model_out["flow_frame"].cpu())
+            flow_frames.append(model_out["flow_frame"])
             reconstructed_frames.append(
-                model_out["reconstructed_frame"].cpu())
+                model_out["reconstructed_frame"])
 
             log_flow_context_residuals(
                 writer,
