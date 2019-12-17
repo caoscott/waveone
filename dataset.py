@@ -1,6 +1,5 @@
 import argparse
 import copy
-import hickle as hkl
 import glob
 import os
 import random
@@ -93,12 +92,12 @@ class RandomVidSequenceSampler(data.Sampler):
 
 
 def get_loaders(
-        hkl_paths: List[str],
+        paths: List[str],
         is_train: bool,
         args: argparse.Namespace,
 ) -> Iterator[data.DataLoader]:
-    for hkl_path in hkl_paths:
-        id_to_images = load_hkl_images(hkl_path)
+    for pkl_path in paths:
+        id_to_images = load_pkl_images(pkl_path)
         datasets = convert_images_to_datasets(
             id_to_images,
             is_train=is_train,
@@ -149,16 +148,6 @@ def get_loaders(
 #     )
 #     print(f'Loader for {len(dataset)} images ({len(loader)} batches) created.')
 #     return loader
-
-
-def default_loader(path: str) -> np.ndarray:
-    cv2_img = cv2.imread(path)
-    if cv2_img.shape is None:
-        print(path)
-        print(cv2_img)
-    else:
-        cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
-    return cv2_img
 
 
 def square_cv2(img: np.ndarray) -> np.ndarray:
@@ -233,29 +222,10 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 #     def __len__(self) -> int:
 #         return 0
 
-# def get_id_to_image_lists(root: str) -> Dict[Tuple[str, ...], List[str]]:
-#     print(f'Loading {root}')
-#     id_to_images: DefaultDict[Tuple[str, ...], List[str]] = defaultdict(list)
-#     for filename in glob.iglob(os.path.join(root, '*.png')):
-#         # a = time.time()
-#         # if os.path.isfile(filename):
-#             # b = time.time()
-#             # print("isfile:", b - a)
-#         vid_id = tuple(filename.split("_")[:-1])
-#         # c = time.time()
-#         # print("vid_id:", c - b)
-#         id_to_images[vid_id].append(filename)
-#         # d = time.time()
-#         # print("dict:", d - c)
-#     for vid_id in id_to_images:
-#         id_to_images[vid_id].sort()
-#     print(f"Finished loading {root}.")
-#     return id_to_images
 
-
-def load_hkl_images(filepath: str) -> Dict[str, Tuple[np.ndarray, ...]]:
-    id_to_images: Dict[str, Tuple[np.ndarray, ...]] = {}
-    hkl.load(id_to_images, filepath)
+def load_pkl_images(filepath: str) -> Dict[str, Tuple[np.ndarray, ...]]:
+    print(f"Loading {filepath}.")
+    id_to_images: Dict[str, Tuple[np.ndarray, ...]] = torch.load(filepath)
     return id_to_images
 
 

@@ -27,7 +27,7 @@ from waveone.train_options import parser
 def create_directories(dir_names: Tuple[str, ...]) -> None:
     for dir_name in dir_names:
         if not os.path.exists(dir_name):
-            print("Creating directory %s." % dir_name)
+            print(f"Creating directory {dir_name}.")
             os.makedirs(dir_name)
 
 
@@ -175,7 +175,7 @@ def resume(args: argparse.Namespace,
         f"{args.network}.pth",
     )
 
-    print('Loading %s from %s...' % (args.network, checkpoint_path))
+    print(f'Loading {args.network} from {checkpoint_path}...')
     model.load_state_dict(torch.load(checkpoint_path))
 
 
@@ -232,10 +232,13 @@ def train(args) -> nn.Module:
     print(args)
     ############### Data ###############
 
-    train_paths = glob.glob(os.path.join(args.train, '*.hkl'))
-    train_subset_paths = glob.glob(os.path.join(args.train_subset, '*.hkl'))
-    eval_paths = glob.glob(os.path.join(args.eval, '*.hkl'))
-    
+    train_paths = glob.glob(os.path.join(args.train, '*.pkl'))
+    assert train_paths
+    train_subset_paths = glob.glob(os.path.join(args.train_subset, '*.pkl'))
+    assert train_subset_paths
+    eval_paths = glob.glob(os.path.join(args.eval, '*.pkl'))
+    assert eval_paths
+
     writer = SummaryWriter(f"runs/{args.save_model_name}", purge_step=0)
 
     ############### Model ###############
