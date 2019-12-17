@@ -361,7 +361,8 @@ def train(args) -> nn.Module:
         )
         writer.add_scalar(
             "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
-        plot_scores(writer, scores, train_iter)
+        if args.network == "opt" or train_iter % 100 == 0:
+            plot_scores(writer, scores, train_iter)
 
     for epoch in range(args.max_train_epochs):
         for train_loader in get_loaders(train_paths, is_train=True, args=args):
