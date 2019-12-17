@@ -347,21 +347,21 @@ def train(args) -> nn.Module:
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             solver.step()
-        scores = {
-            **eval_scores(frames[:-1], {"": frames[1:]}, "train_baseline"),
-            **eval_scores(frames[1:], {"": flow_frames}, "train_flow"),
-            **eval_scores(frames[1:], {"": reconstructed_frames},
-                          "train_reconstructed"),
-        }
 
-        writer.add_scalar(
-            "training_loss",
-            loss.item(),
-            train_iter,
-        )
-        writer.add_scalar(
-            "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
         if args.network == "opt" or train_iter % 100 == 0:
+            scores = {
+                **eval_scores(frames[:-1], {"": frames[1:]}, "train_baseline"),
+                **eval_scores(frames[1:], {"": flow_frames}, "train_flow"),
+                **eval_scores(frames[1:], {"": reconstructed_frames},
+                              "train_reconstructed"),
+            }
+            writer.add_scalar(
+                "training_loss",
+                loss.item(),
+                train_iter,
+            )
+            writer.add_scalar(
+                "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
             plot_scores(writer, scores, train_iter)
 
     for epoch in range(args.max_train_epochs):
