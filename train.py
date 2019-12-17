@@ -225,7 +225,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
 
 
 def train(args) -> nn.Module:
-    os.system("cat /proc/meminfo")
+    os.system("free -g")
 
     output_dir = os.path.join(args.out_dir, args.save_model_name)
     model_dir = os.path.join(args.model_dir, args.save_model_name)
