@@ -233,7 +233,7 @@ def train(args) -> nn.Module:
     print(args)
     ############### Data ###############
 
-    train_id_to_image_lists = get_id_to_image_lists(
+    train_id_to_image_names, train_id_to_image_lists = get_id_to_image_lists(
         is_train=True,
         root=args.train,
         args=args,
@@ -241,22 +241,27 @@ def train(args) -> nn.Module:
         sampling_range=args.sampling_range,
     )
     train_loader = get_master_loader(
-        id_to_image_lists=train_id_to_image_lists,
+        list(train_id_to_image_lists.values()),
         is_train=True,
         args=args,
     )
+    first_train_id_image_list = ImageList(
+        next(iter(train_id_to_image_names.values())), 
+        is_train=False, 
+        args=args, 
+        frame_len=1, 
+        sampling_range=0,
+    )
     train_sequential_loader = get_loaders(
-        id_to_image_lists={
-            (): next(iter(train_id_to_image_lists.values())).set_is_train(False)
-        },
+        [first_train_id_image_list],
         is_train=False,
         args=args,
     )[0]
-    eval_id_to_image_lists = get_id_to_image_lists(
+    _, eval_id_to_image_lists = get_id_to_image_lists(
         is_train=False, root=args.eval, args=args, frame_len=1, sampling_range=0,
     )
     eval_loader = get_master_loader(
-        id_to_image_lists=eval_id_to_image_lists,
+        list(eval_id_to_image_lists.values()),
         is_train=False,
         args=args,
     )

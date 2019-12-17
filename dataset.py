@@ -62,11 +62,6 @@ class ImageList(data.Dataset):
 
         return frames
 
-    def set_is_train(self, is_train: bool) -> "ImageList":
-        image_list = copy.copy(self)
-        image_list.is_train = is_train
-        return image_list
-
     def __len__(self) -> int:
         return len(self.img_fns) - self.frame_len + 1
 
@@ -96,12 +91,12 @@ def get_vid_id(filename: str) -> str:
 
 
 def get_loaders(
-        id_to_image_lists: Dict[Tuple[str, ...], ImageList],
+        image_lists: List[ImageList],
         is_train: bool,
         args: argparse.Namespace,
 ) -> List[data.DataLoader]:
     vid_loaders = []
-    for image_list in id_to_image_lists.values():
+    for image_list in image_lists:
         loader = data.DataLoader(
             image_list,
             batch_size=args.batch_size,
@@ -124,14 +119,12 @@ def get_loaders(
 
 
 def get_master_loader(
-        id_to_image_lists: Dict[Tuple[str, ...], ImageList],
+        image_lists: List[ImageList],
         is_train: bool,
         args: argparse.Namespace,
 ) -> data.DataLoader:
     print("Creating ConcatDataset")
-    dataset: data.Dataset = data.ConcatDataset(
-        [image_list for _, image_list in id_to_image_lists.items()]
-    )
+    dataset: data.Dataset = data.ConcatDataset(image_lists)
     print("ConcatDataset finished.")
     loader = data.DataLoader(
         dataset,
@@ -233,7 +226,7 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 def get_id_to_image_lists(
         is_train: bool, root: str, args: argparse.Namespace,
         frame_len: int, sampling_range: int
-) -> Dict[Tuple[str, ...], ImageList]:
+) -> Tuple[Dict[Tuple[str, ...], List[str]], Dict[Tuple[str, ...], ImageList]]:
     print(f'Loading {root}')
     id_to_images: DefaultDict[Tuple[str, ...], List[str]] = defaultdict(list)
     for filename in glob.iglob(os.path.join(root, '*.png')):
@@ -247,11 +240,13 @@ def get_id_to_image_lists(
         id_to_images[vid_id].append(filename)
         # d = time.time()
         # print("dict:", d - c)
+    for vid_id in id_to_images:
+        id_to_images[vid_id].sort()
     print(f"Finished loading {root}.")
     id_to_datasets: Dict[Tuple[str, ...], ImageList] = {}
     for vid_id, imgs in id_to_images.items():
         id_to_datasets[vid_id] = ImageList(
-            sorted(imgs), is_train, args, frame_len, sampling_range
+            imgs, is_train, args, frame_len, sampling_range
         )
     print(f"Finished creating ImageLists.")
-    return id_to_datasets
+    return id_to_images, id_to_datasets
