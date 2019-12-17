@@ -1,5 +1,5 @@
 import argparse
-import logging
+import glob
 import os
 from collections import defaultdict
 from typing import Dict, Iterator, List, Tuple, Union
@@ -14,8 +14,7 @@ import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
-from waveone.dataset import (ImageList, get_id_to_image_lists, get_loaders,
-                             get_master_loader)
+from waveone.dataset import get_loaders
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation, msssim
 from waveone.network import (CAE, AutoencoderUNet, Binarizer,
                              BitToContextDecoder, BitToFlowDecoder,
@@ -233,38 +232,10 @@ def train(args) -> nn.Module:
     print(args)
     ############### Data ###############
 
-    train_id_to_image_names, train_id_to_image_lists = get_id_to_image_lists(
-        is_train=True,
-        root=args.train,
-        args=args,
-        frame_len=args.frame_len,
-        sampling_range=args.sampling_range,
-    )
-    train_loader = get_master_loader(
-        list(train_id_to_image_lists.values()),
-        is_train=True,
-        args=args,
-    )
-    first_train_id_image_list = ImageList(
-        next(iter(train_id_to_image_names.values())), 
-        is_train=False, 
-        args=args, 
-        frame_len=1, 
-        sampling_range=0,
-    )
-    train_sequential_loader = get_loaders(
-        [first_train_id_image_list],
-        is_train=False,
-        args=args,
-    )[0]
-    _, eval_id_to_image_lists = get_id_to_image_lists(
-        is_train=False, root=args.eval, args=args, frame_len=1, sampling_range=0,
-    )
-    eval_loader = get_master_loader(
-        list(eval_id_to_image_lists.values()),
-        is_train=False,
-        args=args,
-    )
+    train_paths = glob.glob(os.path.join(args.train, '*.hkl'))
+    train_subset_paths = glob.glob(os.path.join(args.train_subset, '*.hkl'))
+    eval_paths = glob.glob(os.path.join(args.eval, '*.hkl'))
+    
     writer = SummaryWriter(f"runs/{args.save_model_name}", purge_step=0)
 
     ############### Model ###############
@@ -390,23 +361,26 @@ def train(args) -> nn.Module:
         plot_scores(writer, scores, train_iter)
 
     for epoch in range(args.max_train_epochs):
-        for frames in train_loader:
-            train_iter += 1
-            train_loop(frames)
+        for train_loader in get_loaders(train_paths, is_train=True, args=args):
+            for frames in train_loader:
+                train_iter += 1
+                train_loop(frames)
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            run_eval("eval", eval_loader, model,
-                     epoch, args, writer)
-            run_eval("training", train_sequential_loader, model,
-                     epoch, args, writer)
+            for eval_loader in get_loaders(eval_paths, is_train=False, args=args):
+                run_eval("eval", eval_loader, model, epoch, args, writer)
+            for train_subset_loader in get_loaders(
+                train_subset_paths, is_train=False, args=args
+            ):
+                run_eval("training", train_subset_loader,
+                         model, epoch, args, writer)
             scheduler.step()  # type: ignore
             just_resumed = False
 
     print('Training done.')
-    logging.shutdown()
     return model
 
 

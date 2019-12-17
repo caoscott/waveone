@@ -7,6 +7,9 @@ parser = argparse.ArgumentParser()
 ######## Data ########
 parser.add_argument('--train', required=True, type=str,
                     help='Path to training data.')
+parser.add_argument('--train-subset', required=True, type=str,
+                    help='Path to subset of training data that is '
+                         'properly compressed during evaluation.')
 parser.add_argument('--eval', required=True, type=str,
                     help='Path to eval data.')
 
@@ -85,4 +88,3 @@ parser.add_argument('--frame-len', type=int, default=3,
 parser.add_argument('--detach', action='store_true',
                     help='Detach gradients from previous frame when training from sequence of '
                          'frames. Used to make training more efficient.')
-
