@@ -232,11 +232,11 @@ def train(args) -> nn.Module:
     print(args)
     ############### Data ###############
 
-    train_paths = glob.glob(os.path.join(args.train, '*.pkl'))
+    train_paths = glob.glob(args.train)
     assert train_paths
-    train_subset_paths = glob.glob(os.path.join(args.train_subset, '*.pkl'))
+    train_subset_paths = glob.glob(args.train_subset)
     assert train_subset_paths
-    eval_paths = glob.glob(os.path.join(args.eval, '*.pkl'))
+    eval_paths = glob.glob(args.eval)
     assert eval_paths
 
     writer = SummaryWriter(f"runs/{args.save_model_name}", purge_step=0)
