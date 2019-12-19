@@ -9,6 +9,7 @@ from torchvision import models
 
 from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
                                    outconv, revnet_block, up, upconv)
+from collections import defaultdict
 
 
 class Encoder(nn.Module):
@@ -228,7 +229,7 @@ class BitToFlowDecoder(nn.Module):
         # f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
             # identity_theta, r.shape, align_corners=False)
         f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-                                   align_corners=False)
+                                   align_corners=True)
         return {
             "flow": f,
             "flow_grid": f_grid,
@@ -253,28 +254,41 @@ class WaveoneModel(nn.Module):
 
     def forward(  # type: ignore
             self,
-            frame1: torch.Tensor,
-            frame2: torch.Tensor
+            frames: torch.Tensor,
+            modes: Tuple[str, ...],
+            reuse_frame: bool,
+            detach: bool,
     ) -> Dict[str, torch.Tensor]:
-        codes = self.binarizer(self.encoder(frame1, frame2, 0.))
-        decoder_out = self.decoder((codes, 0.))
-        flow_frame = F.grid_sample(  # type: ignore
-            frame1, decoder_out["flow_grid"], 
-            align_corners=False, 
-            padding_mode="border",
-        ) if "flow" in self.train_type else frame1
+        frame1 = frames[0]
+        out_collector = defaultdict(list)
+        for frame2 in frames[1: ]:
+            codes = self.binarizer(self.encoder(frame1, frame2, 0.))
+            decoder_out = self.decoder((codes, 0.))
+            for k, v in decoder_out.items():
+                out_collector[k].append(v)
+            out_collector["codes"].append(codes)
 
-        reconstructed_frame2 = flow_frame + decoder_out["residuals"] \
-            if "residual" in self.train_type \
-            else flow_frame
-        if self.training is False:  # type: ignore
-            reconstructed_frame2 = torch.clamp(
-                reconstructed_frame2, min=-1., max=1.)
+            flow_frame = F.grid_sample(  # type: ignore
+                frame1, decoder_out["flow_grid"], 
+                align_corners=True, 
+                padding_mode="border",
+            ) if "flow" in self.train_type else frame1
+            out_collector["flow_frame2"].append(flow_frame)
+
+            reconstructed_frame2 = flow_frame + decoder_out["residuals"] \
+                if "residual" in self.train_type \
+                else flow_frame
+            if self.training is False:  # type: ignore
+                reconstructed_frame2 = torch.clamp(
+                    reconstructed_frame2, min=-1., max=1.)
+            out_collector["reconstructed_frame2"].append(reconstructed_frame2)
+
+            frame1 = reconstructed_frame2 if reuse_frame else frame2
+            if detach:
+                frame1 = frame1.detach()
+
         return {
-            **decoder_out,
-            "codes": codes,
-            "flow_frame": flow_frame,
-            "reconstructed_frame": reconstructed_frame2,
+            k: torch.stack(v) for k, v in out_collector.items()
         }
 
 

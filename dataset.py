@@ -26,15 +26,21 @@ class ImageList(data.Dataset):
         self.imgs = imgs
         self.is_train = is_train
         self.frame_len = frame_len
+        self.padding_len = max(frame_len - len(imgs), 0)
         self.sampling_range = sampling_range
         self.args = args
 
         assert frame_len > 0
         assert sampling_range == 0 or sampling_range >= frame_len
-        assert len(self.imgs) >= self.frame_len
+        # assert len(self.imgs) >= self.frame_len
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, ...]:
-        if self.sampling_range:
+    def __getitem__(
+            self, 
+            index: int
+    ) -> Tuple[Tuple[torch.Tensor, ...], Tuple[torch.Tensor, ...]]:
+        if self.padding_len > 0:
+            images = self.imgs
+        elif self.sampling_range > 0:
             idx_sampling_range = min(
                 self.sampling_range, len(self.imgs)-index)
             offsets = np.random.permutation(idx_sampling_range)[
@@ -54,16 +60,27 @@ class ImageList(data.Dataset):
         frames: Tuple[torch.Tensor, ...] = tuple(
             np_to_torch(img.astype(np.float64)/255*2 - 1) for img in images
         )
+        existence_mask: Tuple[torch.Tensor, ...] = tuple(
+            torch.ones((1, 1, 1, 1))) * len(images)
+
+        if self.padding_len > 0:
+            frames += tuple(torch.zeros_like(self.imgs[0])) * self.padding_len
+            existence_mask += (
+                tuple(torch.zeros((1, 1, 1, 1)) * self.padding_len
+            )
 
         if self.args.network == "opt":
             for frame in frames:
                 assert frame.max() <= 1  # type: ignore
                 assert frame.min() >= -1  # type: ignore
-            assert len(frames) == self.frame_len
+        assert len(frames) == self.frame_len
+        assert len(frames) == len(existence_mask)
 
-        return frames
+        return frames, existence_mask
 
     def __len__(self) -> int:
+        if self.padding_len > 0:
+            return 1
         return len(self.imgs) - self.frame_len + 1
 
 
@@ -98,11 +115,12 @@ def get_loaders(
 ) -> Iterator[data.DataLoader]:
     for pkl_path in paths:
         id_to_images = load_pkl_images(pkl_path)
+        max_frame_len = max(len(images) for images in id_to_images.values())
         datasets = convert_images_to_datasets(
             id_to_images,
             is_train=is_train,
             args=args,
-            frame_len=args.frame_len if is_train else 1,
+            frame_len=args.frame_len if is_train else max_frame_len,
             sampling_range=args.sampling_range if is_train else 0,
         )
         concat_dataset: data.Dataset = data.ConcatDataset(datasets)
@@ -119,7 +137,7 @@ def get_loaders(
             num_workers=2,
             drop_last=False,
         )
-        print('Loader for {} images ({} batches) created.'.format(
+        print('Loader for {} sequences ({} batches) created.'.format(
             len(concat_dataset), len(loader))
         )
         yield loader
@@ -178,7 +196,7 @@ def multi_crop_cv2(imgs: Tuple[np.ndarray, ...], patch: int) -> Tuple[np.ndarray
 
 def flip_cv2(imgs: Tuple[np.ndarray, ...]) -> Tuple[np.ndarray, ...]:
     if random.random() < 0.5:  # type: ignore
-        imgs = tuple(cv2.flip(img, 1) for img in imgs)
+        imgs = tuple(np.flip(img, 1) for img in imgs)
     return imgs
 
 

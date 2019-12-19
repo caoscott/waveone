@@ -93,52 +93,49 @@ def run_eval(
     model.eval()
 
     with torch.no_grad():
-        eval_iterator = iter(eval_loader)
-        frame1 = next(eval_iterator)[0]
-        frames = [frame1]
-        reconstructed_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
-        flow_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
-        frame1 = torch.cat((frame1, frame1, frame1), dim=0).cuda()
+        for eval_iter, (frame_list, mask_list) in enumerate(eval_loader):
+            frames = torch.stack(frame_list).cuda()
+            masks = torch.stack(mask_list).cuda()
+            reconstructed_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
+            flow_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
 
-        for eval_iter, (frame,) in enumerate(eval_iterator):
-            frames.append(frame)
-            frame = frame.cuda()
-            frame2 = torch.cat((frame, frame, frame), dim=0)
-            assert frame1.shape == frame2.shape
-            assert frame1.shape[0] == 3
-            model_out = model(frame1, frame2)
+            frame1 = torch.cat(tuple(frames[0]) * 3, dim=0)
+            for frame, mask in zip(frames[1:], masks[1:]):
+                frame2 = torch.cat(tuple(frame) * 3, dim=0)
+                assert frame1.shape == frame2.shape
+                model_out = model(frame1, frame2)
 
-            reconstructed_frame_cpu = model_out["reconstructed_frame"].cpu()
-            flow_frame_cpu = model_out["flow_frame"].cpu()
+                reconstructed_frame_cpu = model_out["reconstructed_frame"].cpu()
+                flow_frame_cpu = model_out["flow_frame"].cpu()
 
-            if args.save_out_img:
-                for frame_i, prefix in enumerate(("", "vcii_", "iframe_")):
-                    flow_i = flow_frame_cpu[frame_i].unsqueeze(0)
-                    reconstructed_i = reconstructed_frame_cpu[frame_i].unsqueeze(
-                        0)
-                    flow_frames[prefix].append(flow_i)
-                    reconstructed_frames[prefix].append(reconstructed_i)
-                    save_tensor_as_img(
-                        frames[-1], f"{prefix}{eval_name}_{eval_iter}_frame", args
-                    )
-                    save_tensor_as_img(
-                        flow_i, f"{prefix}{eval_name}_{eval_iter}_flow", args
-                    )
-                    save_tensor_as_img(
-                        reconstructed_i,
-                        f"{prefix}{eval_name}_{eval_iter}_reconstructed",
-                        args
-                    )
+                if args.save_out_img:
+                    for frame_i, prefix in enumerate(("", "vcii_", "iframe_")):
+                        flow_i = flow_frame_cpu[frame_i].unsqueeze(0)
+                        reconstructed_i = reconstructed_frame_cpu[frame_i].unsqueeze(
+                            0)
+                        flow_frames[prefix].append(flow_i)
+                        reconstructed_frames[prefix].append(reconstructed_i)
+                        save_tensor_as_img(
+                            frames[-1], f"{prefix}{eval_name}_{eval_iter}_frame", args
+                        )
+                        save_tensor_as_img(
+                            flow_i, f"{prefix}{eval_name}_{eval_iter}_flow", args
+                        )
+                        save_tensor_as_img(
+                            reconstructed_i,
+                            f"{prefix}{eval_name}_{eval_iter}_reconstructed",
+                            args
+                        )
 
-            # Update frame1.
-            frame1 = torch.cat(
-                (
-                    model_out["reconstructed_frame"][:1],
-                    frame,
-                    frame if (eval_iter+1) % args.iframe_iter == 0
-                    else model_out["reconstructed_frame"][2:],
-                ), dim=0
-            )
+                # Update frame1.
+                frame1 = torch.cat(
+                    (
+                        model_out["reconstructed_frame"][:1],
+                        frame,
+                        frame if (eval_iter+1) % args.iframe_iter == 0
+                        else model_out["reconstructed_frame"][2:],
+                    ), dim=0
+                )
 
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(frames[:-1], {"": frames[1:]}, f"{eval_name}_baseline"),
@@ -366,7 +363,7 @@ def train(args) -> nn.Module:
 
     for epoch in range(args.max_train_epochs):
         for train_loader in get_loaders(train_paths, is_train=True, args=args):
-            for frames in train_loader:
+            for frames, _ in train_loader:
                 train_iter += 1
                 train_loop(frames)
             del train_loader
