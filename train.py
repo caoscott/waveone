@@ -57,7 +57,9 @@ def eval_scores(
         name: str,
 ) -> Dict[str, torch.Tensor]:
     scores: Dict[str, torch.Tensor] = {}
-    assert frame1.shape == frame2.shape
+    assert frame1.shape == frame2.shape, (
+        "frame1.shape {frame1.shape} != frame2.shape {frame2.shape}"
+    )
     frame1 = frame1.reshape(-1,
                             frame1.shape[-3], frame1.shape[-2], frame1.shape[-1])
     frame2 = frame2.reshape(-1,
