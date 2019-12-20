@@ -67,7 +67,7 @@ class ImageList(data.Dataset):
         if self.padding_len > 0:
             frames += tuple(torch.zeros_like(self.imgs[0])) * self.padding_len
             existence_mask += (
-                tuple(torch.zeros((1, 1, 1, 1)) * self.padding_len
+                tuple(torch.zeros((1, 1, 1, 1))) * self.padding_len
             )
 
         if self.args.network == "opt":
