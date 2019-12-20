@@ -101,7 +101,7 @@ def run_eval(
                 reuse_frame=True, detach=False,
             )
             for key in ("flow_frame2", "reconstructed_frame2"):
-                eval_out_collector[key].append(model_out[key] * masks)
+                eval_out_collector[key].append(model_out[key] * masks[1:])
             # for iter_i, (mask, f2, flow_f2, reconstructed_f2) in enumerate(zip(
             #     masks, frames[1:], model_out["flow_frame2"], model_out["reconstructed_frame2"],
             # )):
