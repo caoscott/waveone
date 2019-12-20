@@ -300,7 +300,7 @@ def train(args) -> nn.Module:
         # context_vec = 0.  # .cuda()
         model_out = model(
             frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach,
-            collect_output=(train_iter % log_iter == 0),
+            collect_output=(log_iter == 0 or train_iter % log_iter == 0),
         )
 
         log_flow_context_residuals(
