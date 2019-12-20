@@ -3,7 +3,7 @@ import glob
 import os
 from collections import defaultdict
 import sys
-from typing import Dict, Iterator, List, Tuple, Union
+from typing import DefaultDict, Dict, Iterator, List, Tuple, Union
 
 import numpy as np
 import torch
@@ -59,8 +59,10 @@ def eval_scores(
 ) -> Dict[str, torch.Tensor]:
     scores: Dict[str, torch.Tensor] = {}
     assert frame1.shape == frame2.shape
-    frame1 = frame1.reshape(-1, frame1.shape[-3], frame1.shape[-2], frame1.shape[-1])
-    frame2 = frame2.reshape(-1, frame2.shape[-3], frame2.shape[-2], frame2.shape[-1])
+    frame1 = frame1.reshape(-1,
+                            frame1.shape[-3], frame1.shape[-2], frame1.shape[-1])
+    frame2 = frame2.reshape(-1,
+                            frame2.shape[-3], frame2.shape[-2], frame2.shape[-1])
     scores[f"{name}_l1"] = F.l1_loss(frame1, frame2, reduction="mean")
     scores[f"{name}_msssim"] = msssim(
         frame1, frame2, val_range=2, normalize=True,
@@ -90,12 +92,13 @@ def run_eval(
 ) -> Dict[str, torch.Tensor]:
     model.eval()
     with torch.no_grad():
-        eval_out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
-        for eval_iter, (frame_list, mask_list) in enumerate(eval_loader): 
+        eval_out_collector: DefaultDict[str,
+                                        List[torch.Tensor]] = defaultdict(list)
+        for eval_iter, (frame_list, mask_list) in enumerate(eval_loader):
             frames = torch.stack(frame_list)
             masks = torch.stack(mask_list)
             model_out = model(
-                frames, iframe_iter=args.iframe_iter, 
+                frames, iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False,
             )
             for key in ("flow_frame2", "reconstructed_frame2"):
@@ -103,11 +106,11 @@ def run_eval(
             # for iter_i, (mask, f2, flow_f2, reconstructed_f2) in enumerate(zip(
             #     masks, frames[1:], model_out["flow_frame2"], model_out["reconstructed_frame2"],
             # )):
-            #     for 
+            #     for
         eval_out = {k: torch.cat(v) for k, v in eval_out_collector.items()}
         total_scores: Dict[str, torch.Tensor] = {
-            **eval_scores(frames[1:], 
-                          frames[0].repeat(frames.shape[0]-1, 1, 1, 1), 
+            **eval_scores(frames[1:],
+                          frames[0].repeat(frames.shape[0]-1, 1, 1, 1),
                           "train_same_frame"),
             **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
             **eval_scores(frames[1:], eval_out["flow_frame2"], f"{eval_name}_flow"),
@@ -291,8 +294,8 @@ def train(args) -> nn.Module:
 
         if args.network == "opt" or train_iter % log_iter == 0:
             scores = {
-                **eval_scores(frames[1:], 
-                              frames[0].repeat(frames.shape[0]-1, 1, 1, 1), 
+                **eval_scores(frames[1:],
+                              frames[0].repeat(frames.shape[0]-1, 1, 1, 1),
                               "train_same_frame"),
                 **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
                 **eval_scores(frames[1:], model_out["flow_frame2"], "train_flow"),
