@@ -102,18 +102,22 @@ def run_eval(
             )
             for key in ("flow_frame2", "reconstructed_frame2"):
                 eval_out_collector[key].append(model_out[key] * masks[1:])
+            eval_out_collector["frames"].append(frames[1:])
             # for iter_i, (mask, f2, flow_f2, reconstructed_f2) in enumerate(zip(
             #     masks, frames[1:], model_out["flow_frame2"], model_out["reconstructed_frame2"],
             # )):
             #     for
-        eval_out = {k: torch.cat(v) for k, v in eval_out_collector.items()}
+        eval_out = {k: torch.cat(v, dim=1)
+                    for k, v in eval_out_collector.items()}
         total_scores: Dict[str, torch.Tensor] = {
-            **eval_scores(frames[1:],
-                          torch.stack([frames[0]] * (frames.shape[0]-1)),
+            **eval_scores(eval_out["frames"][1:],
+                          torch.stack([eval_out["frames"][0]] *
+                                      (eval_out["frames"].shape[0]-1)),
                           "train_same_frame"),
-            **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
-            **eval_scores(frames[1:], eval_out["flow_frame2"], f"{eval_name}_flow"),
-            **eval_scores(frames[1:], eval_out["reconstructed_frame2"], f"{eval_name}_reconstructed"),
+            **eval_scores(eval_out["frames"][1:], eval_out["frames"][:-1], "train_previous_frame"),
+            **eval_scores(eval_out["frames"][1:], eval_out["flow_frame2"], f"{eval_name}_flow"),
+            **eval_scores(eval_out["frames"][1:], eval_out["reconstructed_frame2"], 
+                            f"{eval_name}_reconstructed"),
         }
 
         print(f"{eval_name} epoch {epoch}:")
