@@ -108,14 +108,15 @@ def run_eval(
             eval_out_collector["masks"].append(masks)
         eval_out = {k: torch.cat(v, dim=1)
                     for k, v in eval_out_collector.items()}
-        # for batch_i in range(eval_out["reconstructed_frame2"].shape[1]):
-        #     for seq_i in range(eval_out["reconstructed_frame2"].shape[0]):
-        #         frames = torch.stack([
-        #             eval_out["frames"][seq_i+1, batch_i],
-        #             eval_out["reconstructed_frame2"][seq_i, batch_i],
-        #             eval_out[]
-        #         ])
-        #         save_tensor_as_img()
+        for batch_i in range(eval_out["reconstructed_frame2"].shape[1]):
+            for seq_i in range(eval_out["reconstructed_frame2"].shape[0]):
+                frames = torch.stack([
+                    eval_out["frames"][seq_i+1, batch_i],
+                    eval_out["flow_frame2"][seq_i, batch_i],
+                    eval_out["reconstructed_frame2"][seq_i, batch_i],
+                ])
+                save_tensor_as_img(
+                    frames, f"{eval_name}_{batch_i}_{seq_i}", args)
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(
                 eval_out["frames"][1:],
@@ -209,7 +210,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "context_vec": torch.zeros(1),
         })
         return WaveoneModel(
-            opt_encoder, opt_binarizer, opt_decoder, "residual", 
+            opt_encoder, opt_binarizer, opt_decoder, "residual",
             flow_loss_fn, reconstructed_loss_fn,
         )
     if args.network == "small":
@@ -217,7 +218,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         small_binarizer = SmallBinarizer(not args.binarize_off)
         small_decoder = SmallDecoder(args.bits, 3)
         return WaveoneModel(
-            small_encoder, small_binarizer, small_decoder, args.train_type, 
+            small_encoder, small_binarizer, small_decoder, args.train_type,
             flow_loss_fn, reconstructed_loss_fn,
         )
     raise ValueError(f"No model type named {args.network}.")
@@ -348,7 +349,8 @@ def train(args) -> nn.Module:
             for eval_idx, eval_loader in enumerate(get_loaders(
                 eval_paths, is_train=False, args=args
             )):
-                run_eval(f"eval{eval_idx}", eval_loader, model, epoch, args, writer)
+                run_eval(f"eval{eval_idx}", eval_loader,
+                         model, epoch, args, writer)
                 del eval_loader
             for training_idx, train_subset_loader in enumerate(get_loaders(
                 train_subset_paths, is_train=False, args=args
