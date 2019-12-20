@@ -347,21 +347,21 @@ def train(args) -> nn.Module:
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             solver.step()
-        scores = {
-            **eval_scores(frames[:-1], {"": frames[1:]}, "train_baseline"),
-            **eval_scores(frames[1:], {"": flow_frames}, "train_flow"),
-            **eval_scores(frames[1:], {"": reconstructed_frames},
-                          "train_reconstructed"),
-        }
 
-        writer.add_scalar(
-            "training_loss",
-            loss.item(),
-            train_iter,
-        )
-        writer.add_scalar(
-            "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
         if args.network == "opt" or train_iter % 100 == 0:
+            scores = {
+                **eval_scores(frames[:-1], {"": frames[1:]}, "train_baseline"),
+                **eval_scores(frames[1:], {"": flow_frames}, "train_flow"),
+                **eval_scores(frames[1:], {"": reconstructed_frames},
+                              "train_reconstructed"),
+            }
+            writer.add_scalar(
+                "training_loss",
+                loss.item(),
+                train_iter,
+            )
+            writer.add_scalar(
+                "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
             plot_scores(writer, scores, train_iter)
 
     for epoch in range(args.max_train_epochs):
@@ -369,6 +369,7 @@ def train(args) -> nn.Module:
             for frames in train_loader:
                 train_iter += 1
                 train_loop(frames)
+            del train_loader
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)
@@ -376,11 +377,13 @@ def train(args) -> nn.Module:
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
             for eval_loader in get_loaders(eval_paths, is_train=False, args=args):
                 run_eval("eval", eval_loader, model, epoch, args, writer)
+                del eval_loader
             for train_subset_loader in get_loaders(
                 train_subset_paths, is_train=False, args=args
             ):
                 run_eval("training", train_subset_loader,
                          model, epoch, args, writer)
+                del train_subset_loader
             scheduler.step()  # type: ignore
             just_resumed = False
 
