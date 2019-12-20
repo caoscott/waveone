@@ -98,9 +98,9 @@ def get_loaders(
         args: argparse.Namespace,
 ) -> Iterator[data.DataLoader]:
     for hkl_path in paths:
-        id_to_images = load_hkl_images(hkl_path)
+        image_list = load_hkl_images(hkl_path)
         datasets = convert_images_to_datasets(
-            id_to_images,
+            image_list,
             is_train=is_train,
             args=args,
             frame_len=args.frame_len if is_train else 1,
@@ -231,7 +231,7 @@ def load_hkl_images(filepath: str) -> List[Tuple[np.ndarray, ...]]:
 
 
 def convert_images_to_datasets(
-        id_to_images: Dict[str, Tuple[np.ndarray, ...]],
+        image_list: List[Tuple[np.ndarray, ...]],
         is_train: bool,
         args: argparse.Namespace,
         frame_len: int,
@@ -239,6 +239,6 @@ def convert_images_to_datasets(
 ) -> List[ImageList]:
     datasets = [ImageList(
         imgs, is_train, args, frame_len, sampling_range,
-    ) for imgs in id_to_images.values()]
+    ) for imgs in image_list]
     print(f"Finished creating ImageLists.")
     return datasets
