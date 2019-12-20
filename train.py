@@ -183,7 +183,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "flow": torch.zeros(1),
             "flow_grid": torch.zeros(1),
             "residuals": t[0],
-            "context_vec": t[1],
+            "context_vec": torch.zeros(1),
         })
         return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, train_type="residual")
     if args.network == "small":
