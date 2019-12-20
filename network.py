@@ -173,18 +173,24 @@ class WaveoneModel(nn.Module):
                 align_corners=True,
                 padding_mode="border",
             ) if "flow" in self.train_type else frame1
-            out_collector["flow_frame2"].append(flow_frame2)
 
             reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
                 if "residual" in self.train_type \
                 else flow_frame2
-            if self.training is False:  # type: ignore
+
+            if self.training is True:  # type: ignore
+                loss += self.flow_loss_fn(frame2, flow_frame2)
+                loss += self.reconstructed_loss_fn(frame2, reconstructed_frame2)
+            else:
                 reconstructed_frame2 = torch.clamp(
                     reconstructed_frame2, min=-1., max=1.)
-            out_collector["reconstructed_frame2"].append(reconstructed_frame2)
 
-            loss += self.flow_loss_fn(frame2, flow_frame2)
-            loss += self.reconstructed_loss_fn(frame2, reconstructed_frame2)
+            out_collector["flow_frame2"].append(
+                flow_frame2 if self.training else flow_frame2.cpu()
+            )
+            out_collector["reconstructed_frame2"].append(
+                reconstructed_frame2 if self.training else reconstructed_frame2.cpu()
+            )
 
             frame1 = (reconstructed_frame2 if reuse_frame and
                       iter_i % iframe_iter != 0 else frame2)
@@ -193,7 +199,7 @@ class WaveoneModel(nn.Module):
 
         return {
             **{k: torch.stack(v) for k, v in out_collector.items()},
-            **{"loss": loss / (frames.shape[0]-1)},
+            **({"loss": loss / (frames.shape[0]-1)} if self.training else {}),
         }
 
 
