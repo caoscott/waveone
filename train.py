@@ -17,9 +17,8 @@ from torchvision.utils import save_image
 
 from waveone.dataset import get_loaders
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation, msssim
-from waveone.network import (CAE, AutoencoderUNet, Binarizer,
-                             BitToContextDecoder, BitToFlowDecoder,
-                             ContextToFlowDecoder, Encoder, SmallBinarizer,
+from waveone.network import (CAE, AutoencoderUNet,
+                             BitToContextDecoder, SmallBinarizer,
                              SmallDecoder, SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
@@ -161,18 +160,18 @@ def save(args: argparse.Namespace,
 
 
 def get_model(args: argparse.Namespace) -> nn.Module:
-    if "waveone" in args.network:
-        # context_vec_train_shape = (args.batch_size, 512,
-                            #    args.patch // 2 or 144, args.patch // 2 or 176)
-        # context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
-        # unet = UNet(3, shrink=1)
-        encoder = Encoder(6, args.bits, use_context=False)
-        # decoder = nn.Sequential(BitToContextDecoder(),
-        # ContextToFlowDecoder(3)).cuda()
-        decoder = BitToFlowDecoder(args.bits, 3)
-        binarizer = Binarizer(args.bits, args.bits,
-                              not args.binarize_off)
-        return WaveoneModel(encoder, binarizer, decoder, args.train_type)
+    # if "waveone" in args.network:
+    #     # context_vec_train_shape = (args.batch_size, 512,
+    #                         #    args.patch // 2 or 144, args.patch // 2 or 176)
+    #     # context_vec_test_shape = (args.eval_batch_size, 512, 144, 176)
+    #     # unet = UNet(3, shrink=1)
+    #     encoder = Encoder(6, args.bits, use_context=False)
+    #     # decoder = nn.Sequential(BitToContextDecoder(),
+    #     # ContextToFlowDecoder(3)).cuda()
+    #     decoder = BitToFlowDecoder(args.bits, 3)
+    #     binarizer = Binarizer(args.bits, args.bits,
+    #                           not args.binarize_off)
+    #     return WaveoneModel(encoder, binarizer, decoder, args.train_type)
     if args.network == "cae":
         return CAE()
     if args.network == "unet":
