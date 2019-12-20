@@ -139,9 +139,9 @@ def get_loaders(
             num_workers=2,
             drop_last=False,
         )
-        print('Loader for {} sequences ({} batches) created.'.format(
-            len(concat_dataset), len(loader))
-        )
+        # print('Loader for {} sequences ({} batches) created.'.format(
+            # len(concat_dataset), len(loader))
+        # )
         yield loader
 
 
@@ -244,7 +244,7 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 
 
 def load_hkl_images(filepath: str) -> List[Tuple[np.ndarray, ...]]:
-    print(f"Loading {filepath}.")
+    # print(f"Loading {filepath}.")
     image_list = hkl.load(filepath)
     return image_list
 
