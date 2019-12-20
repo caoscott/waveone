@@ -259,5 +259,4 @@ def convert_images_to_datasets(
     datasets = [ImageList(
         imgs, is_train, args, frame_len, sampling_range,
     ) for imgs in image_list]
-    print(f"Finished creating ImageLists.")
     return datasets
