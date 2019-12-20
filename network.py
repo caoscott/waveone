@@ -158,7 +158,7 @@ class WaveoneModel(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         device = next(self.parameters()).device
         frame1 = frames[0].to(device)
-        loss: torch.Tensor = 0.
+        loss: torch.Tensor = 0.  # type: ignore
         out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
         for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
             frame2: torch.Tensor = frame2.to(device)  # type: ignore
