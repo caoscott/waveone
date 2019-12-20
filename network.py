@@ -168,25 +168,23 @@ class WaveoneModel(nn.Module):
                 out_collector[k].append(v)
             out_collector["codes"].append(codes)
 
-            flow_frame = F.grid_sample(  # type: ignore
+            flow_frame2 = F.grid_sample(  # type: ignore
                 frame1, decoder_out["flow_grid"],
                 align_corners=True,
                 padding_mode="border",
             ) if "flow" in self.train_type else frame1
-            out_collector["flow_frame2"].append(flow_frame)
+            out_collector["flow_frame2"].append(flow_frame2)
 
-            reconstructed_frame2 = flow_frame + decoder_out["residuals"] \
+            reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
                 if "residual" in self.train_type \
-                else flow_frame
+                else flow_frame2
             if self.training is False:  # type: ignore
                 reconstructed_frame2 = torch.clamp(
                     reconstructed_frame2, min=-1., max=1.)
             out_collector["reconstructed_frame2"].append(reconstructed_frame2)
 
-            loss += self.flow_loss_fn(frame2, decoder_out["flow_frame2"])
-            loss += self.reconstructed_loss_fn(
-                frame2, decoder_out["reconstructed_frame2"]
-            )
+            loss += self.flow_loss_fn(frame2, flow_frame2)
+            loss += self.reconstructed_loss_fn(frame2, reconstructed_frame2)
 
             frame1 = (reconstructed_frame2 if reuse_frame and
                       iter_i % iframe_iter != 0 else frame2)
