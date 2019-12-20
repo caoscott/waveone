@@ -99,7 +99,7 @@ def run_eval(
             frames = torch.stack(frame_list)
             masks = torch.stack(mask_list[1:])
             model_out = model(
-                frames.cuda(), iframe_iter=args.iframe_iter,
+                frames, iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False,
             )
             for key in ("flow_frame2", "reconstructed_frame2"):
@@ -285,7 +285,7 @@ def train(args) -> nn.Module:
     def train_loop(frame_list: List[torch.Tensor], log_iter: int) -> None:
         if np.random.random() < 0.5:
             frame_list = frame_list[::-1]
-        frames = torch.stack(frame_list).cuda()
+        frames = torch.stack(frame_list)
 
         model.train()
         solver.zero_grad()

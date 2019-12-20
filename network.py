@@ -151,10 +151,12 @@ class WaveoneModel(nn.Module):
             reuse_frame: bool,
             detach: bool,
     ) -> Dict[str, torch.Tensor]:
-        frame1 = frames[0]
+        device = next(self.parameters()).device
+        frame1 = frames[0].to(device)
         out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
         frame2: torch.Tensor
         for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
+            frame2 = frame2.cuda()
             codes = self.binarizer(self.encoder(frame1, frame2, 0.))
             decoder_out = self.decoder((codes, 0.))
             for k, v in decoder_out.items():
