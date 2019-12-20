@@ -90,7 +90,7 @@ def run_eval(
 ) -> Dict[str, torch.Tensor]:
     model.eval()
     with torch.no_grad():
-        eval_out_collector = defaultdict(list)
+        eval_out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
         for eval_iter, (frame_list, mask_list) in enumerate(eval_loader): 
             frames = torch.stack(frame_list)
             masks = torch.stack(mask_list)

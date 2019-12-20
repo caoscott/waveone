@@ -61,13 +61,14 @@ class ImageList(data.Dataset):
         frames: Tuple[torch.Tensor, ...] = tuple(
             np_to_torch(img.astype(np.float64)/255*2 - 1) for img in images
         )
-        existence_mask: Tuple[torch.Tensor, ...] = tuple(
+        existence_mask: Tuple[torch.Tensor, ...] = tuple(  # type: ignore
             torch.ones((1, 1, 1, 1))) * len(images)
 
         if self.padding_len > 0:
-            frames += tuple(torch.zeros_like(self.imgs[0])) * self.padding_len
-            existence_mask += (
-                tuple(torch.zeros((1, 1, 1, 1))) * self.padding_len
+            frames += tuple(  # type: ignore
+                torch.zeros_like(self.imgs[0])) * self.padding_len
+            existence_mask += (tuple(  # type: ignore
+                torch.zeros((1, 1, 1, 1))) * self.padding_len
             )
 
         if self.args.network == "opt":
@@ -116,7 +117,7 @@ def get_loaders(
 ) -> Iterator[data.DataLoader]:
     for hkl_path in paths:
         image_list = load_hkl_images(hkl_path)
-        max_frame_len = max(len(images) for images in id_to_images.values())
+        max_frame_len = max(len(images) for images in image_list)
         datasets = convert_images_to_datasets(
             image_list,
             is_train=is_train,

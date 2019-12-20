@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # full assembly of the sub-parts to form the complete net
-from typing import Dict, List, Tuple
+from typing import DefaultDict, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
@@ -262,8 +262,9 @@ class WaveoneModel(nn.Module):
             detach: bool,
     ) -> Dict[str, torch.Tensor]:
         frame1 = frames[0]
-        out_collector = defaultdict(list)
-        for iter_i, frame2 in enumerate(frames[1:]):
+        out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
+        frame2: torch.Tensor
+        for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
             codes = self.binarizer(self.encoder(frame1, frame2, 0.))
             decoder_out = self.decoder((codes, 0.))
             for k, v in decoder_out.items():
