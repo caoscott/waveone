@@ -165,7 +165,7 @@ class SmallDecoder(nn.Module):
             "flow": f,
             "flow_grid": f_grid,
             "residuals": r,
-            "context_vec": context_vec
+            # "context_vec": context_vec
         }
 
 
@@ -235,7 +235,7 @@ class BitToFlowDecoder(nn.Module):
             "flow": f,
             "flow_grid": f_grid,
             "residuals": r,
-            "context_vec": context_vec
+            # "context_vec": context_vec
         }
 
 
