@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 from collections import defaultdict
+import sys
 from typing import Dict, Iterator, List, Tuple, Union
 
 import numpy as np
@@ -52,21 +53,18 @@ def save_tensor_as_img(
 
 
 def eval_scores(
-        frames1: List[torch.Tensor],
-        dict2: Dict[str, List[torch.Tensor]],
+        frame1: torch.Tensor,
+        frame2: torch.Tensor,
         name: str,
 ) -> Dict[str, torch.Tensor]:
-    msssim_fn = MSSSIM(val_range=2, normalize=True)
     scores: Dict[str, torch.Tensor] = {}
-    f1 = torch.cat(frames1, dim=0)
-
-    for prefix, frames2 in dict2.items():
-        f2 = torch.cat(frames2, dim=0)
-        assert f1.shape == f2.shape
-        scores[f"{name}_{prefix}l1"] = F.l1_loss(f1, f2, reduction="mean")
-        scores[f"{name}_{prefix}msssim"] = msssim(
-            f1, f2, val_range=2, normalize=True,
-        )
+    assert frame1.shape == frame2.shape
+    frame1 = frame1.reshape(-1, frame1.shape[-3], frame1.shape[-2], frame1.shape[-1])
+    frame2 = frame2.reshape(-1, frame2.shape[-3], frame2.shape[-2], frame2.shape[-1])
+    scores[f"{name}_l1"] = F.l1_loss(frame1, frame2, reduction="mean")
+    scores[f"{name}_msssim"] = msssim(
+        frame1, frame2, val_range=2, normalize=True,
+    )
     return scores
 
 
@@ -91,56 +89,29 @@ def run_eval(
         writer: SummaryWriter,
 ) -> Dict[str, torch.Tensor]:
     model.eval()
-
     with torch.no_grad():
-        for eval_iter, (frame_list, mask_list) in enumerate(eval_loader):
-            frames = torch.stack(frame_list).cuda()
-            masks = torch.stack(mask_list).cuda()
-            reconstructed_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
-            flow_frames: Dict[str, List[torch.Tensor]] = defaultdict(list)
-
-            frame1 = torch.cat(tuple(frames[0]) * 3, dim=0)
-            for frame, mask in zip(frames[1:], masks[1:]):
-                frame2 = torch.cat(tuple(frame) * 3, dim=0)
-                assert frame1.shape == frame2.shape
-                model_out = model(frame1, frame2)
-
-                reconstructed_frame_cpu = model_out["reconstructed_frame"].cpu()
-                flow_frame_cpu = model_out["flow_frame"].cpu()
-
-                if args.save_out_img:
-                    for frame_i, prefix in enumerate(("", "vcii_", "iframe_")):
-                        flow_i = flow_frame_cpu[frame_i].unsqueeze(0)
-                        reconstructed_i = reconstructed_frame_cpu[frame_i].unsqueeze(
-                            0)
-                        flow_frames[prefix].append(flow_i)
-                        reconstructed_frames[prefix].append(reconstructed_i)
-                        save_tensor_as_img(
-                            frames[-1], f"{prefix}{eval_name}_{eval_iter}_frame", args
-                        )
-                        save_tensor_as_img(
-                            flow_i, f"{prefix}{eval_name}_{eval_iter}_flow", args
-                        )
-                        save_tensor_as_img(
-                            reconstructed_i,
-                            f"{prefix}{eval_name}_{eval_iter}_reconstructed",
-                            args
-                        )
-
-                # Update frame1.
-                frame1 = torch.cat(
-                    (
-                        model_out["reconstructed_frame"][:1],
-                        frame,
-                        frame if (eval_iter+1) % args.iframe_iter == 0
-                        else model_out["reconstructed_frame"][2:],
-                    ), dim=0
-                )
-
+        eval_out_collector = defaultdict(list)
+        for eval_iter, (frame_list, mask_list) in enumerate(eval_loader): 
+            frames = torch.stack(frame_list)
+            masks = torch.stack(mask_list)
+            model_out = model(
+                frames, iframe_iter=args.iframe_iter, 
+                reuse_frame=True, detach=False,
+            )
+            for key in ("flow_frame2", "reconstructed_frame2"):
+                eval_out_collector[key].append(model_out[key] * masks)
+            # for iter_i, (mask, f2, flow_f2, reconstructed_f2) in enumerate(zip(
+            #     masks, frames[1:], model_out["flow_frame2"], model_out["reconstructed_frame2"],
+            # )):
+            #     for 
+        eval_out = {k, torch.cat(v) for k, v in eval_out_collector.items()}
         total_scores: Dict[str, torch.Tensor] = {
-            **eval_scores(frames[:-1], {"": frames[1:]}, f"{eval_name}_baseline"),
-            **eval_scores(frames[1:], flow_frames, f"{eval_name}_flow"),
-            **eval_scores(frames[1:], reconstructed_frames, f"{eval_name}_reconstructed"),
+            **eval_scores(frames[1:], 
+                          frames[0].repeat(frames.shape[0]-1, 1, 1, 1), 
+                          "train_same_frame"),
+            **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
+            **eval_scores(frames[1:], eval_out["flow_frame2"], f"{eval_name}_flow"),
+            **eval_scores(frames[1:], eval_out["reconstructed_frame2"], f"{eval_name}_reconstructed"),
         }
 
         print(f"{eval_name} epoch {epoch}:")
@@ -254,26 +225,22 @@ def train(args) -> nn.Module:
             writer: SummaryWriter,
             flows: torch.Tensor,
             context_vec: torch.Tensor,
-            residuals: torch.Tensor,
     ) -> None:
         if args.network != "opt" and "flow" in args.train_type:
-            flows_mean = flows.mean(dim=0).mean(dim=0).mean(dim=0)
-            flows_max = flows.max(dim=0).values.max(  # type: ignore
-                dim=0).values.max(dim=0).values  # type: ignore
-            flows_min = flows.min(dim=0).values.min(  # type: ignore
-                dim=0).values.min(dim=0).values  # type: ignore
+            flows_x = flows[:, :, :, 0]
+            flows_y = flows[:, :, :, 1]
             writer.add_histogram(
-                "mean_flow_x", flows_mean[0].item(), train_iter)
+                "mean_flow_x", flows_x.mean().item(), train_iter)
             writer.add_histogram(
-                "mean_flow_y", flows_mean[1].item(), train_iter)
+                "mean_flow_y", flows_y.mean().item(), train_iter)
             writer.add_histogram(
-                "max_flow_x", flows_max[0].item(), train_iter)
+                "max_flow_x", flows_x.max().item(), train_iter)
             writer.add_histogram(
-                "max_flow_y", flows_max[1].item(), train_iter)
+                "max_flow_y", flows_y.max().item(), train_iter)
             writer.add_histogram(
-                "min_flow_x", flows_min[0].item(), train_iter)
+                "min_flow_x", flows_x.min().item(), train_iter)
             writer.add_histogram(
-                "min_flow_y", flows_min[1].item(), train_iter)
+                "min_flow_y", flows_y.min().item(), train_iter)
 
         if "ctx" in args.network:
             writer.add_histogram("mean_context_vec_norm",
@@ -282,13 +249,6 @@ def train(args) -> nn.Module:
                                  context_vec.max().item(), train_iter)
             writer.add_histogram("min_context_vec_norm",
                                  context_vec.min().item(), train_iter)
-
-        writer.add_histogram("mean_input_residuals",
-                             residuals.mean().item(), train_iter)
-        writer.add_histogram("max_input_residuals",
-                             residuals.max().item(), train_iter)
-        writer.add_histogram("min_input_residuals",
-                             residuals.min().item(), train_iter)
 
     ############### Training ###############
 
@@ -299,57 +259,44 @@ def train(args) -> nn.Module:
         resume(args, model)
         just_resumed = True
 
-    def train_loop(frames: List[torch.Tensor]) -> None:
+    def train_loop(frame_list: List[torch.Tensor], log_iter: int) -> None:
         if np.random.random() < 0.5:
-            frames = frames[::-1]
+            frame_list = frame_list[::-1]
+        frames = torch.stack(frame_list).cuda()
 
         model.train()
         solver.zero_grad()
 
-        context_vec = 0.  # .cuda()
-        reconstructed_frames = []
-        flow_frames = []
-        loss: torch.Tensor = 0.  # type: ignore
-        frames = [frame.cuda() for frame in frames]
+        # context_vec = 0.  # .cuda()
+        model_out = model(
+            frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach
+        )
+        loss = (flow_loss_fn(frames[1:], model_out["flow_frame2"])
+                + reconstructed_loss_fn(frames[1:], model_out["reconstructed_frame2"]))
 
-        frame1 = frames[0]
-        for frame2 in frames[1:]:
-            model_out = model(frame1, frame2)
-            if "flow" in args.train_type:
-                loss += (
-                    flow_loss_fn(frame2, model_out["flow_frame"])
-                    #  + 0.01 * tv(model_out["flow"])
-                )
-            if "residual" in args.train_type:
-                loss += reconstructed_loss_fn(frame2,
-                                              model_out["reconstructed_frame"])
+        log_flow_context_residuals(
+            writer,
+            model_out["flow"],
+            torch.tensor(0.),
+        )
 
-            flow_frames.append(model_out["flow_frame"])
-            reconstructed_frames.append(
-                model_out["reconstructed_frame"])
+        # frame1 = model_out["reconstructed_frame"]
+        # if args.detach:
+        #     frame1 = frame1.detach()
 
-            log_flow_context_residuals(
-                writer,
-                model_out["flow"],
-                torch.tensor(context_vec),
-                torch.abs(frame2 - frame1)
-            )
-
-            frame1 = model_out["reconstructed_frame"]
-            if args.detach:
-                frame1 = frame1.detach()
-
-        loss /= len(frames) - 1
         if args.network != "opt":
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             solver.step()
 
-        if args.network == "opt" or train_iter % 100 == 0:
+        if args.network == "opt" or train_iter % log_iter == 0:
             scores = {
-                **eval_scores(frames[:-1], {"": frames[1:]}, "train_baseline"),
-                **eval_scores(frames[1:], {"": flow_frames}, "train_flow"),
-                **eval_scores(frames[1:], {"": reconstructed_frames},
+                **eval_scores(frames[1:], 
+                              frames[0].repeat(frames.shape[0]-1, 1, 1, 1), 
+                              "train_same_frame"),
+                **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
+                **eval_scores(frames[1:], model_out["flow_frame2"], "train_flow"),
+                **eval_scores(frames[1:], model_out["reconstructed_frame2"],
                               "train_reconstructed"),
             }
             writer.add_scalar(
@@ -365,7 +312,7 @@ def train(args) -> nn.Module:
         for train_loader in get_loaders(train_paths, is_train=True, args=args):
             for frames, _ in train_loader:
                 train_iter += 1
-                train_loop(frames)
+                train_loop(frames, log_iter=len(train_loader)//5)
             del train_loader
 
         if (epoch + 1) % args.checkpoint_epochs == 0:

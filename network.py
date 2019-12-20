@@ -47,7 +47,8 @@ class Encoder(nn.Module):
             (self.encode_frame1(x), self.encode_frame2(x)),
             dim=1
         )
-        context_x = self.encode_context(context_vec) if self.use_context else 0.
+        context_x = self.encode_context(
+            context_vec) if self.use_context else 0.
         return self.encode(frames_x + context_x)
 
 
@@ -156,7 +157,7 @@ class SmallDecoder(nn.Module):
         f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
             identity_theta, r.shape, align_corners=False)
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-                                #    align_corners=False)
+        #    align_corners=False)
         if self.training is False:
             f_grid = f_grid.clamp(-1., 1.)
 
@@ -225,9 +226,9 @@ class BitToFlowDecoder(nn.Module):
         f = self.flow(x).permute(0, 2, 3, 1)
         assert f.shape[-1] == 2
         # grid_normalize = torch.tensor(
-            # f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
+        # f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
         # f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
-            # identity_theta, r.shape, align_corners=False)
+        # identity_theta, r.shape, align_corners=False)
         f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
                                    align_corners=True)
         return {
@@ -236,6 +237,7 @@ class BitToFlowDecoder(nn.Module):
             "residuals": r,
             "context_vec": context_vec
         }
+
 
 class WaveoneModel(nn.Module):
     NAMES = ("encoder", "binarizer", "decoder")
@@ -255,13 +257,13 @@ class WaveoneModel(nn.Module):
     def forward(  # type: ignore
             self,
             frames: torch.Tensor,
-            modes: Tuple[str, ...],
+            iframe_iter: int,
             reuse_frame: bool,
             detach: bool,
     ) -> Dict[str, torch.Tensor]:
         frame1 = frames[0]
         out_collector = defaultdict(list)
-        for frame2 in frames[1: ]:
+        for iter_i, frame2 in enumerate(frames[1:]):
             codes = self.binarizer(self.encoder(frame1, frame2, 0.))
             decoder_out = self.decoder((codes, 0.))
             for k, v in decoder_out.items():
@@ -269,8 +271,8 @@ class WaveoneModel(nn.Module):
             out_collector["codes"].append(codes)
 
             flow_frame = F.grid_sample(  # type: ignore
-                frame1, decoder_out["flow_grid"], 
-                align_corners=True, 
+                frame1, decoder_out["flow_grid"],
+                align_corners=True,
                 padding_mode="border",
             ) if "flow" in self.train_type else frame1
             out_collector["flow_frame2"].append(flow_frame)
@@ -283,7 +285,8 @@ class WaveoneModel(nn.Module):
                     reconstructed_frame2, min=-1., max=1.)
             out_collector["reconstructed_frame2"].append(reconstructed_frame2)
 
-            frame1 = reconstructed_frame2 if reuse_frame else frame2
+            frame1 = (reconstructed_frame2 if reuse_frame and 
+                      iter_i % iframe_iter != 0 else frame2)
             if detach:
                 frame1 = frame1.detach()
 
@@ -630,7 +633,8 @@ class PredNet(nn.Module):
 
         for i in range(self.n_layers):
             conv = nn.Sequential(
-                nn.Conv2d(self.r_channels[i], self.a_channels[i], 3, padding=1),
+                nn.Conv2d(self.r_channels[i],
+                          self.a_channels[i], 3, padding=1),
                 # nn.ReLU(),
             )
             if i == 0:
