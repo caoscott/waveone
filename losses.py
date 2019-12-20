@@ -181,6 +181,11 @@ class MSSSIM(torch.nn.Module):
                 img1: torch.Tensor,
                 img2: torch.Tensor,
                 ) -> torch.Tensor:
+        assert img1.shape == img2.shape
+        if len(img1.shape) > 4:
+            new_shape = (-1, img1.shape[-3], img1.shape[-2], img1.shape[-1])
+            img1 = img1.reshape(*new_shape)
+            img2 = img2.reshape(*new_shape)
         # TODO: store window between calls if possible
         score = msssim(
             img1, img2, window_size=self.window_size,
