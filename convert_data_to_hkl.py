@@ -4,22 +4,26 @@ import glob
 from typing import DefaultDict, Dict, List, Tuple
 
 import cv2
-import torch
+import hickle as hkl
 import numpy as np
 from pympler import asizeof
 
-# MATCH = "/scratch/cluster/scottcao/vcii_all/*.png"
-# STORE = '/scratch/cluster/scottcao/vcii_pkl'
-# NAME = "vcii"
+# MATCH = "/scratch/cluster/scottcao/vcii_data/train/*.png"
+# STORE = '/scratch/cluster/scottcao/vcii_hkl'
+# NAME = "train"
+
+MATCH = "/scratch/cluster/scottcao/vcii_data/eval/*.png"
+STORE = '/scratch/cluster/scottcao/vcii_hkl'
+NAME = "eval"
 
 # MATCH = "/scratch/cluster/cywu/kinetics_train_8_100frames_352x288/6yuov4mSl1Q_*.png"
-# STORE = '/scratch/cluster/scottcao/kinetics_8_pkl_subset/'
+# STORE = '/scratch/cluster/scottcao/kinetics_8_hkl_subset/'
 # NAME = "kinetics"
 
-MATCH = "/scratch/cluster/cywu/kinetics_train_8_100frames_352x288/*.png"
-STORE = '/scratch/cluster/scottcao/kinetics_8_pkl'
-NAME = "kinetics"
-MAX_SIZE = 8 * (2 ** 30)
+# MATCH = "/scratch/cluster/cywu/kinetics_train_8_100frames_352x288/*.png"
+# STORE = '/scratch/cluster/scottcao/kinetics_8_hkl'
+# NAME = "kinetics"
+MAX_SIZE = 13 * (2 ** 30)
 
 
 def default_loader(path: str) -> np.ndarray:
@@ -45,35 +49,43 @@ def get_id_to_image_lists(root: str) -> Dict[Tuple[str, ...], List[str]]:
 
 
 def save(
-        id_to_images: Dict[str, Tuple[np.ndarray, ...]],
+        id_to_images: List[Tuple[np.ndarray, ...]],
         counter: int,
         obj_size: int,
-) -> None:
-    pkl_path = os.path.join(STORE, f"{NAME}{counter}.pkl")
-    torch.save(id_to_images, pkl_path)
-    print(f"Dumped {pkl_path}. Size {obj_size}.")
+) -> str:
+    hkl_path = os.path.join(STORE, f"{NAME}{counter}.hkl")
+    hkl.dump(id_to_images, hkl_path, mode="w", compression="gzip")
+    print(f"Dumped {hkl_path}. Size in memory: {obj_size / 2 ** 30 :.6f} GB. "
+          f"Size on disk: {os.path.getsize(hkl_path) / 2 ** 30 :.6f} GB. ")
+    return hkl_path
+
+
+def check_load(path: str) -> None:
+    hkl.load(path)
 
 
 def main() -> None:
     counter = 0
     id_to_image_lists = get_id_to_image_lists(MATCH)
-    id_to_images: Dict[str, Tuple[np.ndarray, ...]] = {}
+    image_lists: List[Tuple[np.ndarray, ...]] = []
 
     for vid_id, image_list in id_to_image_lists.items():
-        obj_size = asizeof.asizeof(id_to_images)
+        obj_size = asizeof.asizeof(image_lists)
         if obj_size >= 8 * (2 ** 30):
-            save(id_to_images, counter, obj_size)
-            id_to_images = {}
+            file_path = save(image_lists, counter, obj_size)
+            image_lists = []
             counter += 1
+            check_load(file_path)
 
         new_id = "_".join(vid_id)
         images = tuple(default_loader(image_path) for image_path in image_list)
-        id_to_images[new_id] = images
+        image_lists.append(images)
 
         print(f"Finished reading {new_id} into memory.")
 
-    if id_to_images:
-        save(id_to_images, counter, asizeof.asizeof(id_to_images))
+    if image_lists:
+        file_path = save(image_lists, counter, asizeof.asizeof(image_lists))
+        check_load(file_path)
 
 
 if __name__ == '__main__':

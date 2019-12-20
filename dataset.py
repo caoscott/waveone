@@ -8,6 +8,7 @@ from collections import defaultdict
 from typing import DefaultDict, Dict, Iterator, List, Tuple
 
 import cv2
+import hickle as hkl
 import numpy as np
 import torch
 import torch.utils.data as data
@@ -113,11 +114,11 @@ def get_loaders(
         is_train: bool,
         args: argparse.Namespace,
 ) -> Iterator[data.DataLoader]:
-    for pkl_path in paths:
-        id_to_images = load_pkl_images(pkl_path)
+    for hkl_path in paths:
+        image_list = load_hkl_images(hkl_path)
         max_frame_len = max(len(images) for images in id_to_images.values())
         datasets = convert_images_to_datasets(
-            id_to_images,
+            image_list,
             is_train=is_train,
             args=args,
             frame_len=args.frame_len if is_train else max_frame_len,
@@ -241,14 +242,14 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 #         return 0
 
 
-def load_pkl_images(filepath: str) -> Dict[str, Tuple[np.ndarray, ...]]:
+def load_hkl_images(filepath: str) -> List[Tuple[np.ndarray, ...]]:
     print(f"Loading {filepath}.")
-    id_to_images: Dict[str, Tuple[np.ndarray, ...]] = torch.load(filepath)
-    return id_to_images
+    image_list = hkl.load(filepath)
+    return image_list
 
 
 def convert_images_to_datasets(
-        id_to_images: Dict[str, Tuple[np.ndarray, ...]],
+        image_list: List[Tuple[np.ndarray, ...]],
         is_train: bool,
         args: argparse.Namespace,
         frame_len: int,
@@ -256,6 +257,6 @@ def convert_images_to_datasets(
 ) -> List[ImageList]:
     datasets = [ImageList(
         imgs, is_train, args, frame_len, sampling_range,
-    ) for imgs in id_to_images.values()]
+    ) for imgs in image_list]
     print(f"Finished creating ImageLists.")
     return datasets
