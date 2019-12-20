@@ -112,14 +112,24 @@ def run_eval(
         eval_out = {k: torch.cat(v, dim=1)
                     for k, v in eval_out_collector.items()}
         total_scores: Dict[str, torch.Tensor] = {
-            **eval_scores(eval_out["frames"][1:],
-                          torch.stack([eval_out["frames"][0]] *
-                                      (eval_out["frames"].shape[0]-1)),
-                          "train_same_frame"),
-            **eval_scores(eval_out["frames"][1:], eval_out["frames"][:-1], "train_previous_frame"),
-            **eval_scores(eval_out["frames"][1:], eval_out["flow_frame2"], f"{eval_name}_flow"),
-            **eval_scores(eval_out["frames"][1:], eval_out["reconstructed_frame2"], 
-                            f"{eval_name}_reconstructed"),
+            **eval_scores(
+                eval_out["frames"][1:],
+                torch.stack([eval_out["frames"][0]] *
+                            (eval_out["frames"].shape[0]-1)),
+                f"{eval_name}_same_frame"
+            ),
+            **eval_scores(
+                eval_out["frames"][1:], eval_out["frames"][:-1],
+                f"{eval_name}_previous_frame"
+            ),
+            **eval_scores(
+                eval_out["frames"][1:
+                                   ], eval_out["flow_frame2"], f"{eval_name}_flow"
+            ),
+            **eval_scores(
+                eval_out["frames"][1:], eval_out["reconstructed_frame2"],
+                f"{eval_name}_reconstructed"
+            ),
         }
 
         print(f"{eval_name} epoch {epoch}:")
@@ -327,13 +337,15 @@ def train(args) -> nn.Module:
             save(args, model)
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            for eval_loader in get_loaders(eval_paths, is_train=False, args=args):
-                run_eval("eval", eval_loader, model, epoch, args, writer)
+            for eval_idx, eval_loader in enumerate(get_loaders(
+                eval_paths, is_train=False, args=args
+            )):
+                run_eval(f"eval{eval_idx}", eval_loader, model, epoch, args, writer)
                 del eval_loader
-            for train_subset_loader in get_loaders(
+            for training_idx, train_subset_loader in enumerate(get_loaders(
                 train_subset_paths, is_train=False, args=args
-            ):
-                run_eval("training", train_subset_loader,
+            )):
+                run_eval(f"training{training_idx}", train_subset_loader,
                          model, epoch, args, writer)
                 del train_subset_loader
             scheduler.step()  # type: ignore
