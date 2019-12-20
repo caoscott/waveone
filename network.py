@@ -156,7 +156,7 @@ class WaveoneModel(nn.Module):
         out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
         frame2: torch.Tensor
         for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
-            frame2 = frame2.cuda()
+            frame2 = frame2.to(device)
             codes = self.binarizer(self.encoder(frame1, frame2, 0.))
             decoder_out = self.decoder((codes, 0.))
             for k, v in decoder_out.items():
