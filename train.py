@@ -180,8 +180,8 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         opt_encoder = LambdaModule(lambda f1, f2, _: f2 - f1)
         opt_binarizer = nn.Identity()  # type: ignore
         opt_decoder = LambdaModule(lambda t: {
-            "flow": 0.,
-            "flow_grid": 0.,
+            "flow": torch.zeros(1),
+            "flow_grid": torch.zeros(1),
             "residuals": t[0],
             "context_vec": t[1],
         })
