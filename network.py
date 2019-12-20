@@ -12,46 +12,6 @@ from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
 from collections import defaultdict
 
 
-class Encoder(nn.Module):
-    def __init__(self, in_ch: int, out_ch: int, use_context: bool) -> None:
-        super().__init__()
-        self.encode_frame1 = nn.Sequential(
-            inconv(in_ch // 2, 128),
-            down(128, 256),
-        )
-        self.encode_frame2 = nn.Sequential(
-            inconv(in_ch // 2, 128),
-            down(128, 256),
-        )
-        self.encode_context = inconv(512, 512)
-        self.encode = nn.Sequential(
-            down(512, 1024),
-            down(1024, 1024),
-            down(1024, 1024),
-            nn.Conv2d(1024, out_ch, kernel_size=3, padding=1),
-        )
-        self.use_context = use_context
-
-    def forward(  # type: ignore
-            self,
-            frame1: torch.Tensor,
-            frame2: torch.Tensor,
-            context_vec: torch.Tensor
-    ) -> torch.Tensor:
-        # frames_x = torch.cat(
-        #     (self.encode_frame1(frame1), self.encode_frame2(frame2)),
-        #     dim=1
-        # )
-        x = frame2 - frame1
-        frames_x = torch.cat(
-            (self.encode_frame1(x), self.encode_frame2(x)),
-            dim=1
-        )
-        context_x = self.encode_context(
-            context_vec) if self.use_context else 0.
-        return self.encode(frames_x + context_x)
-
-
 class SmallEncoder(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
@@ -169,76 +129,6 @@ class SmallDecoder(nn.Module):
         }
 
 
-# class FeatureEncoder(nn.Module):
-#     def __init__(self, out_ch: int, use_context: bool, shrink: int = 1) -> None:
-#         super().__init__()
-#         self.down2 = down(128 // shrink, 256 // shrink)
-#         self.down3 = down(256 // shrink, 512 // shrink)
-#         self.down4 = down(512 // shrink, 512 // shrink)
-#         self.use_context = use_context
-
-#     def forward(  # type: ignore
-#         self,
-#         frame1: torch.Tensor,
-#         frame2: torch.Tensor,
-#         context_vec: torch.Tensor
-#     ) -> torch.Tensor:
-#         # frames_x = torch.cat(
-#             # (self.encode_frame1(frame1), self.encode_frame2(frame2)), dim=1)
-#         frames_x = torch.cat(
-#             (self.encode_frame1(frame2-frame1), self.encode_frame2(frame2-frame1)),
-#             dim=1
-#         )
-#         context_x = self.encode_context(context_vec) if self.use_context else 0.
-#         return self.encode(frames_x + context_x)
-
-
-class BitToFlowDecoder(nn.Module):
-    IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
-
-    def __init__(self, in_ch: int, out_ch: int) -> None:
-        super().__init__()
-        self.ups = nn.Sequential(
-            upconv(in_ch, 1024, bilinear=False),
-            upconv(1024, 512, bilinear=False),
-            upconv(512, 256, bilinear=False),
-        )
-        self.flow = nn.Sequential(
-            upconv(256, 128, bilinear=False),
-            nn.Conv2d(128, 2, kernel_size=1, bias=False),
-            # nn.Conv2d(128, 2, kernel_size=3, padding=1),
-        )
-        self.residual = nn.Sequential(
-            upconv(256, 128, bilinear=False),
-            nn.Conv2d(128, out_ch, kernel_size=1, bias=False),
-            # nn.Conv2d(128, out_ch, kernel_size=3, padding=1),
-        )
-
-    def forward(  # type: ignore
-        self,
-        input_tuple: Tuple[torch.Tensor, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
-        x, context_vec = input_tuple
-        x = self.ups(x)
-        r = self.residual(x) * 2
-        identity_theta = torch.tensor(
-            BitToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).to(x.device)
-        f = self.flow(x).permute(0, 2, 3, 1)
-        assert f.shape[-1] == 2
-        # grid_normalize = torch.tensor(
-        # f.shape[1: 3]).reshape(1, 1, 1, 2).to(x.device)
-        # f_grid = f / grid_normalize + F.affine_grid(  # type: ignore
-        # identity_theta, r.shape, align_corners=False)
-        f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-                                   align_corners=True)
-        return {
-            "flow": f,
-            "flow_grid": f_grid,
-            "residuals": r,
-            # "context_vec": context_vec
-        }
-
-
 class WaveoneModel(nn.Module):
     NAMES = ("encoder", "binarizer", "decoder")
 
@@ -267,6 +157,7 @@ class WaveoneModel(nn.Module):
         for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
             codes = self.binarizer(self.encoder(frame1, frame2, 0.))
             decoder_out = self.decoder((codes, 0.))
+            print(decoder_out)
             for k, v in decoder_out.items():
                 out_collector[k].append(v)
             out_collector["codes"].append(codes)
@@ -286,7 +177,7 @@ class WaveoneModel(nn.Module):
                     reconstructed_frame2, min=-1., max=1.)
             out_collector["reconstructed_frame2"].append(reconstructed_frame2)
 
-            frame1 = (reconstructed_frame2 if reuse_frame and 
+            frame1 = (reconstructed_frame2 if reuse_frame and
                       iter_i % iframe_iter != 0 else frame2)
             if detach:
                 frame1 = frame1.detach()
@@ -421,18 +312,6 @@ class UNet(nn.Module):
         out3 = self.up2(out4, x3)
         out2 = self.up3(out3, x2)
         return [out4, out3, out2]
-
-
-class SimpleRevNet(nn.Module):
-    def __init__(self, channels: int, num_blocks: int = 10) -> None:
-        super().__init__()
-        self.model = nn.Sequential(  # type: ignore
-            revnet_block(channels // 2) for _ in range(num_blocks)
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
-        f1, f2 = x[:, :3], x[:, 3:]
-        return self.model(f2 - f1)
 
 
 class CAE(nn.Module):
