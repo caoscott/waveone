@@ -8,6 +8,7 @@ from collections import defaultdict
 from typing import DefaultDict, Dict, Iterator, List, Tuple
 
 import cv2
+import hickle as hkl
 import numpy as np
 import torch
 import torch.utils.data as data
@@ -31,7 +32,7 @@ class ImageList(data.Dataset):
 
         assert frame_len > 0
         assert sampling_range == 0 or sampling_range >= frame_len
-        assert len(self.imgs) >= self.frame_len
+        # assert len(self.imgs) >= self.frame_len
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, ...]:
         if self.sampling_range:
@@ -96,8 +97,8 @@ def get_loaders(
         is_train: bool,
         args: argparse.Namespace,
 ) -> Iterator[data.DataLoader]:
-    for pkl_path in paths:
-        id_to_images = load_pkl_images(pkl_path)
+    for hkl_path in paths:
+        id_to_images = load_hkl_images(hkl_path)
         datasets = convert_images_to_datasets(
             id_to_images,
             is_train=is_train,
@@ -223,10 +224,10 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 #         return 0
 
 
-def load_pkl_images(filepath: str) -> Dict[str, Tuple[np.ndarray, ...]]:
+def load_hkl_images(filepath: str) -> List[Tuple[np.ndarray, ...]]:
     print(f"Loading {filepath}.")
-    id_to_images: Dict[str, Tuple[np.ndarray, ...]] = torch.load(filepath)
-    return id_to_images
+    image_list = hkl.load(filepath)
+    return image_list
 
 
 def convert_images_to_datasets(
