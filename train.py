@@ -109,7 +109,7 @@ def run_eval(
         eval_out = {k: torch.cat(v) for k, v in eval_out_collector.items()}
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(frames[1:],
-                          frames[0].repeat(frames.shape[0]-1, 1, 1, 1),
+                          torch.stack([frames[0]] * (frames.shape[0]-1)),
                           "train_same_frame"),
             **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
             **eval_scores(frames[1:], eval_out["flow_frame2"], f"{eval_name}_flow"),
@@ -294,7 +294,7 @@ def train(args) -> nn.Module:
         if args.network == "opt" or train_iter % log_iter == 0:
             scores = {
                 **eval_scores(frames[1:],
-                              frames[0].repeat(frames.shape[0]-1, 1, 1, 1),
+                              torch.stack([frames[0]] * (frames.shape[0]-1)),
                               "train_same_frame"),
                 **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
                 **eval_scores(frames[1:], model_out["flow_frame2"], "train_flow"),

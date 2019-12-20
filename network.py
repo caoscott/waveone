@@ -157,7 +157,6 @@ class WaveoneModel(nn.Module):
         for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
             codes = self.binarizer(self.encoder(frame1, frame2, 0.))
             decoder_out = self.decoder((codes, 0.))
-            print(decoder_out)
             for k, v in decoder_out.items():
                 out_collector[k].append(v)
             out_collector["codes"].append(codes)
@@ -182,7 +181,6 @@ class WaveoneModel(nn.Module):
             if detach:
                 frame1 = frame1.detach()
 
-        print(out_collector)
         return {
             k: torch.stack(v) for k, v in out_collector.items()
         }
