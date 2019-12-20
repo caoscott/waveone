@@ -193,6 +193,8 @@ def get_model(args: argparse.Namespace) -> nn.Module:
     #     binarizer = Binarizer(args.bits, args.bits,
     #                           not args.binarize_off)
     #     return WaveoneModel(encoder, binarizer, decoder, args.train_type)
+    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
+    reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
     if args.network == "cae":
         return CAE()
     if args.network == "unet":
@@ -206,12 +208,18 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "residuals": t[0],
             "context_vec": torch.zeros(1),
         })
-        return WaveoneModel(opt_encoder, opt_binarizer, opt_decoder, train_type="residual")
+        return WaveoneModel(
+            opt_encoder, opt_binarizer, opt_decoder, "residual", 
+            flow_loss_fn, reconstructed_loss_fn,
+        )
     if args.network == "small":
         small_encoder = SmallEncoder(6, args.bits)
         small_binarizer = SmallBinarizer(not args.binarize_off)
         small_decoder = SmallDecoder(args.bits, 3)
-        return WaveoneModel(small_encoder, small_binarizer, small_decoder, args.train_type)
+        return WaveoneModel(
+            small_encoder, small_binarizer, small_decoder, args.train_type, 
+            flow_loss_fn, reconstructed_loss_fn,
+        )
     raise ValueError(f"No model type named {args.network}.")
 
 
@@ -240,8 +248,6 @@ def train(args) -> nn.Module:
         weight_decay=args.weight_decay
     )
     scheduler = LS.StepLR(solver, step_size=40, gamma=0.5)
-    reconstructed_loss_fn = get_loss_fn(args.reconstructed_loss).cuda()
-    flow_loss_fn = get_loss_fn(args.flow_loss).cuda()
     # tv = TotalVariation().cuda()
 
     def log_flow_context_residuals(
@@ -294,8 +300,6 @@ def train(args) -> nn.Module:
         model_out = model(
             frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach
         )
-        loss = (flow_loss_fn(frames[1:], model_out["flow_frame2"])
-                + reconstructed_loss_fn(frames[1:], model_out["reconstructed_frame2"]))
 
         log_flow_context_residuals(
             writer,
@@ -308,7 +312,7 @@ def train(args) -> nn.Module:
         #     frame1 = frame1.detach()
 
         if args.network != "opt":
-            loss.backward()
+            model_out["loss"].backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             solver.step()
 
@@ -323,9 +327,7 @@ def train(args) -> nn.Module:
                               "train_reconstructed"),
             }
             writer.add_scalar(
-                "training_loss",
-                loss.item(),
-                train_iter,
+                "training_loss", model_out["loss"].item(), train_iter,
             )
             writer.add_scalar(
                 "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore

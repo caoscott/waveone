@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torchvision import models
 
 from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
-                                   outconv, revnet_block, up, upconv)
+                                   outconv, revnet_block, up, upconv, LambdaModule)
 from collections import defaultdict
 
 
@@ -136,13 +136,18 @@ class WaveoneModel(nn.Module):
                  encoder: nn.Module,
                  binarizer: nn.Module,
                  decoder: nn.Module,
-                 train_type: str) -> None:
+                 train_type: str,
+                 flow_loss_fn: nn.Module,
+                 reconstructed_loss_fn: nn.Module
+    ) -> None:
         super().__init__()
         self.encoder = encoder
         self.binarizer = binarizer
         self.decoder = decoder
         self.train_type = train_type
         self.nets = (encoder, binarizer, decoder)
+        self.flow_loss_fn = flow_loss_fn
+        self.reconstructed_loss_fn = reconstructed_loss_fn
 
     def forward(  # type: ignore
             self,
@@ -153,8 +158,9 @@ class WaveoneModel(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         device = next(self.parameters()).device
         frame1 = frames[0].to(device)
+        loss: torch.Tensor = 0.
         out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
-        for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore  
+        for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
             frame2: torch.Tensor = frame2.to(device)  # type: ignore
             codes = self.binarizer(self.encoder(frame1, frame2, 0.))
             decoder_out = self.decoder((codes, 0.))
@@ -177,13 +183,19 @@ class WaveoneModel(nn.Module):
                     reconstructed_frame2, min=-1., max=1.)
             out_collector["reconstructed_frame2"].append(reconstructed_frame2)
 
+            loss += self.flow_loss_fn(frame2, decoder_out["flow_frame2"])
+            loss += self.reconstructed_loss_fn(
+                frame2, decoder_out["reconstructed_frame2"]
+            )
+
             frame1 = (reconstructed_frame2 if reuse_frame and
                       iter_i % iframe_iter != 0 else frame2)
             if detach:
                 frame1 = frame1.detach()
 
         return {
-            k: torch.stack(v) for k, v in out_collector.items()
+            **{k: torch.stack(v) for k, v in out_collector.items()},
+            **{"loss": loss / (frames.shape[0]-1)},
         }
 
 
