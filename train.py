@@ -95,22 +95,27 @@ def run_eval(
     with torch.no_grad():
         eval_out_collector: DefaultDict[str,
                                         List[torch.Tensor]] = defaultdict(list)
-        for eval_iter, (frame_list, mask_list) in enumerate(eval_loader):
+        for frame_list, mask_list in eval_loader:
             frames = torch.stack(frame_list)
-            masks = torch.stack(mask_list)
+            masks = torch.stack(mask_list[1:])
             model_out = model(
-                frames, iframe_iter=args.iframe_iter,
+                frames.cuda(), iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False,
             )
             for key in ("flow_frame2", "reconstructed_frame2"):
-                eval_out_collector[key].append(model_out[key] * masks[1:])
+                eval_out_collector[key].append(model_out[key].cpu() * masks)
             eval_out_collector["frames"].append(frames)
-            # for iter_i, (mask, f2, flow_f2, reconstructed_f2) in enumerate(zip(
-            #     masks, frames[1:], model_out["flow_frame2"], model_out["reconstructed_frame2"],
-            # )):
-            #     for
+            eval_out_collector["masks"].append(masks)
         eval_out = {k: torch.cat(v, dim=1)
                     for k, v in eval_out_collector.items()}
+        # for batch_i in range(eval_out["reconstructed_frame2"].shape[1]):
+        #     for seq_i in range(eval_out["reconstructed_frame2"].shape[0]):
+        #         frames = torch.stack([
+        #             eval_out["frames"][seq_i+1, batch_i],
+        #             eval_out["reconstructed_frame2"][seq_i, batch_i],
+        #             eval_out[]
+        #         ])
+        #         save_tensor_as_img()
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(
                 eval_out["frames"][1:],
