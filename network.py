@@ -155,6 +155,7 @@ class WaveoneModel(nn.Module):
             iframe_iter: int,
             reuse_frame: bool,
             detach: bool,
+            collect_output: bool, 
     ) -> Dict[str, torch.Tensor]:
         device = next(self.parameters()).device
         frame1 = frames[0].to(device)
@@ -185,12 +186,9 @@ class WaveoneModel(nn.Module):
                 reconstructed_frame2 = torch.clamp(
                     reconstructed_frame2, min=-1., max=1.)
 
-            out_collector["flow_frame2"].append(
-                flow_frame2 if self.training else flow_frame2.cpu()
-            )
-            out_collector["reconstructed_frame2"].append(
-                reconstructed_frame2 if self.training else reconstructed_frame2.cpu()
-            )
+            if collect_output:
+                out_collector["flow_frame2"].append(flow_frame2.cpu())
+                out_collector["reconstructed_frame2"].append(reconstructed_frame2.cpu())
 
             frame1 = (reconstructed_frame2 if reuse_frame and
                       iter_i % iframe_iter != 0 else frame2)

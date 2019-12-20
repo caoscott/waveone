@@ -100,7 +100,7 @@ def run_eval(
             masks = torch.stack(mask_list[1:])
             model_out = model(
                 frames, iframe_iter=args.iframe_iter,
-                reuse_frame=True, detach=False,
+                reuse_frame=True, detach=False, collect_output=True,
             )
             for key in ("flow_frame2", "reconstructed_frame2"):
                 eval_out_collector[key].append(model_out[key].cpu() * masks)
@@ -298,7 +298,8 @@ def train(args) -> nn.Module:
 
         # context_vec = 0.  # .cuda()
         model_out = model(
-            frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach
+            frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach,
+            collect_output=(train_iter % log_iter == 0),
         )
 
         log_flow_context_residuals(
