@@ -104,7 +104,7 @@ def run_eval(
             #     masks, frames[1:], model_out["flow_frame2"], model_out["reconstructed_frame2"],
             # )):
             #     for 
-        eval_out = {k, torch.cat(v) for k, v in eval_out_collector.items()}
+        eval_out = {k: torch.cat(v) for k, v in eval_out_collector.items()}
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(frames[1:], 
                           frames[0].repeat(frames.shape[0]-1, 1, 1, 1), 
