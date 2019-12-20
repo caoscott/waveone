@@ -291,6 +291,7 @@ class WaveoneModel(nn.Module):
             if detach:
                 frame1 = frame1.detach()
 
+        print(out_collector)
         return {
             k: torch.stack(v) for k, v in out_collector.items()
         }
