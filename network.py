@@ -132,15 +132,17 @@ class SmallDecoder(nn.Module):
 class ResNetEncoder(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.encode_input = nn.Sequential(
-            nn.Conv2d(in_ch, 64, 5, stride=2, padding=2, bias=False),
+        self.encode_frames = nn.ModuleList([nn.Sequential(
+            nn.Conv2d(in_ch // 2, 64, 5, stride=2, padding=2, bias=False),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(64, 128, 5, stride=2, padding=2, bias=False),
+        ) for _ in range(2)])
+        self.encode_input = nn.Sequential(
+            nn.Conv2d(128, 128, 5, stride=2, padding=2, bias=False),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(inplace=True),
         )
-        self.blocks = nn.ModuleList([
+        self.blocks = nn.Sequential([
             ResBlock(128, 128) for _ in range(15)
         ])
         self.encode_output = nn.Conv2d(
@@ -153,18 +155,19 @@ class ResNetEncoder(nn.Module):
             context_vec: torch.Tensor
     ) -> torch.Tensor:
         x = torch.cat(
-            (frame1, frame2),
+            (self.encode_frames[0](frame1), self.encode_frames[1](frame2)),
             dim=1
         )
         x = self.encode_input(x)
-        identity_a = x
-        identity_b = x
-        for block_i, block in enumerate(self.blocks):  # type: ignore
-            x: torch.Tensor = block(x)  # type: ignore
-            if (block_i + 1) % 3 == 0:
-                x += identity_b
-                identity_b = x
-        x += identity_a
+        x = self.blocks(x)
+        # identity_a = x
+        # identity_b = x
+        # for block_i, block in enumerate(self.blocks):  # type: ignore
+        #     x: torch.Tensor = block(x)  # type: ignore
+        #     if (block_i + 1) % 3 == 0:
+        #         x += identity_b
+        #         identity_b = x
+        # x += identity_a
         return self.encode_output(x)
 
 
@@ -177,7 +180,7 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(128),
             nn.ReLU(),
         )
-        self.blocks = nn.ModuleList([
+        self.blocks = nn.Sequential([
             ResBlock(128, 128) for _ in range(15)
         ])
         self.residual = nn.Sequential(
@@ -204,15 +207,16 @@ class ResNetDecoder(nn.Module):
         x, context_vec = input_tuple
         x = self.decode_input(x)
 
-        identity_a = x
-        identity_b = x
-        block: nn.Module
-        for block_i, block in enumerate(self.blocks):  # type: ignore
-            x: torch.Tensor = block(x)  # type: ignore
-            if (block_i + 1) % 3 == 0:
-                x += identity_b
-                identity_b = x
-        x += identity_a
+        # identity_a = x
+        # identity_b = x
+        # block: nn.Module
+        # for block_i, block in enumerate(self.blocks):  # type: ignore
+        #     x: torch.Tensor = block(x)  # type: ignore
+        #     if (block_i + 1) % 3 == 0:
+        #         x += identity_b
+        #         identity_b = x
+        # x += identity_a
+        x = self.blocks(x)
 
         f = self.flow(x).permute(0, 2, 3, 1) * 25
         r = self.residual(x) * 2
