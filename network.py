@@ -182,17 +182,17 @@ class ResNetDecoder(nn.Module):
         ])
         self.residual = nn.Sequential(
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(128),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
             nn.ConvTranspose2d(64, out_ch, 4, stride=2, padding=1, bias=True),
             nn.Tanh(),
         )
         self.flow = nn.Sequential(
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(128),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
             nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
-            nn.BatchNorm2d(128),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(64, 2, 1),
         )
