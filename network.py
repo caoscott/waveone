@@ -159,9 +159,8 @@ class ResNetEncoder(nn.Module):
         x = self.encode_input(x)
         identity_a = x
         identity_b = x
-        block: nn.Module
         for block_i, block in enumerate(self.blocks):  # type: ignore
-            x = block(x)
+            x: torch.Tensor = block(x)  # type: ignore
             if (block_i + 1) % 3 == 0:
                 x += identity_b
                 identity_b = x
@@ -209,7 +208,7 @@ class ResNetDecoder(nn.Module):
         identity_b = x
         block: nn.Module
         for block_i, block in enumerate(self.blocks):  # type: ignore
-            x = block(x)
+            x: torch.Tensor = block(x)  # type: ignore
             if (block_i + 1) % 3 == 0:
                 x += identity_b
                 identity_b = x
