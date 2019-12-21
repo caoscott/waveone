@@ -300,7 +300,7 @@ def train(args) -> nn.Module:
         # context_vec = 0.  # .cuda()
         model_out = model(
             frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach,
-            collect_output=(log_iter == 0 or train_iter % log_iter == 0),
+            collect_output=train_iter % log_iter == 0,
         )
         # frame1 = model_out["reconstructed_frame"]
         # if args.detach:
@@ -338,7 +338,7 @@ def train(args) -> nn.Module:
         for train_loader in get_loaders(train_paths, is_train=True, args=args):
             for frames, _ in train_loader:
                 train_iter += 1
-                train_loop(frames, log_iter=len(train_loader)//5)
+                train_loop(frames, log_iter=max(len(train_loader)//5, 1))
             del train_loader
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
