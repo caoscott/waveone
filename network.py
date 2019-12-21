@@ -140,9 +140,9 @@ class ResNetEncoder(nn.Module):
             nn.BatchNorm2d(128),
             nn.LeakyReLU(inplace=True),
         )
-        self.blocks = tuple(
+        self.blocks = nn.ModuleList([
             ResBlock(128, 128) for _ in range(15)
-        )
+        ])
         self.encode_output = nn.Conv2d(
             128, out_ch, 5, stride=2, padding=2, bias=True)
 
@@ -177,9 +177,9 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(128),
             nn.ReLU(),
         )
-        self.blocks = tuple(
+        self.blocks = nn.ModuleList([
             ResBlock(128, 128) for _ in range(15)
-        )
+        ])
         self.residual = nn.Sequential(
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
