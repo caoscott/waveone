@@ -18,7 +18,7 @@ from torchvision.utils import save_image
 from waveone.dataset import get_loaders
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation, msssim
 from waveone.network import (CAE, AutoencoderUNet,
-                             BitToContextDecoder, ResNetEncoder, ResNetDecoder, SmallBinarizer,
+                             ResNetEncoder, ResNetDecoder, SmallBinarizer,
                              SmallDecoder, SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
