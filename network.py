@@ -142,7 +142,7 @@ class ResNetEncoder(nn.Module):
             nn.BatchNorm2d(128),
             nn.LeakyReLU(inplace=True),
         )
-        self.blocks = nn.Sequential([
+        self.blocks = nn.Sequential(*[
             ResBlock(128, 128) for _ in range(15)
         ])
         self.encode_output = nn.Conv2d(
@@ -180,7 +180,7 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(128),
             nn.ReLU(),
         )
-        self.blocks = nn.Sequential([
+        self.blocks = nn.Sequential(*[
             ResBlock(128, 128) for _ in range(15)
         ])
         self.residual = nn.Sequential(
