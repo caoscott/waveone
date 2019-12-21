@@ -302,13 +302,6 @@ def train(args) -> nn.Module:
             frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach,
             collect_output=(log_iter == 0 or train_iter % log_iter == 0),
         )
-
-        log_flow_context_residuals(
-            writer,
-            model_out["flow"],
-            torch.tensor(0.),
-        )
-
         # frame1 = model_out["reconstructed_frame"]
         # if args.detach:
         #     frame1 = frame1.detach()
@@ -334,6 +327,12 @@ def train(args) -> nn.Module:
             writer.add_scalar(
                 "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
             plot_scores(writer, scores, train_iter)
+            log_flow_context_residuals(
+                writer,
+                model_out["flow"],
+                torch.tensor(0.),
+            )
+
 
     for epoch in range(args.max_train_epochs):
         for train_loader in get_loaders(train_paths, is_train=True, args=args):
