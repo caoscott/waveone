@@ -18,7 +18,7 @@ from torchvision.utils import save_image
 from waveone.dataset import get_loaders
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation, msssim
 from waveone.network import (CAE, AutoencoderUNet,
-                             BitToContextDecoder, SmallBinarizer,
+                             BitToContextDecoder, ResNetEncoder, ResNetDecoder, SmallBinarizer,
                              SmallDecoder, SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
@@ -208,6 +208,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "flow_grid": torch.zeros(1),
             "residuals": t[0],
             "context_vec": torch.zeros(1),
+            "loss": torch.tensor(0.),
         })
         return WaveoneModel(
             opt_encoder, opt_binarizer, opt_decoder, "residual",
@@ -221,6 +222,14 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             small_encoder, small_binarizer, small_decoder, args.train_type,
             flow_loss_fn, reconstructed_loss_fn,
         )
+    if args.network == "resnet":
+        resnet_encoder = ResNetEncoder(6, args.bits)
+        resnet_binarizer = SmallBinarizer(not args.binarize_off)
+        resnet_decoder = ResNetDecoder(args.bits, 3)
+        return WaveoneModel(
+            resnet_encoder, resnet_binarizer, resnet_decoder, args.train_type,
+            flow_loss_fn, reconstructed_loss_fn,
+        ) 
     raise ValueError(f"No model type named {args.network}.")
 
 

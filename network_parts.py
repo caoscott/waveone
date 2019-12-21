@@ -410,3 +410,27 @@ class SatLU(nn.Module):
             + 'min_val=' + str(self.lower) \
             + ', max_val=' + str(self.upper) \
             + inplace_str + ')'
+
+
+class ResBlock(nn.Module):
+    __constants__ = ['downsample']
+
+    def __init__(self, in_ch, out_ch,
+                 norm_layer=None):
+        super().__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = nn.Conv2d(in_ch, out_ch, kernel_size=3,
+                               stride=1, padding=1, bias=False)
+        self.bn1 = norm_layer(out_ch)
+        self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size=3,
+                               stride=1, padding=1, bias=False)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        return out + x

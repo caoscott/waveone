@@ -26,8 +26,8 @@ parser.add_argument('--train-type',
 parser.add_argument('--normalization', default='batch', type=str,
                     help='Set normalization in networks.')
 parser.add_argument('--network',
-                    choices=("unet", "opt", "cae", "waveone",
-                             "waveone-ctx", "prednet", "small"),
+                    choices=("unet", "opt", "cae", 
+                             "prednet", "small", "resnet"),
                     help='Set network architecture.')
 
 ######## Learning ########
