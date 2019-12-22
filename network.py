@@ -296,9 +296,6 @@ class WaveoneModel(nn.Module):
                 loss += self.flow_loss_fn(frame2, flow_frame2)
                 loss += self.reconstructed_loss_fn(frame2,
                                                    reconstructed_frame2)
-            else:
-                reconstructed_frame2 = torch.clamp(
-                    reconstructed_frame2, min=-1., max=1.)
 
             if collect_output:
                 out_collector["flow_frame2"].append(flow_frame2.cpu())
