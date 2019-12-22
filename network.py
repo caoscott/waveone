@@ -115,11 +115,11 @@ class SmallDecoder(nn.Module):
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
         f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=False)
+            identity_theta, r.shape, align_corners=True)
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-        #    align_corners=False)
-        if self.training is False:
-            f_grid = f_grid.clamp(-1., 1.)
+        #    align_corners=True)
+        # if self.training is False:
+        f_grid = f_grid.clamp(-1., 1.)
 
         return {
             "flow": f,
@@ -228,9 +228,9 @@ class ResNetDecoder(nn.Module):
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
         f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=False)
+            identity_theta, r.shape, align_corners=True)
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
-        #    align_corners=False)
+        #    align_corners=True)
         # if self.training is False:
         f_grid = f_grid.clamp(-1., 1.)
 
