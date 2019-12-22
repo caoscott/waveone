@@ -257,7 +257,7 @@ def train(args) -> nn.Module:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    scheduler = LS.StepLR(solver, step_size=40, gamma=0.5)
+    scheduler = LS.StepLR(solver, step_size=50, gamma=0.1)
     # tv = TotalVariation().cuda()
 
     def log_flow_context_residuals(
@@ -334,7 +334,7 @@ def train(args) -> nn.Module:
                 "training_loss", model_out["loss"].item(), train_iter,
             )
             writer.add_scalar(
-                "lr", solver.param_groups[0]["lr"], train_iter)  # type: ignore
+                "lr", scheduler.get_lr()[0], train_iter)  # type: ignore
             plot_scores(writer, scores, train_iter)
             log_flow_context_residuals(
                 writer,
