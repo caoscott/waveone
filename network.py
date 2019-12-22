@@ -204,14 +204,14 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(64),
         )
         self.context_to_output = nn.Sequential(
-            *[ResBlock(128, 128) for _ in range(resblocks)]
+            *[ResBlock(64, 64) for _ in range(resblocks)]
         )
         self.residual = nn.Sequential(
-            nn.ConvTranspose2d(128, out_ch, 4, stride=2, padding=1, bias=True),
+            nn.ConvTranspose2d(64, out_ch, 4, stride=2, padding=1, bias=True),
             nn.Tanh(),
         )
         self.flow = nn.Sequential(
-            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=True),
+            nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(64, 2, 1),
