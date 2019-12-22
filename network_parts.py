@@ -426,11 +426,14 @@ class ResBlock(nn.Module):
         self.bn1 = norm_layer(out_ch)
         self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size=3,
                                stride=1, padding=1, bias=False)
-        self.relu = nn.ReLU(inplace=True)
+        self.bn2 = norm_layer(out_ch)
+        self.relu = nn.LeakyReLU(inplace=True)
 
     def forward(self, x):
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
         out = self.conv2(out)
-        return out + x
+        out = self.bn2(out)
+        out += x
+        return self.relu(out)
