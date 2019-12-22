@@ -231,8 +231,8 @@ class ResNetDecoder(nn.Module):
             identity_theta, r.shape, align_corners=False)
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
         #    align_corners=False)
-        if self.training is False:
-            f_grid = f_grid.clamp(-1., 1.)
+        # if self.training is False:
+        f_grid = f_grid.clamp(-1., 1.)
 
         return {
             "flow": f,
