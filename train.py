@@ -257,7 +257,7 @@ def train(args) -> nn.Module:
         lr=args.lr,
         weight_decay=args.weight_decay
     )
-    scheduler = LS.StepLR(solver, step_size=50, gamma=0.1)
+    scheduler = LS.StepLR(solver, step_size=args.lr_step_size, gamma=0.1)
     # tv = TotalVariation().cuda()
 
     def log_flow_context_residuals(

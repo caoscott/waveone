@@ -91,3 +91,5 @@ parser.add_argument('--detach', action='store_true',
 parser.add_argument('--iters-per-epoch', type=int, default=1,
                     help='Number of training iterations for every hickle file per epoch.'
                          'Used to speed up training on large datasets stored over network.')
+parser.add_argument('--lr-step-size', type=int, default=50,
+                    help='Number of epochs after which to multiply existing learning rate by 0.1.')
