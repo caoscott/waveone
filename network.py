@@ -165,15 +165,12 @@ class ResNetEncoder(nn.Module):
             context_vec: torch.Tensor
     ) -> torch.Tensor:
         assert frame1.shape[0] == frame2.shape[0] == context_vec.shape[0]
-        input_x = (
+        input_x: Tuple[torch.Tensor, ...] = (
             self.encode_frames[0](frame1), self.encode_frames[1](frame2), context_vec,
         ) if self.use_context else (
             self.encode_frames[0](frame1), self.encode_frames[1](frame2),
         )
-        x = torch.cat(
-            input_x,
-            dim=1
-        )
+        x = torch.cat(input_x, dim=1)
         x = self.encode_input(x)
         x = self.blocks(x)
         # identity_a = x
