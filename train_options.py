@@ -88,3 +88,6 @@ parser.add_argument('--frame-len', type=int, default=3,
 parser.add_argument('--detach', action='store_true',
                     help='Detach gradients from previous frame when training from sequence of '
                          'frames. Used to make training more efficient.')
+parser.add_argument('--iters-per-epoch', type=int, default=1,
+                    help='Number of training iterations for every hickle file per epoch.'
+                         'Used to speed up training on large datasets stored over network.')

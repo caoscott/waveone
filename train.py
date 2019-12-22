@@ -345,9 +345,10 @@ def train(args) -> nn.Module:
 
     for epoch in range(args.max_train_epochs):
         for train_loader in get_loaders(train_paths, is_train=True, args=args):
-            for frames, _ in train_loader:
-                train_iter += 1
-                train_loop(frames, log_iter=max(len(train_loader)//5, 1))
+            for _ in range(args.iters_per_epoch):
+                for frames, _ in train_loader:
+                    train_iter += 1
+                    train_loop(frames, log_iter=max(len(train_loader)//5, 1))
             del train_loader
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
