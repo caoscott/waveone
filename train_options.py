@@ -51,6 +51,8 @@ parser.add_argument('--reconstructed-loss', choices=['l1', 'l2', 'msssim'],
                     help='Choose loss type for overall reconstruction.', default='msssim')
 parser.add_argument('--flow-loss', choices=['l1', 'l2', 'msssim'],
                     help='Choose loss type for flow. No-op for --flow-off', default='l1')
+parser.add_argument('--resblocks', type=int, default=8,
+                    help='Number of resblocks to use in encoder and decoder.')
 
 # To save computation, we compute objective for multiple
 # crops for each forward pass.

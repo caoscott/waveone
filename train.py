@@ -212,7 +212,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         })
         return WaveoneModel(
             opt_encoder, opt_binarizer, opt_decoder, "residual",
-            flow_loss_fn, reconstructed_loss_fn,
+            False, flow_loss_fn, reconstructed_loss_fn,
         )
     if args.network == "small":
         small_encoder = SmallEncoder(6, args.bits)
@@ -220,15 +220,18 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         small_decoder = SmallDecoder(args.bits, 3)
         return WaveoneModel(
             small_encoder, small_binarizer, small_decoder, args.train_type,
-            flow_loss_fn, reconstructed_loss_fn,
+            False, flow_loss_fn, reconstructed_loss_fn,
         )
-    if args.network == "resnet":
-        resnet_encoder = ResNetEncoder(6, args.bits)
+    if "resnet" in args.network:
+        use_context = "ctx" in args.network
+        resnet_encoder = ResNetEncoder(
+            6, args.bits, resblocks=args.resblocks, use_context=use_context)
         resnet_binarizer = SmallBinarizer(not args.binarize_off)
-        resnet_decoder = ResNetDecoder(args.bits, 3)
+        resnet_decoder = ResNetDecoder(
+            args.bits, 3, resblocks=args.resblocks, use_context=use_context)
         return WaveoneModel(
             resnet_encoder, resnet_binarizer, resnet_decoder, args.train_type,
-            flow_loss_fn, reconstructed_loss_fn,
+            use_context, flow_loss_fn, reconstructed_loss_fn,
         ) 
     raise ValueError(f"No model type named {args.network}.")
 
