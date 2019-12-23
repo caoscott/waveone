@@ -117,6 +117,9 @@ def run_eval(
                 ])
                 save_tensor_as_img(
                     frames, f"{eval_name}_{batch_i}_{seq_i}", args)
+
+        # TODO: log context per eval iteration here. 
+
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(
                 eval_out["frames"][1:],
@@ -263,10 +266,9 @@ def train(args) -> nn.Module:
     scheduler = LS.StepLR(solver, step_size=args.lr_step_size, gamma=0.1)
     # tv = TotalVariation().cuda()
 
-    def log_flow_context_residuals(
+    def log_flow(
             writer: SummaryWriter,
             flows: torch.Tensor,
-            context_vec: torch.Tensor,
     ) -> None:
         if args.network != "opt" and "flow" in args.train_type:
             flows_x = flows[:, :, :, 0]
@@ -283,14 +285,6 @@ def train(args) -> nn.Module:
                 "min_flow_x", flows_x.min().item(), train_iter)
             writer.add_histogram(
                 "min_flow_y", flows_y.min().item(), train_iter)
-
-        if "ctx" in args.network:
-            writer.add_histogram("mean_context_vec_norm",
-                                 context_vec.mean().item(), train_iter)
-            writer.add_histogram("max_context_vec_norm",
-                                 context_vec.max().item(), train_iter)
-            writer.add_histogram("min_context_vec_norm",
-                                 context_vec.min().item(), train_iter)
 
     ############### Training ###############
 
@@ -339,11 +333,7 @@ def train(args) -> nn.Module:
             writer.add_scalar(
                 "lr", scheduler.get_lr()[0], train_iter)  # type: ignore
             plot_scores(writer, scores, train_iter)
-            log_flow_context_residuals(
-                writer,
-                model_out["flow"],
-                torch.tensor(0.),
-            )
+            log_flow(writer, model_out["flow"])
 
 
     for epoch in range(args.max_train_epochs):

@@ -295,10 +295,7 @@ class WaveoneModel(nn.Module):
             frame2: torch.Tensor = frame2.to(device)  # type: ignore
             codes = self.binarizer(self.encoder(frame1, frame2, context_vec))
             decoder_out = self.decoder((codes, context_vec))
-
-            for k, v in decoder_out.items():
-                out_collector[k].append(v)
-            out_collector["codes"].append(codes)
+            # out_collector["codes"].append(codes)
 
             flow_frame2 = F.grid_sample(  # type: ignore
                 frame1, decoder_out["flow_grid"],
@@ -320,12 +317,14 @@ class WaveoneModel(nn.Module):
                 out_collector["reconstructed_frame2"].append(
                     reconstructed_frame2.cpu())
 
+            for k, v in decoder_out.items():
+                out_collector[k].append(v.cpu())
+
             frame1 = (reconstructed_frame2 if reuse_frame and
                       iter_i % iframe_iter != 0 else frame2)
             context_vec = decoder_out["context_vec"]
             if detach:
                 frame1 = frame1.detach()
-
         return {
             **{k: torch.stack(v) for k, v in out_collector.items()},
             **({"loss": loss / (frames.shape[0]-1)} if self.training else {}),
