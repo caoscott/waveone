@@ -200,8 +200,8 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(128),
             nn.ReLU(),
             *[ResBlock(128, 128) for _ in range(resblocks)],
-            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            nn.ConvTranspose2d(128, 32, 4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(32),
         )
         self.context_to_output = nn.Sequential(
             *[ResBlock(64, 64) for _ in range(resblocks)]
@@ -224,7 +224,7 @@ class ResNetDecoder(nn.Module):
         x, context_vec = input_tuple
         x = self.decode_to_context(x)
         if self.use_context:
-            x = new_context_vec = F.leaky_relu(x)
+            x = new_context_vec = torch.cat((x[32:], F.leaky_relu(x)), dim=1)
         else:
             x = F.leaky_relu(x)
             new_context_vec = torch.zeros_like(x)
