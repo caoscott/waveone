@@ -83,6 +83,14 @@ def get_loss_fn(loss_type: str) -> nn.Module:
     raise ValueError(f"{loss_type} is not an appropriate loss.")
 
 
+def log_context_vec(context_vec: torch.Tensor, writer: SummaryWriter, epoch: int) -> None:
+    writer.add_histogram(
+        "context_vec_l1_norm_diff",
+        context_vec[-1].abs().max() - context_vec[0].abs().max(), 
+        epoch,
+    )
+
+
 def run_eval(
         eval_name: str,
         eval_loader: data.DataLoader,
@@ -102,7 +110,7 @@ def run_eval(
                 frames, iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False, collect_output=True,
             )
-            for key in ("flow_frame2", "reconstructed_frame2"):
+            for key in ("flow_frame2", "reconstructed_frame2", "context_vec"):
                 eval_out_collector[key].append(model_out[key].cpu() * masks)
             eval_out_collector["frames"].append(frames)
             eval_out_collector["masks"].append(masks)
@@ -117,9 +125,6 @@ def run_eval(
                 ])
                 save_tensor_as_img(
                     frames, f"{eval_name}_{batch_i}_{seq_i}", args)
-
-        # TODO: log context per eval iteration here. 
-
         total_scores: Dict[str, torch.Tensor] = {
             **eval_scores(
                 eval_out["frames"][1:],
@@ -143,6 +148,7 @@ def run_eval(
 
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
+        log_context_vec(eval_out["context_vec"], writer, epoch)
         print_scores(total_scores)
         return total_scores
 
