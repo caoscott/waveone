@@ -336,8 +336,7 @@ def train(args) -> nn.Module:
                               "train_same_frame"),
                 **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
                 **eval_scores(frames[1:], model_out["flow_frame2"], "train_flow"),
-                **eval_scores(frames[1:], model_out["reconstructed_frame2"],
-                              "train_reconstructed"),
+                            #   "train_reconstructed"),
             }
             writer.add_scalar(
                 "training_loss", model_out["loss"].item(), train_iter,
