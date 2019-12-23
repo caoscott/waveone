@@ -130,13 +130,13 @@ def get_loaders(
             concat_dataset,
             batch_size=args.batch_size,
             sampler=RandomVidSequenceSampler(concat_dataset, args.frame_len),
-            num_workers=4,
+            num_workers=1,
             drop_last=True,
         ) if is_train else data.DataLoader(
             concat_dataset,
             batch_size=args.eval_batch_size,
             shuffle=False,
-            num_workers=2,
+            num_workers=1,
             drop_last=False,
         )
         print('Loader for {} sequences ({} batches) created.'.format(
