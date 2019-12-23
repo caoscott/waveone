@@ -27,7 +27,8 @@ parser.add_argument('--normalization', default='batch', type=str,
                     help='Set normalization in networks.')
 parser.add_argument('--network',
                     choices=("unet", "opt", "cae", 
-                             "prednet", "small", "resnet", "resnet-ctx"),
+                             "prednet", "small", "resnet", "resnet-ctx",
+                             "resnet-lossless"),
                     help='Set network architecture.')
 
 ######## Learning ########

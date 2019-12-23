@@ -16,8 +16,9 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
 from waveone.dataset import get_loaders
+from waveone.logistic_mixture import DiscretizedMixLogisticLoss
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation, msssim
-from waveone.network import (CAE, AutoencoderUNet,
+from waveone.network import (CAE, AutoencoderUNet, LosslessDecoder,
                              ResNetEncoder, ResNetDecoder, SmallBinarizer,
                              SmallDecoder, SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
@@ -236,8 +237,13 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         resnet_encoder = ResNetEncoder(
             6, args.bits, resblocks=args.resblocks, use_context=use_context)
         resnet_binarizer = SmallBinarizer(not args.binarize_off)
-        resnet_decoder = ResNetDecoder(
-            args.bits, 3, resblocks=args.resblocks, use_context=use_context)
+        resnet_decoder = LosslessDecoder(
+            args.bits, 3, resblocks=args.resblocks, use_context=use_context
+        ) if "lossless" in args.network else ResNetDecoder(
+            args.bits, 3, resblocks=args.resblocks, use_context=use_context
+        )
+        if "lossless" in args.network:
+            reconstructed_loss_fn = DiscretizedMixLogisticLoss(rgb_scale=True)
         return WaveoneModel(
             resnet_encoder, resnet_binarizer, resnet_decoder, args.train_type,
             use_context, flow_loss_fn, reconstructed_loss_fn,

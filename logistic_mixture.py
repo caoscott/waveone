@@ -35,15 +35,17 @@ Note that we use the following names through the code, following the code PixelC
 """
 
 from collections import namedtuple
+import functools
+import itertools
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from fjcommon import functools_ext as ft
 
-import vis.grid
-import vis.summarizable_module
-from modules import quantizer
+# import vis.grid
+# import vis.summarizable_module
+import quantizer
 
 # Note that for RGB, we predict the parameters mu, sigma, pi and lambda. Since RGB has C==3 channels, it so happens that
 # the total number of channels needed to predict the 4 parameters is 4 * C * K (for K mixtures, see final paragraphs of
@@ -56,6 +58,24 @@ _NUM_PARAMS_OTHER = 3  # mu, sigma, pi
 
 _LOG_SCALES_MIN = -7.
 _MAX_K_FOR_VIS = 10
+
+
+def compose(*args):
+    """
+    :param args: a list of functions
+    :return: composition of the functions
+    """
+    def compose2(f1, f2):
+        def composed(*args_c, **kwargs_c):
+            return f1(f2(*args_c, **kwargs_c))
+        return composed
+
+    return functools.reduce(compose2, args)
+
+
+concat = itertools.chain.from_iterable
+# like concat but returns list
+lconcat = compose(list, concat)
 
 
 CDFOut = namedtuple('CDFOut', ['logit_probs_c_sm',
@@ -84,7 +104,7 @@ def non_shared_get_K(Kp, C):
 # --------------------------------------------------------------------------------
 
 
-class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
+class DiscretizedMixLogisticLoss(nn.Module):
     def __init__(self, rgb_scale: bool, x_min=0, x_max=255, L=256):
         """
         :param rgb_scale: Whether this is the loss for the RGB scale. In that case,
@@ -115,7 +135,7 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
         self.x_upper_bound = x_max - 0.001
 
         self._extra_repr = 'DMLL: x={}, L={}, coeffs={}, P={}, bin_width={}'.format(
-                (self.x_min, self.x_max), self.L, self.use_coeffs, self._num_params, self.bin_width)
+            (self.x_min, self.x_max), self.L, self.use_coeffs, self._num_params, self.bin_width)
 
     def to_sym(self, x):
         return quantizer.to_sym(x, self.x_min, self.x_max, self.L)
@@ -135,7 +155,8 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
         assert c_cur < C
 
         # NKHW         NKHW     NKHW
-        logit_probs_c, means_c, log_scales_c, K = self._extract_non_shared_c(c_cur, C, l, x_c)
+        logit_probs_c, means_c, log_scales_c, K = self._extract_non_shared_c(
+            c_cur, C, l, x_c)
 
         logit_probs_c_softmax = F.softmax(logit_probs_c, dim=1)  # NKHW, pi_k
         return CDFOut(logit_probs_c_softmax, means_c, log_scales_c, K, targets.to(l.device))
@@ -150,31 +171,38 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
         :return: log-likelihood, as NHW if shared, NCHW if non_shared pis
         """
         assert x.min() >= self.x_min and x.max() <= self.x_max, '{},{} not in {},{}'.format(
-                x.min(), x.max(), self.x_min, self.x_max)
+            x.min(), x.max(), self.x_min, self.x_max)
 
         # Extract ---
         #  NCKHW      NCKHW  NCKHW
         x, logit_pis, means, log_scales, K = self._extract_non_shared(x, l)
 
         # visualize pi, means, variances
-        self.summarizer.register_images(
-                'val', {f'dmll/{scale}/c{c}': lambda c=c: _visualize_params(logit_pis, means, log_scales, c)
-                        for c in range(x.shape[1])})
+        # self.summarizer.register_images(
+        #     'val', {f'dmll/{scale}/c{c}': lambda c=c: _visualize_params(logit_pis, means, log_scales, c)
+        #             for c in range(x.shape[1])})
 
         centered_x = x - means  # NCKHW
 
         # Calc P = cdf_delta
         # all of the following is NCKHW
-        inv_stdv = torch.exp(-log_scales)  # <= exp(7), is exp(-sigma), inverse std. deviation, i.e., sigma'
-        plus_in = inv_stdv * (centered_x + self.bin_width/2)  # sigma' * (x - mu + 0.5)
+        # <= exp(7), is exp(-sigma), inverse std. deviation, i.e., sigma'
+        inv_stdv = torch.exp(-log_scales)
+        # sigma' * (x - mu + 0.5)
+        plus_in = inv_stdv * (centered_x + self.bin_width/2)
         cdf_plus = torch.sigmoid(plus_in)  # S(sigma' * (x - mu + 1/255))
-        min_in = inv_stdv * (centered_x - self.bin_width/2)  # sigma' * (x - mu - 1/255)
-        cdf_min = torch.sigmoid(min_in)  # S(sigma' * (x - mu - 1/255)) == 1 / (1 + exp(sigma' * (x - mu - 1/255))
+        # sigma' * (x - mu - 1/255)
+        min_in = inv_stdv * (centered_x - self.bin_width/2)
+        # S(sigma' * (x - mu - 1/255)) == 1 / (1 + exp(sigma' * (x - mu - 1/255))
+        cdf_min = torch.sigmoid(min_in)
         # the following two follow from the definition of the logistic distribution
-        log_cdf_plus = plus_in - F.softplus(plus_in)  # log probability for edge case of 0
-        log_one_minus_cdf_min = -F.softplus(min_in)  # log probability for edge case of 255
+        # log probability for edge case of 0
+        log_cdf_plus = plus_in - F.softplus(plus_in)
+        # log probability for edge case of 255
+        log_one_minus_cdf_min = -F.softplus(min_in)
         # NCKHW, P^k(c)
-        cdf_delta = cdf_plus - cdf_min  # probability for all other cases, essentially log_cdf_plus + log_one_minus_cdf_min
+        # probability for all other cases, essentially log_cdf_plus + log_one_minus_cdf_min
+        cdf_delta = cdf_plus - cdf_min
 
         # NOTE: the original code has another condition here:
         #   tf.where(cdf_delta > 1e-5,
@@ -201,10 +229,10 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
 
         # combine with pi, NCKHW, (-inf, 0]
         log_probs_weighted = log_probs.add(
-                log_softmax(logit_pis, dim=2))  # (-inf, 0]
+            log_softmax(logit_pis, dim=2))  # (-inf, 0]
 
         # final log(P), NCHW
-        return -log_sum_exp(log_probs_weighted, dim=2)  # NCHW
+        return -log_sum_exp(log_probs_weighted, dim=2).sum()  # NCHW
 
     def _extract_non_shared(self, x, l):
         """
@@ -229,18 +257,24 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
 
         logit_probs = l[:, 0, ...]  # NCKHW
         means = l[:, 1, ...]  # NCKHW
-        log_scales = torch.clamp(l[:, 2, ...], min=_LOG_SCALES_MIN)  # NCKHW, is >= -7
+        log_scales = torch.clamp(
+            l[:, 2, ...], min=_LOG_SCALES_MIN)  # NCKHW, is >= -7
         x = x.reshape(N, C, 1, H, W)
 
         if self.use_coeffs:
             assert C == 3  # Coefficients only supported for C==3, see note where we define _NUM_PARAMS_RGB
-            coeffs = self._nonshared_coeffs_act(l[:, 3, ...])  # NCKHW, basically coeffs_g_r, coeffs_b_r, coeffs_b_g
-            means_r, means_g, means_b = means[:, 0, ...], means[:, 1, ...], means[:, 2, ...]  # each NKHW
-            coeffs_g_r,  coeffs_b_r, coeffs_b_g = coeffs[:, 0, ...], coeffs[:, 1, ...], coeffs[:, 2, ...]  # each NKHW
+            # NCKHW, basically coeffs_g_r, coeffs_b_r, coeffs_b_g
+            coeffs = self._nonshared_coeffs_act(l[:, 3, ...])
+            # each NKHW
+            means_r, means_g, means_b = means[:,
+                                              0, ...], means[:, 1, ...], means[:, 2, ...]
+            # each NKHW
+            coeffs_g_r,  coeffs_b_r, coeffs_b_g = coeffs[:,
+                                                         0, ...], coeffs[:, 1, ...], coeffs[:, 2, ...]
             means = torch.stack(
-                    (means_r,
-                     means_g + coeffs_g_r * x[:, 0, ...],
-                     means_b + coeffs_b_r * x[:, 0, ...] + coeffs_b_g * x[:, 1, ...]), dim=1)  # NCKHW again
+                (means_r,
+                 means_g + coeffs_g_r * x[:, 0, ...],
+                 means_b + coeffs_b_r * x[:, 0, ...] + coeffs_b_g * x[:, 1, ...]), dim=1)  # NCKHW again
 
         assert means.shape == (N, C, K, H, W), (means.shape, (N, C, K, H, W))
         return x, logit_probs, means, log_scales, K
@@ -257,10 +291,12 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
         l = l.reshape(N, self._num_params, C, K, H, W)
         logit_probs_c = l[:, 0, c, ...]  # NKHW
         means_c = l[:, 1, c, ...]  # NKHW
-        log_scales_c = torch.clamp(l[:, 2, c, ...], min=_LOG_SCALES_MIN)  # NKHW, is >= -7
+        log_scales_c = torch.clamp(
+            l[:, 2, c, ...], min=_LOG_SCALES_MIN)  # NKHW, is >= -7
 
         if self.use_coeffs and c != 0:
-            unscaled_coeffs = l[:, 3, ...]  # NCKHW, coeffs_g_r, coeffs_b_r, coeffs_b_g
+            # NCKHW, coeffs_g_r, coeffs_b_r, coeffs_b_g
+            unscaled_coeffs = l[:, 3, ...]
             if c == 1:
                 assert x is not None
                 coeffs_g_r = torch.sigmoid(unscaled_coeffs[:, 0, ...])  # NKHW
@@ -269,7 +305,8 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
                 assert x is not None
                 coeffs_b_r = torch.sigmoid(unscaled_coeffs[:, 1, ...])  # NKHW
                 coeffs_b_g = torch.sigmoid(unscaled_coeffs[:, 2, ...])  # NKHW
-                means_c += coeffs_b_r * x[:, 0, ...] + coeffs_b_g * x[:, 1, ...]
+                means_c += coeffs_b_r * \
+                    x[:, 0, ...] + coeffs_b_g * x[:, 1, ...]
 
         #      NKHW           NKHW     NKHW
         return logit_probs_c, means_c, log_scales_c, K
@@ -285,25 +322,27 @@ class DiscretizedMixLogisticLoss(vis.summarizable_module.SummarizableModule):
         # sample mixture indicator from softmax
         u = torch.zeros_like(logit_probs).uniform_(1e-5, 1. - 1e-5)  # NCKHW
         sel = torch.argmax(
-                logit_probs - torch.log(-torch.log(u)),  # gumbel sampling
-                dim=2)  # argmax over K, results in NCHW, specifies for each c: which of the K mixtures to take
+            logit_probs - torch.log(-torch.log(u)),  # gumbel sampling
+            dim=2)  # argmax over K, results in NCHW, specifies for each c: which of the K mixtures to take
         assert sel.shape == (N, C, H, W), (sel.shape, (N, C, H, W))
 
         sel = sel.unsqueeze(2)  # NC1HW
 
         means = torch.gather(l[:, 1, ...], 2, sel).squeeze(2)
-        log_scales = torch.clamp(torch.gather(l[:, 2, ...], 2, sel).squeeze(2), min=_LOG_SCALES_MIN)
+        log_scales = torch.clamp(torch.gather(
+            l[:, 2, ...], 2, sel).squeeze(2), min=_LOG_SCALES_MIN)
 
         # sample from the resulting logistic, which now has essentially 1 mixture component only.
         # We use inverse transform sampling. i.e. X~logistic; generate u ~ Unfirom; x = CDF^-1(u),
         #  where CDF^-1 for the logistic is CDF^-1(y) = \mu + \sigma * log(y / (1-y))
         u = torch.zeros_like(means).uniform_(1e-5, 1. - 1e-5)  # NCHW
-        x = means + torch.exp(log_scales) * (torch.log(u) - torch.log(1. - u))  # NCHW
+        x = means + torch.exp(log_scales) * \
+            (torch.log(u) - torch.log(1. - u))  # NCHW
 
         if self.use_coeffs:
             assert C == 3
 
-            clamp = lambda x_: torch.clamp(x_, 0, 255.)
+            def clamp(x_): return torch.clamp(x_, 0, 255.)
 
             # Be careful about coefficients! We need to use the correct selection mask, namely the one for the G and
             #  B channels, as we update the G and B means! Doing torch.gather(l[:, 3, ...], 2, sel) would be completly
@@ -339,34 +378,34 @@ def log_softmax(logit_probs, dim):
 
 def log_sum_exp(log_probs, dim):
     """ numerically stable log_sum_exp implementation that prevents overflow """
-    m, _        = torch.max(log_probs, dim=dim)
-    m_keep, _   = torch.max(log_probs, dim=dim, keepdim=True)
+    m, _ = torch.max(log_probs, dim=dim)
+    m_keep, _ = torch.max(log_probs, dim=dim, keepdim=True)
     # == m + torch.log(torch.sum(torch.exp(log_probs - m_keep), dim=dim))
     return log_probs.sub_(m_keep).exp_().sum(dim=dim).log_().add(m)
 
 
-def _visualize_params(logits_pis, means, log_scales, channel):
-    """
-    :param logits_pis:  NCKHW
-    :param means: NCKHW
-    :param log_scales: NCKHW
-    :param channel: int
-    :return:
-    """
-    assert logits_pis.shape == means.shape == log_scales.shape
-    logits_pis = logits_pis[0, channel, ...].detach()
-    means = means[0, channel, ...].detach()
-    log_scales = log_scales[0, channel, ...].detach()
+# def _visualize_params(logits_pis, means, log_scales, channel):
+#     """
+#     :param logits_pis:  NCKHW
+#     :param means: NCKHW
+#     :param log_scales: NCKHW
+#     :param channel: int
+#     :return:
+#     """
+#     assert logits_pis.shape == means.shape == log_scales.shape
+#     logits_pis = logits_pis[0, channel, ...].detach()
+#     means = means[0, channel, ...].detach()
+#     log_scales = log_scales[0, channel, ...].detach()
 
-    pis = torch.softmax(logits_pis, dim=0)  # Kdim==0 -> KHW
+#     pis = torch.softmax(logits_pis, dim=0)  # Kdim==0 -> KHW
 
-    mixtures = ft.lconcat(
-            zip(_iter_Kdim_normalized(pis, normalize=False),
-                _iter_Kdim_normalized(means),
-                _iter_Kdim_normalized(log_scales)))
-    grid = vis.grid.prep_for_grid(mixtures)
-    img = torchvision.utils.make_grid(grid, nrow=3)
-    return img
+#     mixtures = lconcat(
+#         zip(_iter_Kdim_normalized(pis, normalize=False),
+#             _iter_Kdim_normalized(means),
+#             _iter_Kdim_normalized(log_scales)))
+#     grid = vis.grid.prep_for_grid(mixtures)
+#     img = torchvision.utils.make_grid(grid, nrow=3)
+#     return img
 
 
 def _iter_Kdim_normalized(t, normalize=True):
@@ -379,4 +418,3 @@ def _iter_Kdim_normalized(t, normalize=True):
 
     for k in range(min(_MAX_K_FOR_VIS, K)):
         yield t[k, ...]  # HW
-

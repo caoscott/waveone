@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
+from waveone.prob_clf import AtrousProbabilityClassifier
 from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
                                    outconv, revnet_block, up, upconv, LambdaModule, ResBlock)
 from collections import defaultdict
@@ -254,6 +255,77 @@ class ResNetDecoder(nn.Module):
         }
 
 
+class LosslessDecoder(nn.Module):
+    def __init__(
+            self,
+            in_ch: int, 
+            out_ch: int, 
+            resblocks: int, 
+            use_context: bool
+    ) -> None:
+        super().__init__()
+        self.use_context = use_context
+        self.decode_to_context = nn.Sequential(
+            nn.ConvTranspose2d(in_ch, 128, 4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            *[ResBlock(128, 128) for _ in range(resblocks)],
+            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(64),
+        )
+        self.context_to_output = nn.Sequential(
+            *[ResBlock(64, 64) for _ in range(resblocks)]
+        )
+        self.residual = nn.Sequential(
+            nn.ConvTranspose2d(64, out_ch, 4, stride=2, padding=1, bias=True),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(inplace=True),
+            AtrousProbabilityClassifier(),
+        )
+        self.flow = nn.Sequential(
+            nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(64, 2, 1),
+        )
+
+    def forward(  # type: ignore
+            self,
+            input_tuple: Tuple[torch.Tensor, torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        x, context_vec = input_tuple
+        x = self.decode_to_context(x)
+        if self.use_context:
+            x = new_context_vec = F.leaky_relu(x)
+        else:
+            x = F.leaky_relu(x)
+            new_context_vec = torch.zeros_like(x)
+
+        x = self.context_to_output(x)
+        f = self.flow(x).permute(0, 2, 3, 1) * 25
+        r = self.residual(x) * 2
+
+        assert f.shape[-1] == 2
+
+        grid_normalize = torch.tensor(
+            f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, 2).to(x.device)
+        identity_theta = torch.tensor(
+            IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
+        f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
+            identity_theta, r.shape, align_corners=True)
+        # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
+        #    align_corners=True)
+        # if self.training is False:
+        # f_grid = f_grid.clamp(-1., 1.)
+
+        return {
+            "flow": f,
+            "flow_grid": f_grid,
+            "residuals": r,
+            "context_vec": new_context_vec
+        }
+
+
 class WaveoneModel(nn.Module):
     NAMES = ("encoder", "binarizer", "decoder")
 
@@ -263,6 +335,7 @@ class WaveoneModel(nn.Module):
                  decoder: nn.Module,
                  train_type: str,
                  use_context: bool,
+                 lossless: bool,
                  flow_loss_fn: nn.Module,
                  reconstructed_loss_fn: nn.Module
                  ) -> None:
@@ -272,6 +345,7 @@ class WaveoneModel(nn.Module):
         self.decoder = decoder
         self.train_type = train_type
         self.use_context = use_context
+        self.lossless = lossless
         self.flow_loss_fn = flow_loss_fn
         self.reconstructed_loss_fn = reconstructed_loss_fn
 
@@ -302,26 +376,30 @@ class WaveoneModel(nn.Module):
                 align_corners=True,
                 padding_mode="border",
             ) if "flow" in self.train_type else frame1
+            if collect_output:
+                out_collector["flow_frame2"].append(flow_frame2.cpu())
 
-            reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
-                if "residual" in self.train_type \
-                else flow_frame2
+            if self.lossless is False:
+                reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
+                    if "residual" in self.train_type \
+                    else flow_frame2
+                if collect_output:
+                    out_collector["reconstructed_frame2"].append(
+                        reconstructed_frame2.cpu())
 
             if self.training is True:  # type: ignore
                 loss += self.flow_loss_fn(frame2, flow_frame2)
-                loss += self.reconstructed_loss_fn(frame2,
-                                                   reconstructed_frame2)
-
-            if collect_output:
-                out_collector["flow_frame2"].append(flow_frame2.cpu())
-                out_collector["reconstructed_frame2"].append(
-                    reconstructed_frame2.cpu())
+                loss += self.reconstructed_loss_fn(
+                    frame2 - flow_frame2,
+                    decoder_out["residuals"])
 
             for k, v in decoder_out.items():
                 out_collector[k].append(v.cpu())
 
-            frame1 = (reconstructed_frame2 if reuse_frame and
-                      iter_i % iframe_iter != 0 else frame2)
+            frame1 = (reconstructed_frame2 
+                      if reuse_frame and iter_i % iframe_iter != 0 
+                      and self.lossless is False 
+                      else frame2)
             context_vec = decoder_out["context_vec"]
             if detach:
                 frame1 = frame1.detach()
@@ -329,79 +407,6 @@ class WaveoneModel(nn.Module):
             **{k: torch.stack(v) for k, v in out_collector.items()},
             **({"loss": loss / (frames.shape[0]-1)} if self.training else {}),
         }
-
-
-# class BitToContextDecoder(nn.Module):
-#     def __init__(self) -> None:
-#         super().__init__()
-#         self.ups = nn.Sequential(
-#             upconv(512, 512, bilinear=False),
-#             upconv(512, 512, bilinear=False),
-#             upconv(512, 512, bilinear=False),
-#             outconv(512, 512),
-#         )
-
-#     def forward(  # type: ignore
-#         self,
-#         input_tuple: Tuple[torch.Tensor, torch.Tensor]
-#     ) -> Tuple[torch.Tensor, torch.Tensor]:
-#         x, context_vec = input_tuple
-#         add_to_context = self.ups(x)
-#         return add_to_context, (context_vec + add_to_context).clamp(-1., 1.)
-#         # TODO: Feed in both x and context_vec
-
-
-# class ContextToFlowDecoder(nn.Module):
-#     IDENTITY_TRANSFORM = [[[1., 0., 0.], [0., 1., 0.]]]
-
-#     def __init__(self, out_ch: int) -> None:
-#         super().__init__()
-#         self.flow = nn.Sequential(
-#             upconv(1024, 128, bilinear=False),
-#             nn.Conv2d(128, 2, kernel_size=1, bias=False),
-#             nn.Tanh(),
-#         )
-#         self.residual = nn.Sequential(
-#             upconv(1024, 128, bilinear=False),
-#             nn.Conv2d(128, out_ch, kernel_size=1, bias=False),
-#             nn.Tanh(),
-#         )
-
-#     def forward(  # type: ignore
-#         self,
-#         input_tuple: Tuple[torch.Tensor, torch.Tensor]
-#     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-#         _, context = input_tuple
-#         x = torch.cat(input_tuple, dim=1)
-#         r = self.residual(x) * 2
-#         identity_theta = torch.tensor(
-#             ContextToFlowDecoder.IDENTITY_TRANSFORM * x.shape[0]).cuda()
-#         # f = self.flow(x).permute(0, 2, 3, 1) + \
-#         # F.affine_grid(identity_theta, r.shape)
-#         f = F.affine_grid(identity_theta, r.shape)  # type: ignore
-#         return f, r, context
-
-
-# class Binarizer(nn.Module):
-#     def __init__(
-#         self,
-#         in_ch: int,
-#         bits: int,
-#         use_binarizer: bool = True
-#     ) -> None:
-#         super().__init__()
-#         self.conv = nn.Conv2d(in_ch, bits, kernel_size=1, bias=False)
-#         self.sign = Sign()
-#         self.tanh = nn.Tanh()
-#         self.use_binarizer = use_binarizer
-
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
-#         x = self.conv(x)
-#         x = self.tanh(x)
-#         if self.use_binarizer:
-#             return self.sign(x)
-#         else:
-#             return x
 
 
 class AutoencoderUNet(nn.Module):
