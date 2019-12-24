@@ -114,7 +114,7 @@ def run_eval(
             )
             if "lossless" in args.network:
                 bpsps.append(model_out["bpsp"].item())
-            for key in ("flow_frame2", "residuals", "context_vec"):
+            for key in ("flow_frame2", "context_vec"):
                 eval_out_collector[key].append(model_out[key].cpu() * masks)
             eval_out_collector["frames"].append(frames)
             eval_out_collector["masks"].append(masks)
