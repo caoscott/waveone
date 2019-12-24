@@ -42,10 +42,10 @@ class ImageList(data.Dataset):
             indexed_paths = self.img_paths
         elif self.sampling_range > 0:
             idx_sampling_range = min(
-                self.sampling_range, len(self.imgs)-index)
+                self.sampling_range, len(self.img_paths)-index)
             offsets = np.random.permutation(idx_sampling_range)[
                 :self.frame_len]
-            indexed_paths = tuple(self.img_fns[index + offset]
+            indexed_paths = tuple(self.img_paths[index + offset]
                                   for offset in np.sort(offsets))
         else:
             indexed_paths = self.img_paths[index: index+self.frame_len]
@@ -67,7 +67,7 @@ class ImageList(data.Dataset):
 
         if self.padding_len > 0:
             frames += tuple(  # type: ignore
-                torch.zeros_like(self.imgs[0])) * self.padding_len
+                torch.zeros_like(frames[0])) * self.padding_len
             existence_mask += (tuple(  # type: ignore
                 torch.zeros((1, 1, 1, 1))) * self.padding_len
             )
