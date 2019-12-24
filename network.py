@@ -366,7 +366,7 @@ class WaveoneModel(nn.Module):
         if self.use_context:
             context_vec = context_vec.to(device)
         loss: torch.Tensor = 0.  # type: ignore
-        bpsp: torch.Tensor = 0.
+        bpsp: torch.Tensor = 0.  # type: ignore
         out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
         for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
             frame2: torch.Tensor = frame2.to(device)  # type: ignore
@@ -393,7 +393,8 @@ class WaveoneModel(nn.Module):
 
             bpsp += self.reconstructed_loss_fn(
                 ((frame2 - flow_frame2 + 1) * 127.5).round().clamp(0, 255),
-                decoder_out["residuals"]) / (torch.log(2) if self.lossless else 1)
+                decoder_out["residuals"]) / (torch.log(2)  # type: ignore
+                                             if self.lossless else 1)
             loss += self.flow_loss_fn(frame2, flow_frame2)
 
             for k, v in decoder_out.items():
