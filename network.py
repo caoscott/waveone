@@ -3,6 +3,7 @@
 from collections import defaultdict
 from typing import DefaultDict, Dict, List, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -393,7 +394,7 @@ class WaveoneModel(nn.Module):
 
             bpsp += self.reconstructed_loss_fn(
                 ((frame2 - flow_frame2 + 1) * 127.5).round().clamp(0, 255),
-                decoder_out["residuals"]) / (torch.log(2)  # type: ignore
+                decoder_out["residuals"]) / (np.log(2)
                                              if self.lossless else 1)
             loss += self.flow_loss_fn(frame2, flow_frame2)
 
