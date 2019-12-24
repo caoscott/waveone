@@ -1,8 +1,8 @@
 import argparse
 import glob
 import os
-from collections import defaultdict
 import sys
+from collections import defaultdict
 from typing import DefaultDict, Dict, Iterator, List, Tuple, Union
 
 import numpy as np
@@ -15,11 +15,11 @@ import torch.utils.data as data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import save_image
 
-from waveone.dataset import get_loaders
+from waveone.dataset import get_loader
 from waveone.losses import MSSSIM, CharbonnierLoss, TotalVariation, msssim
-from waveone.network import (CAE, AutoencoderUNet,
-                             ResNetEncoder, ResNetDecoder, SmallBinarizer,
-                             SmallDecoder, SmallEncoder, UNet, WaveoneModel)
+from waveone.network import (CAE, AutoencoderUNet, ResNetDecoder,
+                             ResNetEncoder, SmallBinarizer, SmallDecoder,
+                             SmallEncoder, UNet, WaveoneModel)
 from waveone.network_parts import LambdaModule
 from waveone.train_options import parser
 
@@ -86,7 +86,7 @@ def get_loss_fn(loss_type: str) -> nn.Module:
 def log_context_vec(context_vec: torch.Tensor, writer: SummaryWriter, epoch: int) -> None:
     writer.add_histogram(
         "context_vec_l1_norm_diff",
-        context_vec[-1].abs().max() - context_vec[0].abs().max(), 
+        context_vec[-1].abs().max() - context_vec[0].abs().max(),
         epoch,
     )
 
@@ -241,7 +241,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         return WaveoneModel(
             resnet_encoder, resnet_binarizer, resnet_decoder, args.train_type,
             use_context, flow_loss_fn, reconstructed_loss_fn,
-        ) 
+        )
     raise ValueError(f"No model type named {args.network}.")
 
 
@@ -259,6 +259,10 @@ def train(args) -> nn.Module:
     assert train_subset_paths
     eval_paths = glob.glob(args.eval)
     assert eval_paths
+    train_loader = get_loader(train_paths, is_train=True, args=args)
+    train_subset_loader = get_loader(
+        train_subset_paths, is_train=False, args=args)
+    eval_loader = get_loader(eval_paths, is_train=False, args=args)
 
     writer = SummaryWriter(f"runs/{args.save_model_name}", purge_step=0)
 
@@ -341,31 +345,18 @@ def train(args) -> nn.Module:
             plot_scores(writer, scores, train_iter)
             log_flow(writer, model_out["flow"])
 
-
     for epoch in range(args.max_train_epochs):
-        for train_loader in get_loaders(train_paths, is_train=True, args=args):
-            for _ in range(args.iters_per_epoch):
-                for frames, _ in train_loader:
-                    train_iter += 1
-                    train_loop(frames, log_iter=max(len(train_loader)//5, 1))
-            del train_loader
+        for frames, _ in train_loader:
+            train_iter += 1
+            train_loop(frames, log_iter=max(len(train_loader)//5, 1))
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)
 
         if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            for eval_idx, eval_loader in enumerate(get_loaders(
-                eval_paths, is_train=False, args=args
-            )):
-                run_eval(f"eval{eval_idx}", eval_loader,
-                         model, epoch, args, writer)
-                del eval_loader
-            for training_idx, train_subset_loader in enumerate(get_loaders(
-                train_subset_paths, is_train=False, args=args
-            )):
-                run_eval(f"training{training_idx}", train_subset_loader,
-                         model, epoch, args, writer)
-                del train_subset_loader
+            run_eval("eval", eval_loader, model, epoch, args, writer)
+            run_eval("training", train_subset_loader,
+                     model, epoch, args, writer)
             scheduler.step()  # type: ignore
             just_resumed = False
 

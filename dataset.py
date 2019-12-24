@@ -8,7 +8,6 @@ from collections import defaultdict
 from typing import DefaultDict, Dict, Iterator, List, Tuple
 
 import cv2
-import hickle as hkl
 import numpy as np
 import torch
 import torch.utils.data as data
@@ -17,17 +16,17 @@ import torch.utils.data as data
 class ImageList(data.Dataset):
     def __init__(
         self,
-        imgs: Tuple[np.ndarray, ...],
+        img_paths: List[str],
         is_train: bool,
         args: argparse.Namespace,
         frame_len: int,
         sampling_range: int,
     ) -> None:
         super().__init__()
-        self.imgs = imgs
+        self.img_paths = img_paths
         self.is_train = is_train
         self.frame_len = frame_len
-        self.padding_len = max(frame_len - len(imgs), 0)
+        self.padding_len = max(frame_len - len(img_paths), 0)
         self.sampling_range = sampling_range
         self.args = args
 
@@ -36,21 +35,23 @@ class ImageList(data.Dataset):
         # assert len(self.imgs) >= self.frame_len
 
     def __getitem__(
-            self, 
+            self,
             index: int
     ) -> Tuple[Tuple[torch.Tensor, ...], Tuple[torch.Tensor, ...]]:
         if self.padding_len > 0:
-            images = self.imgs
+            indexed_paths = self.img_paths
         elif self.sampling_range > 0:
             idx_sampling_range = min(
                 self.sampling_range, len(self.imgs)-index)
             offsets = np.random.permutation(idx_sampling_range)[
                 :self.frame_len]
-            images = tuple(self.imgs[index + offset]
-                           for offset in np.sort(offsets))
+            indexed_paths = tuple(self.img_fns[index + offset]
+                                  for offset in np.sort(offsets))
         else:
-            images = self.imgs[index: index+self.frame_len]
+            indexed_paths = self.img_paths[index: index+self.frame_len]
 
+        images = tuple(default_loader(image_name)
+                       for image_name in indexed_paths)
         if self.is_train:
             # images = contrast_cv2(brightness_cv2(flip_cv2(images)))
             images = flip_cv2(images)
@@ -83,7 +84,7 @@ class ImageList(data.Dataset):
     def __len__(self) -> int:
         if self.padding_len > 0:
             return 1
-        return len(self.imgs) - self.frame_len + 1
+        return len(self.img_paths) - self.frame_len + 1
 
 
 class RandomVidSequenceSampler(data.Sampler):
@@ -106,68 +107,55 @@ class RandomVidSequenceSampler(data.Sampler):
         return self.num_samples
 
 
-# def get_vid_id(filename: str) -> str:
-#     return "_".join(filename.split("_")[:-1])
+def get_vid_id(filename: str) -> str:
+    return "_".join(filename.split("_")[:-1])
 
 
-def get_loaders(
+def get_loader(
         paths: List[str],
         is_train: bool,
         args: argparse.Namespace,
-) -> Iterator[data.DataLoader]:
-    for hkl_path in paths:
-        image_list = load_hkl_images(hkl_path)
-        max_frame_len = max(len(images) for images in image_list)
-        datasets = convert_images_to_datasets(
-            image_list,
+) -> data.DataLoader:
+    id_to_filepaths = get_id_to_filepaths(is_train, paths)
+    max_frame_len = max(len(filepaths)
+                        for filepaths in id_to_filepaths.values())
+    datasets = tuple(
+        ImageList(
+            filepaths,
             is_train=is_train,
             args=args,
             frame_len=args.frame_len if is_train else max_frame_len,
             sampling_range=args.sampling_range if is_train else 0,
-        )
-        concat_dataset: data.Dataset = data.ConcatDataset(datasets)
-        loader = data.DataLoader(
-            concat_dataset,
-            batch_size=args.batch_size,
-            sampler=RandomVidSequenceSampler(concat_dataset, args.frame_len),
-            num_workers=1,
-            drop_last=True,
-        ) if is_train else data.DataLoader(
-            concat_dataset,
-            batch_size=args.eval_batch_size,
-            shuffle=False,
-            num_workers=1,
-            drop_last=False,
-        )
-        print('Loader for {} sequences ({} batches) created.'.format(
-            len(concat_dataset), len(loader))
-        )
-        yield loader
+        ) for filepaths in id_to_filepaths.values()
+    )
+    concat_dataset: data.Dataset = data.ConcatDataset(datasets)
+    loader = data.DataLoader(
+        concat_dataset,
+        batch_size=args.batch_size,
+        sampler=RandomVidSequenceSampler(concat_dataset, args.frame_len),
+        num_workers=6,
+        drop_last=True,
+    ) if is_train else data.DataLoader(
+        concat_dataset,
+        batch_size=args.eval_batch_size,
+        shuffle=False,
+        num_workers=2,
+        drop_last=False,
+    )
+    print('Loader for {} sequences ({} batches) created.'.format(
+        len(concat_dataset), len(loader))
+    )
+    return loader
 
 
-# def get_master_loader(
-#         image_lists: List[ImageList],
-#         is_train: bool,
-#         args: argparse.Namespace,
-# ) -> data.DataLoader:
-#     print("Creating ConcatDataset")
-#     dataset: data.Dataset = data.ConcatDataset(image_lists)
-#     print("ConcatDataset finished.")
-#     loader = data.DataLoader(
-#         dataset,
-#         batch_size=args.batch_size,
-#         sampler=RandomVidSequenceSampler(dataset, args.frame_len),
-#         num_workers=4,
-#         drop_last=is_train,
-#     ) if is_train else data.DataLoader(
-#         dataset,
-#         batch_size=args.eval_batch_size,
-#         shuffle=False,
-#         num_workers=2,
-#         drop_last=False,
-#     )
-#     print(f'Loader for {len(dataset)} images ({len(loader)} batches) created.')
-#     return loader
+def default_loader(path: str) -> np.ndarray:
+    cv2_img = cv2.imread(path)
+    if cv2_img.shape is None:
+        print(path)
+        print(cv2_img)
+    else:
+        cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
+    return cv2_img
 
 
 def square_cv2(img: np.ndarray) -> np.ndarray:
@@ -205,7 +193,7 @@ def flip_cv2(imgs: Tuple[np.ndarray, ...]) -> Tuple[np.ndarray, ...]:
 def brightness_cv2(imgs: Tuple[np.ndarray, ...]) -> Tuple[np.ndarray, ...]:
     brightness_factor = np.random.random() * 0.5 + 0.75
     return tuple((img.astype(np.float32)*brightness_factor).clip(min=0, max=255).astype(img.dtype)
-            for img in imgs)
+                 for img in imgs)
 
 
 def contrast_cv2(imgs: Tuple[np.ndarray, ...]) -> Tuple[np.ndarray, ...]:
@@ -243,20 +231,13 @@ def np_to_torch(img: np.ndarray) -> torch.Tensor:
 #         return 0
 
 
-def load_hkl_images(filepath: str) -> List[Tuple[np.ndarray, ...]]:
-    # print(f"Loading {filepath}.")
-    image_list = hkl.load(filepath)
-    return image_list
-
-
-def convert_images_to_datasets(
-        image_list: List[Tuple[np.ndarray, ...]],
-        is_train: bool,
-        args: argparse.Namespace,
-        frame_len: int,
-        sampling_range: int,
-) -> List[ImageList]:
-    datasets = [ImageList(
-        imgs, is_train, args, frame_len, sampling_range,
-    ) for imgs in image_list]
-    return datasets
+def get_id_to_filepaths(
+        is_train: bool, paths: List[str],
+) -> Dict[str, List[str]]:
+    id_to_file_paths: DefaultDict[str, List[str]] = defaultdict(list)
+    for filepath in paths:
+        vid_id = get_vid_id(filepath)
+        id_to_file_paths[vid_id].append(filepath)
+    for file_paths in id_to_file_paths.values():
+        file_paths.sort()
+    return id_to_file_paths
