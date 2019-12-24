@@ -111,18 +111,17 @@ def run_eval(
                 frames, iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False, collect_output=True,
             )
-            for key in ("flow_frame2", "reconstructed_frame2", "context_vec"):
+            for key in ("flow_frame2", "residuals", "context_vec"):
                 eval_out_collector[key].append(model_out[key].cpu() * masks)
             eval_out_collector["frames"].append(frames)
             eval_out_collector["masks"].append(masks)
         eval_out = {k: torch.cat(v, dim=1)
                     for k, v in eval_out_collector.items()}
-        for batch_i in range(eval_out["reconstructed_frame2"].shape[1]):
-            for seq_i in range(eval_out["reconstructed_frame2"].shape[0]):
+        for batch_i in range(eval_out["flow_frame2"].shape[1]):
+            for seq_i in range(eval_out["flow_frame2"].shape[0]):
                 frames = torch.stack([
                     eval_out["frames"][seq_i+1, batch_i],
                     eval_out["flow_frame2"][seq_i, batch_i],
-                    eval_out["reconstructed_frame2"][seq_i, batch_i],
                 ])
                 save_tensor_as_img(
                     frames, f"{eval_name}_{batch_i}_{seq_i}", args)
@@ -138,15 +137,22 @@ def run_eval(
                 f"{eval_name}_previous_frame"
             ),
             **eval_scores(
-                eval_out["frames"][1:
-                                   ], eval_out["flow_frame2"], f"{eval_name}_flow"
-            ),
-            **eval_scores(
-                eval_out["frames"][1:], eval_out["reconstructed_frame2"],
-                f"{eval_name}_reconstructed"
+                eval_out["frames"][1:],
+                eval_out["flow_frame2"], f"{eval_name}_flow"
             ),
         }
 
+        if "lossless" in args.network:
+            nll = DiscretizedMixLogisticLoss(
+                rgb_scale=True)(
+                    frames[1:] - eval_out["flow_frame2"],
+                    eval_out["residuals"]
+            ).sum().item()
+            num_subpixels = int(np.prod(frames[1:].shape))
+            total_scores[f"{eval_name}_bpsp"] = nll / (
+                np.log(2.) * num_subpixels)
+            total_scores[f"{eval_name}_total_bpsp"] = (
+                nll + args.bits) / (np.log(2.) * num_subpixels)
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
         log_context_vec(eval_out["context_vec"], writer, epoch)
@@ -222,7 +228,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         })
         return WaveoneModel(
             opt_encoder, opt_binarizer, opt_decoder, "residual",
-            False, flow_loss_fn, reconstructed_loss_fn,
+            False, False, flow_loss_fn, reconstructed_loss_fn,
         )
     if args.network == "small":
         small_encoder = SmallEncoder(6, args.bits)
@@ -230,23 +236,24 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         small_decoder = SmallDecoder(args.bits, 3)
         return WaveoneModel(
             small_encoder, small_binarizer, small_decoder, args.train_type,
-            False, flow_loss_fn, reconstructed_loss_fn,
+            False, False, flow_loss_fn, reconstructed_loss_fn,
         )
     if "resnet" in args.network:
         use_context = "ctx" in args.network
+        lossless = "lossless" in args.network
         resnet_encoder = ResNetEncoder(
             6, args.bits, resblocks=args.resblocks, use_context=use_context)
         resnet_binarizer = SmallBinarizer(not args.binarize_off)
         resnet_decoder = LosslessDecoder(
             args.bits, 3, resblocks=args.resblocks, use_context=use_context
-        ) if "lossless" in args.network else ResNetDecoder(
+        ) if lossless else ResNetDecoder(
             args.bits, 3, resblocks=args.resblocks, use_context=use_context
         )
-        if "lossless" in args.network:
+        if lossless:
             reconstructed_loss_fn = DiscretizedMixLogisticLoss(rgb_scale=True)
         return WaveoneModel(
             resnet_encoder, resnet_binarizer, resnet_decoder, args.train_type,
-            use_context, flow_loss_fn, reconstructed_loss_fn,
+            use_context, lossless, flow_loss_fn, reconstructed_loss_fn,
         )
     raise ValueError(f"No model type named {args.network}.")
 
@@ -324,9 +331,6 @@ def train(args) -> nn.Module:
             frames, iframe_iter=sys.maxsize, reuse_frame=True, detach=args.detach,
             collect_output=train_iter % log_iter == 0,
         )
-        # frame1 = model_out["reconstructed_frame"]
-        # if args.detach:
-        #     frame1 = frame1.detach()
 
         if args.network != "opt":
             model_out["loss"].backward()
@@ -340,8 +344,18 @@ def train(args) -> nn.Module:
                               "train_same_frame"),
                 **eval_scores(frames[1:], frames[:-1], "train_previous_frame"),
                 **eval_scores(frames[1:], model_out["flow_frame2"], "train_flow"),
-                #   "train_reconstructed"),
             }
+            if "lossless" in args.network:
+                nll = DiscretizedMixLogisticLoss(
+                    rgb_scale=True)(
+                        frames[1:] - model_out["flow_frame2"],
+                        model_out["residuals"]
+                ).sum().item()
+                num_subpixels = int(np.prod(frames[1:].shape))
+                scores["train_bpsp"] = nll / (np.log(2.) * num_subpixels)
+                scores[f"{eval_name}_total_bpsp"] = (
+                    nll + args.bits) / (np.log(2.) * num_subpixels)
+
             writer.add_scalar(
                 "training_loss", model_out["loss"].item(), train_iter,
             )
