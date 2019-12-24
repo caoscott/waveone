@@ -14,7 +14,7 @@ parser.add_argument('--eval', required=True, type=str,
                     help='Path to eval data.')
 
 ######## Model ########
-parser.add_argument('--bits', default=256, type=int,
+parser.add_argument('--bits', default=64, type=int,
                     help='Bottle neck size.')
 parser.add_argument('--binarize-off', action='store_true',
                     help='Turn off binarizer')
@@ -26,7 +26,7 @@ parser.add_argument('--train-type',
 parser.add_argument('--normalization', default='batch', type=str,
                     help='Set normalization in networks.')
 parser.add_argument('--network',
-                    choices=("unet", "opt", "cae", 
+                    choices=("unet", "opt", "cae",
                              "prednet", "small", "resnet", "resnet-ctx"),
                     help='Set network architecture.')
 
@@ -64,22 +64,22 @@ parser.add_argument('--out-dir', type=str, default='output',
                     help='Output directory (for compressed codes & output images).')
 parser.add_argument('--model-dir', type=str, default='model',
                     help='Path to model folder.')
-parser.add_argument('--load-model-name', type=str,
+parser.add_argument('--load-model', type=str,
                     help='Checkpoint name to load. (Do nothing if not specified.)')
 # parser.add_argument('--load-epoch', type=int,
 # help='Epoch of checkpoint to load.')
-parser.add_argument('--save-model-name', type=str, default='demo',
+parser.add_argument('--save-model', type=str, default='demo',
                     help='Checkpoint name to save.')
-parser.add_argument('--save-codes', action='store_true',
-                    help='If true, write compressed codes during eval.')
+# parser.add_argument('--save-codes', action='store_true',
+# help='If true, write compressed codes during eval.')
 parser.add_argument('--save-out-img', action='store_true',
                     help='If true, save output images during eval.')
 parser.add_argument('--checkpoint-epochs', type=int, default=2,
                     help='Model checkpoint period.')
 parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
-parser.add_argument('--plot-codes', action='store_true',
-                    help='If true, plot encoded bits from binarizer.')
+# parser.add_argument('--plot-codes', action='store_true',
+# help='If true, plot encoded bits from binarizer.')
 parser.add_argument('--iframe-iter', type=int, default=1000,
                     help='Set # of eval iterations for saving iframe.')
 parser.add_argument('--sampling-range', type=int, default=0,
@@ -90,8 +90,5 @@ parser.add_argument('--frame-len', type=int, default=3,
 parser.add_argument('--detach', action='store_true',
                     help='Detach gradients from previous frame when training from sequence of '
                          'frames. Used to make training more efficient.')
-parser.add_argument('--iters-per-epoch', type=int, default=1,
-                    help='Number of training iterations for every hickle file per epoch.'
-                         'Used to speed up training on large datasets stored over network.')
 parser.add_argument('--lr-step-size', type=int, default=50,
                     help='Number of epochs after which to multiply existing learning rate by 0.1.')
