@@ -45,8 +45,8 @@ class ImageList(data.Dataset):
                 self.sampling_range, len(self.img_paths)-index)
             offsets = np.random.permutation(idx_sampling_range)[
                 :self.frame_len]
-            indexed_paths = tuple(self.img_paths[index + offset]
-                                  for offset in np.sort(offsets))
+            indexed_paths = [self.img_paths[index + offset]
+                             for offset in np.sort(offsets)]
         else:
             indexed_paths = self.img_paths[index: index+self.frame_len]
 
@@ -115,6 +115,8 @@ def get_loader(
         paths: List[str],
         is_train: bool,
         args: argparse.Namespace,
+
+
 ) -> data.DataLoader:
     id_to_filepaths = get_id_to_filepaths(is_train, paths)
     max_frame_len = max(len(filepaths)
