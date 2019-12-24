@@ -353,7 +353,7 @@ def train(args) -> nn.Module:
                 ).sum().item()
                 num_subpixels = int(np.prod(frames[1:].shape))
                 scores["train_bpsp"] = nll / (np.log(2.) * num_subpixels)
-                scores[f"{eval_name}_total_bpsp"] = (
+                scores[f"train_total_bpsp"] = (
                     nll + args.bits) / (np.log(2.) * num_subpixels)
 
             writer.add_scalar(

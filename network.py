@@ -381,7 +381,7 @@ class WaveoneModel(nn.Module):
             if collect_output:
                 out_collector["flow_frame2"].append(flow_frame2.cpu())
 
-            reconstructed_frame2 = None
+            reconstructed_frame2 = torch.zeros_like(frame2)
             if self.lossless is False:
                 reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
                     if "residual" in self.train_type \
