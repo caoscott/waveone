@@ -393,7 +393,7 @@ class WaveoneModel(nn.Module):
             if self.training is True:  # type: ignore
                 loss += self.flow_loss_fn(frame2, flow_frame2)
                 loss += self.reconstructed_loss_fn(
-                    frame2 - flow_frame2,
+                    ((frame2 - flow_frame2 + 1) * 127.5).round().clamp(0, 255),
                     decoder_out["residuals"])
 
             for k, v in decoder_out.items():

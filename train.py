@@ -145,7 +145,8 @@ def run_eval(
         if "lossless" in args.network:
             nll = DiscretizedMixLogisticLoss(
                 rgb_scale=True)(
-                    frames[1:] - eval_out["flow_frame2"],
+                    ((frames[1:] - eval_out["flow_frame2"] + 1)
+                     * 127.5).round().clamp(0, 255),
                     eval_out["residuals"]
             ).sum().item()
             num_subpixels = int(np.prod(frames[1:].shape))
@@ -348,7 +349,8 @@ def train(args) -> nn.Module:
             if "lossless" in args.network:
                 nll = DiscretizedMixLogisticLoss(
                     rgb_scale=True)(
-                        frames[1:] - model_out["flow_frame2"],
+                        ((frames[1:] - model_out["flow_frame2"] + 1)
+                         * 127.5).round().clamp(0, 255),
                         model_out["residuals"]
                 ).sum().item()
                 num_subpixels = int(np.prod(frames[1:].shape))
