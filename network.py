@@ -279,7 +279,7 @@ class LosslessDecoder(nn.Module):
             *[ResBlock(64, 64) for _ in range(resblocks)]
         )
         self.residual = nn.Sequential(
-            nn.ConvTranspose2d(64, out_ch, 4, stride=2, padding=1, bias=True),
+            nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
             AtrousProbabilityClassifier(),
@@ -305,7 +305,7 @@ class LosslessDecoder(nn.Module):
 
         x = self.context_to_output(x)
         f = self.flow(x).permute(0, 2, 3, 1) * 25
-        r = self.residual(x) * 2
+        r = self.residual(x)
 
         assert f.shape[-1] == 2
 
