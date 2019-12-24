@@ -267,7 +267,9 @@ def train(args) -> nn.Module:
     writer = SummaryWriter(f"runs/{args.save_model}", purge_step=0)
 
     ############### Model ###############
-    model = get_model(args).cuda()
+    model = get_model(args)
+    print(model)
+    model = model.cuda()
     solver = optim.Adam(
         model.parameters() if args.network != "opt" else [torch.zeros((1,))],
         lr=args.lr,
