@@ -104,6 +104,7 @@ def run_eval(
     with torch.no_grad():
         eval_out_collector: DefaultDict[str,
                                         List[torch.Tensor]] = defaultdict(list)
+        bpsps = []
         for frame_list, mask_list in eval_loader:
             frames = torch.stack(frame_list)
             masks = torch.stack(mask_list[1:])
@@ -111,6 +112,8 @@ def run_eval(
                 frames, iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False, collect_output=True,
             )
+            if "lossless" in args.network:
+                bpsps.append(model_out["bpsp"].item())
             for key in ("flow_frame2", "residuals", "context_vec"):
                 eval_out_collector[key].append(model_out[key].cpu() * masks)
             eval_out_collector["frames"].append(frames)
@@ -143,17 +146,7 @@ def run_eval(
         }
 
         if "lossless" in args.network:
-            nll = DiscretizedMixLogisticLoss(
-                rgb_scale=True)(
-                    ((frames[1:] - eval_out["flow_frame2"] + 1)
-                     * 127.5).round().clamp(0, 255),
-                    eval_out["residuals"]
-            ).sum().item()
-            num_subpixels = int(np.prod(frames[1:].shape))
-            total_scores[f"{eval_name}_bpsp"] = nll / (
-                np.log(2.) * num_subpixels)
-            total_scores[f"{eval_name}_total_bpsp"] = (
-                nll + args.bits) / (np.log(2.) * num_subpixels)
+            total_scores[f"{eval_name}_bpsp"] = np.average(bpsps)
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
         log_context_vec(eval_out["context_vec"], writer, epoch)
@@ -347,16 +340,7 @@ def train(args) -> nn.Module:
                 **eval_scores(frames[1:], model_out["flow_frame2"], "train_flow"),
             }
             if "lossless" in args.network:
-                nll = DiscretizedMixLogisticLoss(
-                    rgb_scale=True)(
-                        ((frames[1:] - model_out["flow_frame2"] + 1)
-                         * 127.5).round().clamp(0, 255),
-                        model_out["residuals"]
-                ).sum().item()
-                num_subpixels = int(np.prod(frames[1:].shape))
-                scores["train_bpsp"] = nll / (np.log(2.) * num_subpixels)
-                scores[f"train_total_bpsp"] = (
-                    nll + args.bits) / (np.log(2.) * num_subpixels)
+                scores["train_bpsp"] = model_out["bpsp"]
 
             writer.add_scalar(
                 "training_loss", model_out["loss"].item(), train_iter,

@@ -34,9 +34,9 @@ Note that we use the following names through the code, following the code PixelC
       for the mixture weights.
 """
 
-from collections import namedtuple
 import functools
 import itertools
+from collections import namedtuple
 
 import torch
 import torch.nn as nn
@@ -232,7 +232,7 @@ class DiscretizedMixLogisticLoss(nn.Module):
             log_softmax(logit_pis, dim=2))  # (-inf, 0]
 
         # final log(P), NCHW
-        return -log_sum_exp(log_probs_weighted, dim=2).sum()  # NCHW
+        return -log_sum_exp(log_probs_weighted, dim=2).mean()  # NCHW
 
     def _extract_non_shared(self, x, l):
         """
