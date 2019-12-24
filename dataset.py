@@ -115,8 +115,6 @@ def get_loader(
         paths: List[str],
         is_train: bool,
         args: argparse.Namespace,
-
-
 ) -> data.DataLoader:
     id_to_filepaths = get_id_to_filepaths(is_train, paths)
     max_frame_len = max(len(filepaths)
@@ -126,7 +124,9 @@ def get_loader(
             filepaths,
             is_train=is_train,
             args=args,
-            frame_len=args.frame_len if is_train else max_frame_len,
+            frame_len=(
+                args.frame_len if is_train or ("lossless" in args.network)
+                else max_frame_len),
             sampling_range=args.sampling_range if is_train else 0,
         ) for filepaths in id_to_filepaths.values()
     )
