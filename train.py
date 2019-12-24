@@ -45,7 +45,7 @@ def save_tensor_as_img(
         args: argparse.Namespace,
         extension: str = "png",
 ) -> None:
-    output_dir = os.path.join(args.out_dir, args.save_model_name)
+    output_dir = os.path.join(args.out_dir, args.save_model)
     save_image(t / 2 + 0.5, os.path.join(output_dir, f"{name}.{extension}"))
 
 ############### Eval ###################
@@ -172,7 +172,7 @@ def resume(args: argparse.Namespace,
            model: nn.Module) -> None:
     checkpoint_path = os.path.join(
         args.model_dir,
-        args.load_model_name,
+        args.load_model,
         f"{args.network}.pth",
     )
 
@@ -184,7 +184,7 @@ def save(args: argparse.Namespace,
          model: nn.Module) -> None:
     checkpoint_path = os.path.join(
         args.model_dir,
-        args.save_model_name,
+        args.save_model,
         f'{args.network}.pth',
     )
     torch.save(model.state_dict(), checkpoint_path)
@@ -246,8 +246,8 @@ def get_model(args: argparse.Namespace) -> nn.Module:
 
 
 def train(args) -> nn.Module:
-    output_dir = os.path.join(args.out_dir, args.save_model_name)
-    model_dir = os.path.join(args.model_dir, args.save_model_name)
+    output_dir = os.path.join(args.out_dir, args.save_model)
+    model_dir = os.path.join(args.model_dir, args.save_model)
     create_directories((output_dir, model_dir))
 
     print(args)
@@ -264,7 +264,7 @@ def train(args) -> nn.Module:
         train_subset_paths, is_train=False, args=args)
     eval_loader = get_loader(eval_paths, is_train=False, args=args)
 
-    writer = SummaryWriter(f"runs/{args.save_model_name}", purge_step=0)
+    writer = SummaryWriter(f"runs/{args.save_model}", purge_step=0)
 
     ############### Model ###############
     model = get_model(args).cuda()
@@ -300,8 +300,8 @@ def train(args) -> nn.Module:
 
     train_iter = 0
     just_resumed = False
-    if args.load_model_name:
-        print(f'Loading {args.load_model_name}')
+    if args.load_model:
+        print(f'Loading {args.load_model}')
         resume(args, model)
         just_resumed = True
 
