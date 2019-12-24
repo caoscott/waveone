@@ -199,19 +199,24 @@ class ResNetDecoder(nn.Module):
     ) -> None:
         super().__init__()
         self.use_context = use_context
+        resblocks1 = resblocks // 2  # if use_context else resblocks - 1
+        resblocks2 = resblocks - resblocks1
         self.decode_to_context = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
-            nn.ReLU(),
-            *[ResBlock(128, 128) for _ in range(resblocks)],
+            nn.LeakyReLU(inplace=True),
+            *[ResBlock(128, 128) for _ in range(resblocks1)],
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64),
         )
         self.context_to_output = nn.Sequential(
-            *[ResBlock(64, 64) for _ in range(resblocks)]
+            *[ResBlock(64, 64) for _ in range(resblocks2)]
         )
         self.residual = nn.Sequential(
-            nn.ConvTranspose2d(64, out_ch, 4, stride=2, padding=1, bias=True),
+            nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(64, 3, 1),
             nn.Tanh(),
         )
         self.flow = nn.Sequential(
@@ -268,16 +273,18 @@ class LosslessDecoder(nn.Module):
     ) -> None:
         super().__init__()
         self.use_context = use_context
+        resblocks1 = resblocks // 2  # if use_context else resblocks - 1
+        resblocks2 = resblocks - resblocks1
         self.decode_to_context = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.ReLU(),
-            *[ResBlock(128, 128) for _ in range(resblocks)],
+            *[ResBlock(128, 128) for _ in range(resblocks1)],
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64),
         )
         self.context_to_output = nn.Sequential(
-            *[ResBlock(64, 64) for _ in range(resblocks)]
+            *[ResBlock(64, 64) for _ in range(resblocks2)]
         )
         self.residual = nn.Sequential(
             nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
