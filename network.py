@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # full assembly of the sub-parts to form the complete net
+from collections import defaultdict
 from typing import DefaultDict, Dict, List, Tuple
 
 import torch
@@ -7,9 +8,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
-from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
-                                   outconv, revnet_block, up, upconv, LambdaModule, ResBlock)
-from collections import defaultdict
+from waveone.network_parts import (ConvLSTMCell, LambdaModule, ResBlock, SatLU,
+                                   Sign, down, inconv, outconv, revnet_block,
+                                   up, upconv)
 
 
 class SmallEncoder(nn.Module):
@@ -131,10 +132,10 @@ class SmallDecoder(nn.Module):
 
 class ResNetEncoder(nn.Module):
     def __init__(
-            self, 
-            in_ch: int, 
-            out_ch: int, 
-            resblocks: int, 
+            self,
+            in_ch: int,
+            out_ch: int,
+            resblocks: int,
             use_context: bool,
     ) -> None:
         super().__init__()
@@ -142,7 +143,7 @@ class ResNetEncoder(nn.Module):
         encode_frames_out_ch = 32 if use_context else 64
         self.encode_frames = nn.ModuleList([nn.Sequential(
             nn.Conv2d(
-                in_ch // 2, encode_frames_out_ch, 
+                in_ch // 2, encode_frames_out_ch,
                 5, stride=2, padding=2, bias=False),
             nn.BatchNorm2d(encode_frames_out_ch),
             nn.LeakyReLU(inplace=True),
@@ -166,7 +167,8 @@ class ResNetEncoder(nn.Module):
     ) -> torch.Tensor:
         assert frame1.shape[0] == frame2.shape[0] == context_vec.shape[0]
         input_x = (
-            self.encode_frames[0](frame1), self.encode_frames[1](frame2), context_vec,
+            self.encode_frames[0](frame1), self.encode_frames[1](
+                frame2), context_vec,
         ) if self.use_context else (
             self.encode_frames[0](frame1), self.encode_frames[1](frame2),
         )
@@ -187,10 +189,10 @@ class ResNetEncoder(nn.Module):
 class ResNetDecoder(nn.Module):
 
     def __init__(
-            self, 
-            in_ch: int, 
-            out_ch: int, 
-            resblocks: int, 
+            self,
+            in_ch: int,
+            out_ch: int,
+            resblocks: int,
             use_context: bool
     ) -> None:
         super().__init__()
@@ -306,6 +308,7 @@ class WaveoneModel(nn.Module):
             reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
                 if "residual" in self.train_type \
                 else flow_frame2
+            reconstructed_frame2 = reconstructed_frame2.clamp(-1., 1.)
 
             if self.training is True:  # type: ignore
                 loss += self.flow_loss_fn(frame2, flow_frame2)
