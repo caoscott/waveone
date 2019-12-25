@@ -401,9 +401,10 @@ class WaveoneModel(nn.Module):
                     out_collector["reconstructed_frame2"].append(
                         reconstructed_frame2.cpu())
 
-            residuals = (frame2 - flow_frame2) * 255.
-            residuals = residuals + residuals.new(
-                residuals.size()).uniform_() if self.training else torch.round(
+            residuals = (frame2 - flow_frame2) / 2 * 255.
+            residuals = residuals + (residuals.new(
+                residuals.size()).uniform_() - 0.5).clamp(
+                -255., 255.) if self.training else torch.round(
                 residuals)
             bpsp += self.reconstructed_loss_fn(
                 residuals,
