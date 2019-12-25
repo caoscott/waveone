@@ -360,11 +360,6 @@ class WaveoneModel(nn.Module):
         self.flow_loss_fn = flow_loss_fn
         self.reconstructed_loss_fn = reconstructed_loss_fn
 
-        if lossless is True:
-            levels = nn.Parameter(
-                torch.arange(-255., 256.), requires_grad=False)
-            self.quantizer = Quantizer(levels)
-
     def forward(  # type: ignore
             self,
             frames: torch.Tensor,
@@ -393,6 +388,7 @@ class WaveoneModel(nn.Module):
                 align_corners=True,
                 padding_mode="border",
             ) if "flow" in self.train_type else frame1
+            flow_frame2 = flow_frame2.clamp(-1., 1.)
             if collect_output:
                 out_collector["flow_frame2"].append(flow_frame2.cpu())
 
@@ -405,10 +401,12 @@ class WaveoneModel(nn.Module):
                     out_collector["reconstructed_frame2"].append(
                         reconstructed_frame2.cpu())
 
-            quantized_soft, quantized_hard, _ = self.quantizer(
-                (frame2 - flow_frame2) * 255.)
+            residuals = (frame2 - flow_frame2) * 255.
+            residuals = residuals + residuals.new(
+                residuals.size()).uniform_() if self.training else torch.round(
+                residuals)
             bpsp += self.reconstructed_loss_fn(
-                quantized_soft if self.training else quantized_hard,
+                residuals,
                 decoder_out["residuals"]) / (np.log(2)
                                              if self.lossless else 1)
             loss += 100 * self.flow_loss_fn(frame2, flow_frame2)
