@@ -92,7 +92,7 @@ def log_context_vec(context_vec: torch.Tensor, writer: SummaryWriter, epoch: int
     )
 
 
-def run_eval(
+def run_eval(  # type: ignore
         eval_name: str,
         eval_loader: data.DataLoader,
         model: nn.Module,
