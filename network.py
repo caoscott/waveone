@@ -410,7 +410,7 @@ class WaveoneModel(nn.Module):
                 residuals,
                 decoder_out["residuals"]) / (np.log(2)
                                              if self.lossless else 1)
-            loss += 100 * self.flow_loss_fn(frame2, flow_frame2)
+            loss += self.flow_loss_fn(frame2, flow_frame2)
 
             for k, v in decoder_out.items():
                 out_collector[k].append(v.cpu())
@@ -424,7 +424,7 @@ class WaveoneModel(nn.Module):
                 frame1 = frame1.detach()
         return {
             **{k: torch.stack(v) for k, v in out_collector.items()},
-            **{"loss": (loss + bpsp) / (frames.shape[0]-1)},
+            **{"loss": (loss + 0.1 * bpsp) / (frames.shape[0]-1)},
             **{"bpsp": bpsp / (frames.shape[0]-1)}
         }
 
