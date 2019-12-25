@@ -405,8 +405,10 @@ class WaveoneModel(nn.Module):
                     out_collector["reconstructed_frame2"].append(
                         reconstructed_frame2.cpu())
 
+            quantized_soft, quantized_hard, _ = self.quantizer(
+                (frame2 - flow_frame2) * 255.)
             bpsp += self.reconstructed_loss_fn(
-                self.quantizer((frame2 - flow_frame2) * 255.),
+                quantized_soft if self.training else quantized_hard,
                 decoder_out["residuals"]) / (np.log(2)
                                              if self.lossless else 1)
             loss += 100 * self.flow_loss_fn(frame2, flow_frame2)
