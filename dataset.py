@@ -76,10 +76,10 @@ class ImageList(data.Dataset):
             for frame in frames:
                 assert frame.max() <= 1  # type: ignore
                 assert frame.min() >= -1  # type: ignore
-        assert len(frames
-                   ) == self.frame_len, f"{len(frames)} != {self.frame_len}"
-        assert len(frames) == len(
-            existence_mask), f"{len(frames)} != {len(existence_mask)}"
+        assert len(frames) == self.frame_len, \
+            f"{len(frames)} != {self.frame_len}"
+        assert len(frames) == len(existence_mask), \
+            f"{len(frames)} != {len(existence_mask)}"
 
         return frames, existence_mask
 
