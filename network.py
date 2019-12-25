@@ -400,7 +400,7 @@ class WaveoneModel(nn.Module):
                         reconstructed_frame2.cpu())
 
             bpsp += self.reconstructed_loss_fn(
-                ((frame2 - flow_frame2 + 1) * 127.5).round().clamp(0, 255),
+                ((frame2 - flow_frame2) * 255.).round().clamp(-255, 255),
                 decoder_out["residuals"]) / (np.log(2)
                                              if self.lossless else 1)
             loss += 10 * self.flow_loss_fn(frame2, flow_frame2)
