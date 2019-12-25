@@ -85,15 +85,15 @@ class up(nn.Module):
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
         if bilinear:
-            self.up: nn.Module = nn.UpsamplingBilinear2d(scale_factor=2)
+            self._up: nn.Module = nn.UpsamplingBilinear2d(scale_factor=2)
         else:
-            self.up: nn.Module = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
+            self._up: nn.Module = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
 
         self.conv = double_conv(
             in_ch * 2, out_ch, norm="batch", activation="leaky_relu")
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:  # type: ignore
-        x1 = self.up(x1)
+        x1 = self._up(x1)
         diff_x = x1.size()[2] - x2.size()[2]
         diff_y = x1.size()[3] - x2.size()[3]
         x2 = F.pad(x2, [diff_x // 2, int(diff_x / 2),
@@ -110,15 +110,15 @@ class upconv(nn.Module):
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
         if bilinear:
-            self.up: nn.Module = nn.UpsamplingBilinear2d(scale_factor=2)
+            self._up: nn.Module = nn.UpsamplingBilinear2d(scale_factor=2)
         else:
-            self.up: nn.Module = nn.ConvTranspose2d(in_ch, out_ch, 2, stride=2)
+            self._up: nn.Module = nn.ConvTranspose2d(in_ch, out_ch, 2, stride=2)
 
         self.conv = double_conv(
             out_ch, out_ch, norm="batch", activation="leaky_relu")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
-        x = self.up(x)
+        x = self._up(x)
         x = self.conv(x)
         return x
 

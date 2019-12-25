@@ -62,14 +62,14 @@ class ImageList(data.Dataset):
         frames: Tuple[torch.Tensor, ...] = tuple(
             np_to_torch(img.astype(np.float64)/255*2 - 1) for img in images
         )
-        existence_mask: Tuple[torch.Tensor, ...] = tuple(  # type: ignore
-            torch.ones((1, 1, 1, 1))) * len(images)
+        existence_mask: Tuple[torch.Tensor, ...] = tuple(
+            torch.ones((1, 1, 1, 1))) * len(images)  # type: ignore
 
         if self.padding_len > 0:
-            frames += tuple(  # type: ignore
-                torch.zeros_like(frames[0])) * self.padding_len
-            existence_mask += (tuple(  # type: ignore
-                torch.zeros((1, 1, 1, 1))) * self.padding_len
+            frames += tuple(
+                torch.zeros_like(frames[0])) * self.padding_len  # type: ignore
+            existence_mask += (tuple(
+                torch.zeros((1, 1, 1, 1))) * self.padding_len  # type: ignore
             )
 
         if self.args.network == "opt":
