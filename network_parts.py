@@ -84,10 +84,11 @@ class up(nn.Module):
 
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
+        self._up: nn.Module
         if bilinear:
-            self._up: nn.Module = nn.UpsamplingBilinear2d(scale_factor=2)
+            self._up = nn.UpsamplingBilinear2d(scale_factor=2)
         else:
-            self._up: nn.Module = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
+            self._up = nn.ConvTranspose2d(in_ch, in_ch, 2, stride=2)
 
         self.conv = double_conv(
             in_ch * 2, out_ch, norm="batch", activation="leaky_relu")
@@ -109,10 +110,11 @@ class upconv(nn.Module):
 
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
+        self._up: nn.Module
         if bilinear:
-            self._up: nn.Module = nn.UpsamplingBilinear2d(scale_factor=2)
+            self._up = nn.UpsamplingBilinear2d(scale_factor=2)
         else:
-            self._up: nn.Module = nn.ConvTranspose2d(in_ch, out_ch, 2, stride=2)
+            self._up = nn.ConvTranspose2d(in_ch, out_ch, 2, stride=2)
 
         self.conv = double_conv(
             out_ch, out_ch, norm="batch", activation="leaky_relu")
