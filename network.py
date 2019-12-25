@@ -402,7 +402,7 @@ class WaveoneModel(nn.Module):
                         reconstructed_frame2.cpu())
 
             residuals = (frame2 - flow_frame2) / 2 * 255.
-            residuals = residuals + (residuals.new(
+            residuals = (residuals + residuals.new(
                 residuals.size()).uniform_() - 0.5).clamp(
                 -255., 255.) if self.training else torch.round(
                 residuals)
