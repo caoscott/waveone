@@ -244,7 +244,8 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             args.bits, 3, resblocks=args.resblocks, use_context=use_context
         )
         if lossless:
-            reconstructed_loss_fn = DiscretizedMixLogisticLoss(rgb_scale=True)
+            reconstructed_loss_fn = DiscretizedMixLogisticLoss(
+                rgb_scale=True, x_min=-255, x_max=255, L=511)
         return WaveoneModel(
             resnet_encoder, resnet_binarizer, resnet_decoder, args.train_type,
             use_context, lossless, flow_loss_fn, reconstructed_loss_fn,

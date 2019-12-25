@@ -322,7 +322,7 @@ class LosslessDecoder(nn.Module):
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
         f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=True)
+            identity_theta, r.shape, align_corners=True)  # type: ignore
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
         #    align_corners=True)
         # if self.training is False:
@@ -403,7 +403,7 @@ class WaveoneModel(nn.Module):
                 ((frame2 - flow_frame2 + 1) * 127.5).round().clamp(0, 255),
                 decoder_out["residuals"]) / (np.log(2)
                                              if self.lossless else 1)
-            loss += self.flow_loss_fn(frame2, flow_frame2)
+            loss += 10 * self.flow_loss_fn(frame2, flow_frame2)
 
             for k, v in decoder_out.items():
                 out_collector[k].append(v.cpu())
