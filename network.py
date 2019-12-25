@@ -13,6 +13,7 @@ from waveone.network_parts import (ConvLSTMCell, LambdaModule, ResBlock, SatLU,
                                    Sign, down, inconv, outconv, revnet_block,
                                    up, upconv)
 from waveone.prob_clf import AtrousProbabilityClassifier
+from waveone.quantizer import Quantizer
 
 
 class SmallEncoder(nn.Module):
@@ -359,6 +360,11 @@ class WaveoneModel(nn.Module):
         self.flow_loss_fn = flow_loss_fn
         self.reconstructed_loss_fn = reconstructed_loss_fn
 
+        if lossless is True:
+            levels = nn.Parameter(
+                torch.arange(-255., 256.), requires_grad=False)
+            self.quantizer = Quantizer(levels)
+
     def forward(  # type: ignore
             self,
             frames: torch.Tensor,
@@ -400,10 +406,10 @@ class WaveoneModel(nn.Module):
                         reconstructed_frame2.cpu())
 
             bpsp += self.reconstructed_loss_fn(
-                ((frame2 - flow_frame2) * 255.).round().clamp(-255, 255),
+                self.quantizer((frame2 - flow_frame2) * 255.),
                 decoder_out["residuals"]) / (np.log(2)
                                              if self.lossless else 1)
-            loss += 10 * self.flow_loss_fn(frame2, flow_frame2)
+            loss += 100 * self.flow_loss_fn(frame2, flow_frame2)
 
             for k, v in decoder_out.items():
                 out_collector[k].append(v.cpu())
