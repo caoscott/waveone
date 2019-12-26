@@ -204,8 +204,8 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(128),
             nn.LeakyReLU(inplace=True),
             *[ResBlock(128, 128) for _ in range(resblocks1)],
-            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            nn.ConvTranspose2d(128, 32, 4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(32),
         )
         self.context_to_output = nn.Sequential(
             *[ResBlock(64, 64) for _ in range(resblocks2)]
