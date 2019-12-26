@@ -91,7 +91,7 @@ def log_context_vec(context_vec: torch.Tensor, writer: SummaryWriter, epoch: int
     )
 
 
-def run_eval(
+def run_eval(  # type: ignore
         eval_name: str,
         eval_loader: data.DataLoader,
         model: nn.Module,
@@ -267,7 +267,9 @@ def train(args) -> nn.Module:
     writer = SummaryWriter(f"runs/{args.save_model}", purge_step=0)
 
     ############### Model ###############
-    model = get_model(args).cuda()
+    model = get_model(args)
+    print(model)
+    model = model.cuda()
     solver = optim.Adam(
         model.parameters() if args.network != "opt" else [torch.zeros((1,))],
         lr=args.lr,
@@ -349,6 +351,7 @@ def train(args) -> nn.Module:
         for frames, _ in train_loader:
             train_iter += 1
             train_loop(frames, log_iter=max(len(train_loader)//5, 1))
+        scheduler.step()  # type: ignore
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)
@@ -357,7 +360,6 @@ def train(args) -> nn.Module:
             run_eval("eval", eval_loader, model, epoch, args, writer)
             run_eval("training", train_subset_loader,
                      model, epoch, args, writer)
-            scheduler.step()  # type: ignore
             just_resumed = False
 
     print('Training done.')
