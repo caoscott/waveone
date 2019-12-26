@@ -338,8 +338,6 @@ class LosslessDecoder(nn.Module):
 
 
 class WaveoneModel(nn.Module):
-    NAMES = ("encoder", "binarizer", "decoder")
-
     def __init__(self,
                  encoder: nn.Module,
                  binarizer: nn.Module,
@@ -347,6 +345,95 @@ class WaveoneModel(nn.Module):
                  train_type: str,
                  use_context: bool,
                  lossless: bool,
+                 flow_loss_fn: nn.Module,
+                 reconstructed_loss_fn: nn.Module
+                 ) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.binarizer = binarizer
+        self.decoder = decoder
+        self.train_type = train_type
+        self.use_context = use_context
+        self.lossless = lossless
+        self.flow_loss_fn = flow_loss_fn
+        self.reconstructed_loss_fn = reconstructed_loss_fn
+
+    def forward(  # type: ignore
+            self,
+            frames: torch.Tensor,
+            iframe_iter: int,
+            reuse_frame: bool,
+            detach: bool,
+            collect_output: bool,
+    ) -> Dict[str, torch.Tensor]:
+        device = next(self.parameters()).device
+        frame1 = frames[0].to(device)
+        b, c, h, w = frames.size()[1:]
+        context_vec = torch.zeros((b, 64, h // 2, w // 2), requires_grad=False)
+        if self.use_context:
+            context_vec = context_vec.to(device)
+        loss: torch.Tensor = 0.  # type: ignore
+        bpsp: torch.Tensor = 0.  # type: ignore
+        out_collector: DefaultDict[str, List[torch.Tensor]] = defaultdict(list)
+        for iter_i, frame2 in enumerate(frames[1:]):  # type: ignore
+            frame2: torch.Tensor = frame2.to(device)  # type: ignore
+            codes = self.binarizer(self.encoder(frame1, frame2, context_vec))
+            decoder_out = self.decoder((codes, context_vec))
+            # out_collector["codes"].append(codes)
+
+            flow_frame2 = F.grid_sample(  # type: ignore
+                frame1, decoder_out["flow_grid"],
+                align_corners=True,
+                padding_mode="border",
+            ) if "flow" in self.train_type else frame1
+            flow_frame2 = flow_frame2.clamp(-1., 1.)
+            if collect_output:
+                out_collector["flow_frame2"].append(flow_frame2.cpu())
+
+            reconstructed_frame2 = torch.zeros_like(frame2)
+            if self.lossless is False:
+                reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
+                    if "residual" in self.train_type \
+                    else flow_frame2
+                if collect_output:
+                    out_collector["reconstructed_frame2"].append(
+                        reconstructed_frame2.cpu())
+
+            residuals = (frame2 - flow_frame2) / 2 * 255.
+            residuals = (residuals + residuals.new(
+                residuals.size()).uniform_() - 0.5).clamp(
+                -255., 255.) if self.training else torch.round(
+                residuals)
+            bpsp += self.reconstructed_loss_fn(
+                residuals,
+                decoder_out["residuals"]) / (np.log(2)
+                                             if self.lossless else 1)
+            loss += self.flow_loss_fn(frame2, flow_frame2)
+
+            for k, v in decoder_out.items():
+                out_collector[k].append(v.cpu())
+
+            frame1 = (reconstructed_frame2
+                      if reuse_frame and iter_i % iframe_iter != 0
+                      and self.lossless is False
+                      else frame2)
+            context_vec = decoder_out["context_vec"]
+            if detach:
+                frame1 = frame1.detach()
+        return {
+            **{k: torch.stack(v) for k, v in out_collector.items()},
+            **{"loss": (loss + 0.1 * bpsp) / (frames.shape[0]-1)},
+            **{"bpsp": bpsp / (frames.shape[0]-1)}
+        }
+
+
+class WaveoneDoublyLossless(nn.Module):
+    def __init__(self,
+                 encoder: nn.Module,
+                 binarizer: nn.Module,
+                 decoder: nn.Module,
+                 train_type: str,
+                 use_context: bool,
                  flow_loss_fn: nn.Module,
                  reconstructed_loss_fn: nn.Module
                  ) -> None:
