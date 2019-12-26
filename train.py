@@ -55,8 +55,8 @@ def eval_scores(
         frame1: torch.Tensor,
         frame2: torch.Tensor,
         name: str,
-) -> Dict[str, torch.Tensor]:
-    scores: Dict[str, torch.Tensor] = {}
+) -> Dict[str, float]:
+    scores: Dict[str, float] = {}
     assert frame1.shape == frame2.shape, (
         "frame1.shape {frame1.shape} != frame2.shape {frame2.shape}"
     )
@@ -64,10 +64,10 @@ def eval_scores(
                             frame1.shape[-3], frame1.shape[-2], frame1.shape[-1])
     frame2 = frame2.reshape(-1,
                             frame2.shape[-3], frame2.shape[-2], frame2.shape[-1])
-    scores[f"{name}_l1"] = F.l1_loss(frame1, frame2, reduction="mean")
+    scores[f"{name}_l1"] = F.l1_loss(frame1, frame2, reduction="mean").item()
     scores[f"{name}_msssim"] = msssim(
         frame1, frame2, val_range=2, normalize=True,
-    )
+    ).item()
     return scores
 
 
@@ -98,73 +98,75 @@ def run_eval(  # type: ignore
         epoch: int,
         args: argparse.Namespace,
         writer: SummaryWriter,
-) -> Dict[str, torch.Tensor]:
+) -> Dict[str, float]:
     model.eval()
     with torch.no_grad():
-        eval_out_collector: DefaultDict[str,
-                                        List[torch.Tensor]] = defaultdict(list)
-        for frame_list, mask_list in eval_loader:
+        score_collector: DefaultDict[str,
+                                     List[float]] = defaultdict(list)
+        for eval_idx, (frame_list, mask_list) in enumerate(eval_loader):
             frames = torch.stack(frame_list)
             masks = torch.stack(mask_list[1:])
             model_out = model(
                 frames, iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False, collect_output=True,
             )
-            for key in ("flow_frame2", "reconstructed_frame2", "context_vec"):
-                eval_out_collector[key].append(model_out[key].cpu() * masks)
-            eval_out_collector["frames"].append(frames)
-            eval_out_collector["masks"].append(masks)
-        eval_out = {k: torch.cat(v, dim=1)
-                    for k, v in eval_out_collector.items()}
-        for batch_i in range(eval_out["reconstructed_frame2"].shape[1]):
-            for seq_i in range(eval_out["reconstructed_frame2"].shape[0]):
-                frames = torch.stack([
-                    eval_out["frames"][seq_i+1, batch_i],
-                    eval_out["flow_frame2"][seq_i, batch_i],
-                    eval_out["reconstructed_frame2"][seq_i, batch_i],
-                ])
-                save_tensor_as_img(
-                    frames, f"{eval_name}_{batch_i}_{seq_i}", args)
-        total_scores: Dict[str, torch.Tensor] = {
-            **eval_scores(
-                eval_out["frames"][1:],
-                torch.stack([eval_out["frames"][0]] *
-                            (eval_out["frames"].shape[0]-1)),
-                f"{eval_name}_same_frame"
-            ),
-            **eval_scores(
-                eval_out["frames"][1:], eval_out["frames"][:-1],
-                f"{eval_name}_previous_frame"
-            ),
-            **eval_scores(
-                eval_out["frames"][1:
-                                   ], eval_out["flow_frame2"], f"{eval_name}_flow"
-            ),
-            **eval_scores(
-                eval_out["frames"][1:], eval_out["reconstructed_frame2"],
-                f"{eval_name}_reconstructed"
-            ),
+            for batch_i in range(model_out["reconstructed_frame2"].shape[1]):
+                for seq_i in range(model_out["reconstructed_frame2"].shape[0]):
+                    if masks[seq_i, batch_i].item() == 0:
+                        break
+                    frames = torch.stack([
+                        model_out["frames"][seq_i+1, batch_i],
+                        model_out["flow_frame2"][seq_i, batch_i],
+                        model_out["reconstructed_frame2"][seq_i, batch_i],
+                    ])
+                    vid_i = batch_i + eval_idx * args.eval_batch_size
+                    save_tensor_as_img(
+                        frames, f"{eval_name}_{vid_i}_{seq_i}", args)
+            scores = {
+                **eval_scores(
+                    frames[1:],
+                    torch.stack([frames[0]] *
+                                (frames.shape[0]-1)),
+                    f"{eval_name}_same_frame"
+                ),
+                **eval_scores(
+                    frames[1:], frames[:-1],
+                    f"{eval_name}_previous_frame"
+                ),
+                **eval_scores(
+                    frames[1:], model_out["flow_frame2"],
+                    f"{eval_name}_flow"
+                ),
+                **eval_scores(
+                    frames[1:], model_out["reconstructed_frame2"],
+                    f"{eval_name}_reconstructed"
+                ),
+            }
+            for key, score in scores.items():
+                score_collector[key].append(score)
+            log_context_vec(model_out["context_vec"], writer, epoch)
+        total_scores: Dict[str, float] = {  # type: ignore
+            np.average(score_list) for key, score_list in score_collector.items()
         }
 
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
-        log_context_vec(eval_out["context_vec"], writer, epoch)
         print_scores(total_scores)
         return total_scores
 
 
 def plot_scores(
         writer: SummaryWriter,
-        scores: Dict[str, torch.Tensor],
+        scores: Dict[str, float],
         train_iter: int
 ) -> None:
     for key, value in scores.items():
-        writer.add_scalar(key, value.item(), train_iter)
+        writer.add_scalar(key, value, train_iter)
 
 
-def print_scores(scores: Dict[str, torch.Tensor]) -> None:
+def print_scores(scores: Dict[str, float]) -> None:
     for key, value in scores.items():
-        print(f"{key}: {value.item() :.6f}")
+        print(f"{key}: {value :.6f}")
     print("")
 
 
