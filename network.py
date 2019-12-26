@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # full assembly of the sub-parts to form the complete net
+from collections import defaultdict
 from typing import DefaultDict, Dict, List, Tuple
 
 import torch
@@ -7,9 +8,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
-from waveone.network_parts import (ConvLSTMCell, SatLU, Sign, down, inconv,
-                                   outconv, revnet_block, up, upconv, LambdaModule, ResBlock)
-from collections import defaultdict
+from waveone.network_parts import (ConvLSTMCell, LambdaModule, ResBlock, SatLU,
+                                   Sign, down, inconv, outconv, revnet_block,
+                                   up, upconv)
 
 
 class SmallEncoder(nn.Module):
@@ -115,7 +116,7 @@ class SmallDecoder(nn.Module):
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
         f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=True)
+            identity_theta, r.shape, align_corners=True)  # type: ignore
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
         #    align_corners=True)
         # if self.training is False:
@@ -131,10 +132,10 @@ class SmallDecoder(nn.Module):
 
 class ResNetEncoder(nn.Module):
     def __init__(
-            self, 
-            in_ch: int, 
-            out_ch: int, 
-            resblocks: int, 
+            self,
+            in_ch: int,
+            out_ch: int,
+            resblocks: int,
             use_context: bool,
     ) -> None:
         super().__init__()
@@ -142,7 +143,7 @@ class ResNetEncoder(nn.Module):
         encode_frames_out_ch = 32 if use_context else 64
         self.encode_frames = nn.ModuleList([nn.Sequential(
             nn.Conv2d(
-                in_ch // 2, encode_frames_out_ch, 
+                in_ch // 2, encode_frames_out_ch,
                 5, stride=2, padding=2, bias=False),
             nn.BatchNorm2d(encode_frames_out_ch),
             nn.LeakyReLU(inplace=True),
@@ -166,7 +167,8 @@ class ResNetEncoder(nn.Module):
     ) -> torch.Tensor:
         assert frame1.shape[0] == frame2.shape[0] == context_vec.shape[0]
         input_x = (
-            self.encode_frames[0](frame1), self.encode_frames[1](frame2), context_vec,
+            self.encode_frames[0](frame1), self.encode_frames[1](
+                frame2), context_vec,
         ) if self.use_context else (
             self.encode_frames[0](frame1), self.encode_frames[1](frame2),
         )
@@ -187,27 +189,32 @@ class ResNetEncoder(nn.Module):
 class ResNetDecoder(nn.Module):
 
     def __init__(
-            self, 
-            in_ch: int, 
-            out_ch: int, 
-            resblocks: int, 
+            self,
+            in_ch: int,
+            out_ch: int,
+            resblocks: int,
             use_context: bool
     ) -> None:
         super().__init__()
         self.use_context = use_context
+        resblocks1 = resblocks // 2  # if use_context else resblocks - 1
+        resblocks2 = resblocks - resblocks1
         self.decode_to_context = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
-            nn.ReLU(),
-            *[ResBlock(128, 128) for _ in range(resblocks)],
+            nn.LeakyReLU(inplace=True),
+            *[ResBlock(128, 128) for _ in range(resblocks1)],
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64),
         )
         self.context_to_output = nn.Sequential(
-            *[ResBlock(64, 64) for _ in range(resblocks)]
+            *[ResBlock(64, 64) for _ in range(resblocks2)]
         )
         self.residual = nn.Sequential(
-            nn.ConvTranspose2d(64, out_ch, 4, stride=2, padding=1, bias=True),
+            nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(64, 3, 1),
             nn.Tanh(),
         )
         self.flow = nn.Sequential(
@@ -240,7 +247,7 @@ class ResNetDecoder(nn.Module):
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
         f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
-            identity_theta, r.shape, align_corners=True)
+            identity_theta, r.shape, align_corners=True)  # type: ignore
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
         #    align_corners=True)
         # if self.training is False:
@@ -306,6 +313,7 @@ class WaveoneModel(nn.Module):
             reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
                 if "residual" in self.train_type \
                 else flow_frame2
+            reconstructed_frame2 = reconstructed_frame2.clamp(-1., 1.)
 
             if self.training is True:  # type: ignore
                 loss += self.flow_loss_fn(frame2, flow_frame2)
