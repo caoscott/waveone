@@ -145,8 +145,8 @@ def run_eval(  # type: ignore
             for key, score in scores.items():
                 score_collector[key].append(score)
             log_context_vec(model_out["context_vec"], writer, epoch)
-        total_scores: Dict[str, float] = {  # type: ignore
-            np.average(score_list) for key, score_list in score_collector.items()
+        total_scores: Dict[str, float] = {
+            key: np.average(score_list) for key, score_list in score_collector.items()
         }
 
         print(f"{eval_name} epoch {epoch}:")
