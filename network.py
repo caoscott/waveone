@@ -246,7 +246,7 @@ class ResNetDecoder(nn.Module):
         assert f.shape[-1] == self.num_flows * 2
 
         grid_normalize = torch.tensor(
-            f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, f.shape[3]).to(x.device)
+            f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, 2).to(x.device)
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
         identity_grid = F.affine_grid(  # type: ignore
