@@ -218,7 +218,6 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(64, 3, 1),
-            nn.Tanh(),
         )
         self.flow = nn.Sequential(
             nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
@@ -241,7 +240,7 @@ class ResNetDecoder(nn.Module):
 
         x = self.context_to_output(x)
         f = self.flow(x).permute(0, 2, 3, 1) * 25
-        r = self.residual(x) * 2
+        r = torch.clamp(self.residual(x), -2, 2)
 
         assert f.shape[-1] == self.num_flows * 2
 
