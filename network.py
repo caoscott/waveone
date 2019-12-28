@@ -240,7 +240,7 @@ class ResNetDecoder(nn.Module):
             new_context_vec = torch.zeros_like(x)
 
         x = self.context_to_output(x)
-        f = self.flow(x).permute(0, 2, 3, 1) * 15
+        f = self.flow(x).permute(0, 2, 3, 1) * 25
         r = self.residual(x) * 2
 
         assert f.shape[-1] == self.num_flows * 2
