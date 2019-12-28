@@ -313,7 +313,8 @@ class WaveoneModel(nn.Module):
 
             flow_frame2: torch.Tensor = sum(  # type: ignore
                 F.grid_sample(  # type: ignore
-                    frame1, decoder_out["flow_grid"][flow_index: flow_index+2],
+                    frame1,
+                    decoder_out["flow_grid"][:, :, :, flow_index:flow_index+2],
                     align_corners=True,
                     padding_mode="border",
                 ) for flow_index in range(0, self.decoder.num_flows * 2, 2)  # type: ignore
