@@ -114,14 +114,14 @@ def run_eval(  # type: ignore
                 for seq_i in range(model_out["reconstructed_frame2"].shape[0]):
                     if masks[seq_i, batch_i].item() == 0:
                         break
-                    frames = torch.stack([
-                        model_out["frames"][seq_i+1, batch_i],
+                    save_frames = torch.stack([
+                        frames[seq_i+1, batch_i],
                         model_out["flow_frame2"][seq_i, batch_i],
                         model_out["reconstructed_frame2"][seq_i, batch_i],
                     ])
                     vid_i = batch_i + eval_idx * args.eval_batch_size
                     save_tensor_as_img(
-                        frames, f"{eval_name}_{vid_i}_{seq_i}", args)
+                        save_frames, f"{eval_name}_{vid_i}_{seq_i}", args)
             scores = {
                 **eval_scores(
                     frames[1:],
@@ -145,8 +145,8 @@ def run_eval(  # type: ignore
             for key, score in scores.items():
                 score_collector[key].append(score)
             log_context_vec(model_out["context_vec"], writer, epoch)
-        total_scores: Dict[str, float] = {  # type: ignore
-            np.average(score_list) for key, score_list in score_collector.items()
+        total_scores: Dict[str, float] = {
+            key: np.average(score_list) for key, score_list in score_collector.items()
         }
 
         print(f"{eval_name} epoch {epoch}:")

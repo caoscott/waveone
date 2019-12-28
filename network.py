@@ -234,7 +234,7 @@ class ResNetDecoder(nn.Module):
         x, context_vec = input_tuple
         x = self.decode_to_context(x)
         if self.use_context:
-            x = new_context_vec = F.leaky_relu(x)
+            x = new_context_vec = torch.tanh(x + context_vec)
         else:
             x = F.leaky_relu(x)
             new_context_vec = torch.zeros_like(x)
