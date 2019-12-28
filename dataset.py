@@ -77,7 +77,9 @@ class ImageList(data.Dataset):
                 assert frame.max() <= 1  # type: ignore
                 assert frame.min() >= -1  # type: ignore
         assert len(frames) == self.frame_len, \
-            f"{len(frames)} != {self.frame_len}, padding_len is {self.padding_len}"
+            f"{len(frames)} != {self.frame_len}, " \
+            f"padding_len is {self.padding_len}. " \
+            f"len(img_paths) is {len(self.img_paths)}"
         assert len(frames) == len(existence_mask), \
             f"{len(frames)} != {len(existence_mask)}"
 
