@@ -221,6 +221,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "context_vec": torch.zeros(1),
             "loss": torch.tensor(0.),
         })
+        opt_decoder.num_flows = 1  # type: ignore
         return WaveoneModel(
             opt_encoder, opt_binarizer, opt_decoder, "residual",
             False, flow_loss_fn, reconstructed_loss_fn,
@@ -239,7 +240,8 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             6, args.bits, resblocks=args.resblocks, use_context=use_context)
         resnet_binarizer = SmallBinarizer(not args.binarize_off)
         resnet_decoder = ResNetDecoder(
-            args.bits, 3, resblocks=args.resblocks, use_context=use_context)
+            args.bits, 3, resblocks=args.resblocks, use_context=use_context,
+            num_flows=args.num_flows)
         return WaveoneModel(
             resnet_encoder, resnet_binarizer, resnet_decoder, args.train_type,
             use_context, flow_loss_fn, reconstructed_loss_fn,

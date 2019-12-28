@@ -82,6 +82,7 @@ class SmallDecoder(nn.Module):
 
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
+        self.num_flows = 1
         self.ups = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
@@ -193,12 +194,14 @@ class ResNetDecoder(nn.Module):
             in_ch: int,
             out_ch: int,
             resblocks: int,
-            use_context: bool
+            use_context: bool,
+            num_flows: int,
     ) -> None:
         super().__init__()
         self.use_context = use_context
         resblocks1 = resblocks // 2  # if use_context else resblocks - 1
         resblocks2 = resblocks - resblocks1
+        self.num_flows = num_flows
         self.decode_to_context = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
@@ -221,7 +224,7 @@ class ResNetDecoder(nn.Module):
             nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(64, 2, 1),
+            nn.Conv2d(64, 2 * num_flows, 1),
         )
 
     def forward(  # type: ignore
@@ -243,11 +246,13 @@ class ResNetDecoder(nn.Module):
         assert f.shape[-1] == 2
 
         grid_normalize = torch.tensor(
-            f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, 2).to(x.device)
+            f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, f.shape[3]).to(x.device)
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
-        f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
+        identity_grid = F.affine_grid(  # type: ignore
             identity_theta, r.shape, align_corners=True)  # type: ignore
+        identity_grid = torch.cat([identity_grid] * self.num_flows, dim=-1)
+        f_grid = f / grid_normalize * 2 + identity_grid
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
         #    align_corners=True)
         # if self.training is False:
@@ -304,11 +309,13 @@ class WaveoneModel(nn.Module):
             decoder_out = self.decoder((codes, context_vec))
             # out_collector["codes"].append(codes)
 
-            flow_frame2 = F.grid_sample(  # type: ignore
-                frame1, decoder_out["flow_grid"],
-                align_corners=True,
-                padding_mode="border",
-            ) if "flow" in self.train_type else frame1
+            flow_frame2: torch.Tensor = sum(  # type: ignore
+                F.grid_sample(  # type: ignore
+                    frame1, decoder_out["flow_grid"][flow_index: flow_index+2],
+                    align_corners=True,
+                    padding_mode="border",
+                ) for flow_index in range(0, self.decoder.num_flows * 2, 2)  # type: ignore
+            ) / self.decoder.num_flows if "flow" in self.train_type else frame1
 
             reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
                 if "residual" in self.train_type \
