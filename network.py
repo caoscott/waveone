@@ -243,7 +243,7 @@ class ResNetDecoder(nn.Module):
         f = self.flow(x).permute(0, 2, 3, 1) * 25
         r = self.residual(x) * 2
 
-        assert f.shape[-1] == 2
+        assert f.shape[-1] == self.num_flows * 2
 
         grid_normalize = torch.tensor(
             f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, f.shape[3]).to(x.device)
