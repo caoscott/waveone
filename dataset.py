@@ -68,6 +68,8 @@ class ImageList(data.Dataset):
         if self.padding_len > 0:
             frames += tuple(
                 [torch.zeros_like(frames[0])]) * self.padding_len  # type: ignore
+            for frame in frames:
+                print(frame.shape)
             existence_mask += tuple(
                 [torch.zeros((1, 1, 1))]) * self.padding_len  # type: ignore
 
