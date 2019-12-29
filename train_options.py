@@ -87,5 +87,7 @@ parser.add_argument('--checkpoint-epochs', type=int, default=2,
                     help='Model checkpoint period.')
 parser.add_argument('--eval-epochs', type=int, default=10,
                     help='Evaluation period.')
+parser.add_argument('--mode', choices=("train, eval"), default="train",
+                    help="Choose whether to train the model.")
 # parser.add_argument('--plot-codes', action='store_true',
 # help='If true, plot encoded bits from binarizer.')

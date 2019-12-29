@@ -351,11 +351,12 @@ def train(args) -> nn.Module:
             plot_scores(writer, scores, train_iter)
             log_flow(writer, model_out["flow"])
 
-    for epoch in range(args.max_train_epochs):
-        for frames, _ in train_loader:
-            train_iter += 1
-            train_loop(frames, log_iter=max(len(train_loader)//5, 1))
-        scheduler.step()  # type: ignore
+    for epoch in range(1 if args.mode == "eval" else args.max_train_epochs):
+        if args.mode == "train":
+            for frames, _ in train_loader:
+                train_iter += 1
+                train_loop(frames, log_iter=max(len(train_loader)//5, 1))
+            scheduler.step()  # type: ignore
 
         if (epoch + 1) % args.checkpoint_epochs == 0:
             save(args, model)
