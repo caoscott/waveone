@@ -52,7 +52,6 @@ class ImageList(data.Dataset):
 
         images = tuple(default_loader(image_name)
                        for image_name in indexed_paths)
-        print("np:", images[0].shape)
         if self.is_train:
             # images = contrast_cv2(brightness_cv2(flip_cv2(images)))
             images = flip_cv2(images)
@@ -60,7 +59,6 @@ class ImageList(data.Dataset):
                 images = multi_crop_cv2(images, self.args.patch)
         else:
             images = tuple(square_cv2(img) for img in images)
-        print("crop:", images[0].shape)
 
         frames: Tuple[torch.Tensor, ...] = tuple(
             np_to_torch(img.astype(np.float64)/255*2 - 1) for img in images
@@ -79,13 +77,10 @@ class ImageList(data.Dataset):
                 assert frame.max() <= 1  # type: ignore
                 assert frame.min() >= -1  # type: ignore
         assert len(frames) == self.frame_len, \
-            f"{len(frames)} != {self.frame_len}, " \
-            f"padding_len is {self.padding_len}. " \
-            f"len(img_paths) is {len(self.img_paths)}"
+            f"{len(frames)} != {self.frame_len}"
         assert len(frames) == len(existence_mask), \
             f"{len(frames)} != {len(existence_mask)}"
 
-        print("torch:", frames[0].shape)
         return frames, existence_mask
 
     def __len__(self) -> int:
