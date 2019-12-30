@@ -102,8 +102,8 @@ def run_eval(  # type: ignore
 ) -> Dict[str, float]:
     model.eval()
     with torch.no_grad():
-        score_collector: DefaultDict[str,
-                                     List[float]] = defaultdict(list)
+        score_collector: DefaultDict[
+            str, List[float]] = defaultdict(list)
         for eval_idx, (frame_list, mask_list) in enumerate(eval_loader):
             frames = torch.stack(frame_list)
             masks = torch.stack(mask_list[1:])
@@ -144,10 +144,11 @@ def run_eval(  # type: ignore
                 ),
             }
             for key, score in scores.items():
-                score_collector[key].append(score)
+                score_collector[key].append(score * frame_list[0].shape[0])
             log_context_vec(model_out["context_vec"], writer, epoch)
         total_scores: Dict[str, float] = {
-            key: np.average(score_list) for key, score_list in score_collector.items()
+            key: sum(score_list) / len(eval_loader.dataset)
+            for key, score_list in score_collector.items()
         }
 
         print(f"{eval_name} epoch {epoch}:")
@@ -362,7 +363,7 @@ def train(args) -> nn.Module:
                  model, 0, args, writer)
 
     if args.mode == "train":
-        for epoch in args.max_train_epochs:
+        for epoch in range(args.max_train_epochs):
             for frames, _ in train_loader:
                 train_iter += 1
                 train_loop(frames, log_iter=max(len(train_loader)//5, 1))
