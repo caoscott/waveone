@@ -57,20 +57,20 @@ class ImageList(data.Dataset):
             images = flip_cv2(images)
             if self.args.patch:
                 images = multi_crop_cv2(images, self.args.patch)
-        images = tuple(square_cv2(img) for img in images)
+        else:
+            images = tuple(square_cv2(img) for img in images)
 
         frames: Tuple[torch.Tensor, ...] = tuple(
             np_to_torch(img.astype(np.float64)/255*2 - 1) for img in images
         )
-        existence_mask: Tuple[torch.Tensor, ...] = tuple(
-            torch.ones((1, 1, 1, 1))) * len(images)  # type: ignore
+        existence_mask: Tuple[torch.Tensor, ...] = tuple([
+            torch.ones((1, 1, 1))]) * len(images)  # type: ignore
 
         if self.padding_len > 0:
             frames += tuple(
-                torch.zeros_like(frames[0])) * self.padding_len  # type: ignore
-            existence_mask += (tuple(
-                torch.zeros((1, 1, 1, 1))) * self.padding_len  # type: ignore
-            )
+                [torch.zeros_like(frames[0])]) * self.padding_len  # type: ignore
+            existence_mask += tuple(
+                [torch.zeros((1, 1, 1))]) * self.padding_len  # type: ignore
 
         if self.args.network == "opt":
             for frame in frames:
@@ -146,8 +146,9 @@ def get_loader(
         num_workers=2,
         drop_last=False,
     )
-    print('Loader for {} sequences ({} batches) created.'.format(
-        len(concat_dataset), len(loader))
+    print(
+        f'Loader for {len(concat_dataset)} sequences ({len(loader)} '
+        'batches) created.'
     )
     return loader
 
@@ -164,8 +165,8 @@ def default_loader(path: str) -> np.ndarray:
 
 def square_cv2(img: np.ndarray) -> np.ndarray:
     width, height, _ = img.shape
-    if width % 16 != 0 or height % 16 != 0:
-        img = img[:(width//16)*16, :(height//16)*16]
+    if width % 8 != 0 or height % 8 != 0:
+        img = img[:(width//8)*8, :(height//8)*8]
     return img
 
 

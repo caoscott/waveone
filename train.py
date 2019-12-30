@@ -1,5 +1,6 @@
 import argparse
 import glob
+import math
 import os
 import sys
 from collections import defaultdict
@@ -56,8 +57,8 @@ def eval_scores(
         frame1: torch.Tensor,
         frame2: torch.Tensor,
         name: str,
-) -> Dict[str, torch.Tensor]:
-    scores: Dict[str, torch.Tensor] = {}
+) -> Dict[str, float]:
+    scores: Dict[str, float] = {}
     assert frame1.shape == frame2.shape, (
         "frame1.shape {frame1.shape} != frame2.shape {frame2.shape}"
     )
@@ -65,10 +66,10 @@ def eval_scores(
                             frame1.shape[-3], frame1.shape[-2], frame1.shape[-1])
     frame2 = frame2.reshape(-1,
                             frame2.shape[-3], frame2.shape[-2], frame2.shape[-1])
-    scores[f"{name}_l1"] = F.l1_loss(frame1, frame2, reduction="mean")
+    scores[f"{name}_l1"] = F.l1_loss(frame1, frame2, reduction="mean").item()
     scores[f"{name}_msssim"] = msssim(
         frame1, frame2, val_range=2, normalize=True,
-    )
+    ).item()
     return scores
 
 
@@ -99,73 +100,77 @@ def run_eval(  # type: ignore
         epoch: int,
         args: argparse.Namespace,
         writer: SummaryWriter,
-) -> Dict[str, torch.Tensor]:
+) -> Dict[str, float]:
     model.eval()
     with torch.no_grad():
-        eval_out_collector: DefaultDict[str,
-                                        List[torch.Tensor]] = defaultdict(list)
-        bpsps = []
-        for frame_list, mask_list in eval_loader:
+        score_collector: DefaultDict[
+            str, List[float]] = defaultdict(list)
+        for eval_idx, (frame_list, mask_list) in enumerate(eval_loader):
             frames = torch.stack(frame_list)
             masks = torch.stack(mask_list[1:])
             model_out = model(
                 frames, iframe_iter=args.iframe_iter,
                 reuse_frame=True, detach=False, collect_output=True,
             )
-            if "lossless" in args.network:
-                bpsps.append(model_out["bpsp"].item())
-            for key in ("flow_frame2", "context_vec"):
-                eval_out_collector[key].append(model_out[key].cpu() * masks)
-            eval_out_collector["frames"].append(frames)
-            eval_out_collector["masks"].append(masks)
-        eval_out = {k: torch.cat(v, dim=1)
-                    for k, v in eval_out_collector.items()}
-        for batch_i in range(eval_out["flow_frame2"].shape[1]):
-            for seq_i in range(eval_out["flow_frame2"].shape[0]):
-                frames = torch.stack([
-                    eval_out["frames"][seq_i+1, batch_i],
-                    eval_out["flow_frame2"][seq_i, batch_i],
-                ])
-                save_tensor_as_img(
-                    frames, f"{eval_name}_{batch_i}_{seq_i}", args)
-        total_scores: Dict[str, torch.Tensor] = {
-            **eval_scores(
-                eval_out["frames"][1:],
-                torch.stack([eval_out["frames"][0]] *
-                            (eval_out["frames"].shape[0]-1)),
-                f"{eval_name}_same_frame"
-            ),
-            **eval_scores(
-                eval_out["frames"][1:], eval_out["frames"][:-1],
-                f"{eval_name}_previous_frame"
-            ),
-            **eval_scores(
-                eval_out["frames"][1:],
-                eval_out["flow_frame2"], f"{eval_name}_flow"
-            ),
+            for batch_i in range(model_out["reconstructed_frame2"].shape[1]):
+                for seq_i in range(model_out["reconstructed_frame2"].shape[0]):
+                    if masks[seq_i, batch_i].item() == 0:
+                        break
+                    save_frames = torch.stack([
+                        frames[seq_i+1, batch_i],
+                        model_out["flow_frame2"][seq_i, batch_i],
+                        model_out["reconstructed_frame2"][seq_i, batch_i],
+                    ])
+                    vid_i = batch_i + eval_idx * args.eval_batch_size
+                    save_tensor_as_img(
+                        save_frames, f"{eval_name}_{vid_i}_{seq_i}", args)
+            scores = {
+                **eval_scores(
+                    frames[1:],
+                    torch.stack([frames[0]] *
+                                (frames.shape[0]-1)),
+                    f"{eval_name}_same_frame"
+                ),
+                **eval_scores(
+                    frames[1:], frames[:-1],
+                    f"{eval_name}_previous_frame"
+                ),
+                **eval_scores(
+                    frames[1:], model_out["flow_frame2"],
+                    f"{eval_name}_flow"
+                ),
+                **eval_scores(
+                    frames[1:], model_out["reconstructed_frame2"],
+                    f"{eval_name}_reconstructed"
+                ),
+                f"{eval_name}_bpsp": model_out["bpsp"].item(),
+            }
+            for key, score in scores.items():
+                score_collector[key].append(frame_list[0].shape[0] * score)
+            log_context_vec(model_out["context_vec"], writer, epoch)
+        total_scores: Dict[str, float] = {
+            key: sum(score_list)/len(eval_loader.dataset)
+            for key, score_list in score_collector.items()
         }
 
-        if "lossless" in args.network:
-            total_scores[f"{eval_name}_bpsp"] = np.average(bpsps)
         print(f"{eval_name} epoch {epoch}:")
         plot_scores(writer, total_scores, epoch)
-        log_context_vec(eval_out["context_vec"], writer, epoch)
         print_scores(total_scores)
         return total_scores
 
 
 def plot_scores(
         writer: SummaryWriter,
-        scores: Dict[str, torch.Tensor],
+        scores: Dict[str, float],
         train_iter: int
 ) -> None:
     for key, value in scores.items():
-        writer.add_scalar(key, value.item(), train_iter)
+        writer.add_scalar(key, value, train_iter)
 
 
-def print_scores(scores: Dict[str, torch.Tensor]) -> None:
+def print_scores(scores: Dict[str, float]) -> None:
     for key, value in scores.items():
-        print(f"{key}: {value.item() :.6f}")
+        print(f"{key}: {value :.6f}")
     print("")
 
 
@@ -220,6 +225,7 @@ def get_model(args: argparse.Namespace) -> nn.Module:
             "context_vec": torch.zeros(1),
             "loss": torch.tensor(0.),
         })
+        opt_decoder.num_flows = 1  # type: ignore
         return WaveoneModel(
             opt_encoder, opt_binarizer, opt_decoder, "residual",
             False, False, flow_loss_fn, reconstructed_loss_fn,
@@ -241,7 +247,8 @@ def get_model(args: argparse.Namespace) -> nn.Module:
         resnet_decoder = LosslessDecoder(
             args.bits, 3, resblocks=args.resblocks, use_context=use_context
         ) if lossless else ResNetDecoder(
-            args.bits, 3, resblocks=args.resblocks, use_context=use_context
+            args.bits, 3, resblocks=args.resblocks, use_context=use_context,
+            num_flows=args.num_flows,
         )
         if lossless:
             reconstructed_loss_fn = DiscretizedMixLogisticLoss(
@@ -309,11 +316,15 @@ def train(args) -> nn.Module:
     ############### Training ###############
 
     train_iter = 0
-    just_resumed = False
+    assert args.checkpoint_epochs > 0, f"{args.checkpoint_epochs} <= 0"
+    assert args.eval_epochs > 0, f"{args.eval_epochs} <= 0"
+    checkpoint_iters = int(
+        math.ceil(args.checkpoint_epochs * len(train_loader)))
+    eval_iters = int(math.ceil(args.eval_epochs * len(train_loader)))
+
     if args.load_model:
         print(f'Loading {args.load_model}')
         resume(args, model)
-        just_resumed = True
 
     def train_loop(frame_list: List[torch.Tensor], log_iter: int) -> None:
         if np.random.random() < 0.5:
@@ -353,20 +364,25 @@ def train(args) -> nn.Module:
             plot_scores(writer, scores, train_iter)
             log_flow(writer, model_out["flow"])
 
-    for epoch in range(args.max_train_epochs):
-        for frames, _ in train_loader:
-            train_iter += 1
-            train_loop(frames, log_iter=max(len(train_loader)//5, 1))
-        scheduler.step()  # type: ignore
+    if args.load_model or args.mode == "eval":
+        run_eval("eval", eval_loader, model, 0, args, writer)
+        run_eval("training", train_subset_loader,
+                 model, 0, args, writer)
 
-        if (epoch + 1) % args.checkpoint_epochs == 0:
-            save(args, model)
+    if args.mode == "train":
+        for epoch in args.max_train_epochs:
+            for frames, _ in train_loader:
+                train_iter += 1
+                train_loop(frames, log_iter=max(len(train_loader)//5, 1))
 
-        if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            run_eval("eval", eval_loader, model, epoch, args, writer)
-            run_eval("training", train_subset_loader,
-                     model, epoch, args, writer)
-            just_resumed = False
+                if (train_iter + 1) % checkpoint_iters == 0:
+                    save(args, model)
+                if (train_iter + 1) % args.eval_epochs == 0:
+                    run_eval("eval", eval_loader, model, epoch, args, writer)
+                    run_eval("training", train_subset_loader,
+                             model, epoch, args, writer)
+
+            scheduler.step()  # type: ignore
 
     print('Training done.')
     return model

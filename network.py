@@ -85,6 +85,7 @@ class SmallDecoder(nn.Module):
 
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
+        self.num_flows = 1
         self.ups = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 2, stride=2),
             nn.LeakyReLU(inplace=True),
@@ -196,12 +197,14 @@ class ResNetDecoder(nn.Module):
             in_ch: int,
             out_ch: int,
             resblocks: int,
-            use_context: bool
+            use_context: bool,
+            num_flows: int,
     ) -> None:
         super().__init__()
         self.use_context = use_context
         resblocks1 = resblocks // 2  # if use_context else resblocks - 1
         resblocks2 = resblocks - resblocks1
+        self.num_flows = num_flows
         self.decode_to_context = nn.Sequential(
             nn.ConvTranspose2d(in_ch, 128, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
@@ -218,13 +221,12 @@ class ResNetDecoder(nn.Module):
             nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(64, 3, 1),
-            nn.Tanh(),
         )
         self.flow = nn.Sequential(
             nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1, bias=True),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(64, 2, 1),
+            nn.Conv2d(64, 2 * num_flows, 1),
         )
 
     def forward(  # type: ignore
@@ -234,23 +236,27 @@ class ResNetDecoder(nn.Module):
         x, context_vec = input_tuple
         x = self.decode_to_context(x)
         if self.use_context:
-            x = new_context_vec = F.leaky_relu(x)
+            x = new_context_vec = torch.tanh(x + context_vec)
         else:
             x = F.leaky_relu(x)
             new_context_vec = torch.zeros_like(x)
 
         x = self.context_to_output(x)
         f = self.flow(x).permute(0, 2, 3, 1) * 25
-        r = self.residual(x) * 2
+        r = torch.clamp(self.residual(x), -2, 2)
 
-        assert f.shape[-1] == 2
+        assert f.shape[-1] == self.num_flows * 2
 
         grid_normalize = torch.tensor(
-            f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, 2).to(x.device)
+            f.shape[1: 3], requires_grad=False).reshape(1, 1, 1, 2)
+        grid_normalize = torch.cat(
+            [grid_normalize] * self.num_flows, dim=-1).to(x.device)
         identity_theta = torch.tensor(
             IDENTITY_TRANSFORM * x.shape[0], requires_grad=False).to(x.device)
-        f_grid = f / grid_normalize * 2 + F.affine_grid(  # type: ignore
+        identity_grid = F.affine_grid(  # type: ignore
             identity_theta, r.shape, align_corners=True)  # type: ignore
+        identity_grid = torch.cat([identity_grid] * self.num_flows, dim=-1)
+        f_grid = f / grid_normalize * 2 + identity_grid
         # f_grid = f + F.affine_grid(identity_theta, r.shape,  # type: ignore
         #    align_corners=True)
         # if self.training is False:
@@ -273,6 +279,7 @@ class LosslessDecoder(nn.Module):
             use_context: bool
     ) -> None:
         super().__init__()
+        self.num_flows = 1
         self.use_context = use_context
         resblocks1 = resblocks // 2  # if use_context else resblocks - 1
         resblocks2 = resblocks - resblocks1
@@ -381,12 +388,14 @@ class WaveoneModel(nn.Module):
             decoder_out = self.decoder((codes, context_vec))
             # out_collector["codes"].append(codes)
 
-            flow_frame2 = F.grid_sample(  # type: ignore
-                frame1, decoder_out["flow_grid"],
-                align_corners=True,
-                padding_mode="border",
-            ) if "flow" in self.train_type else frame1
-            flow_frame2 = flow_frame2.clamp(-1., 1.)
+            flow_frame2: torch.Tensor = sum(  # type: ignore
+                F.grid_sample(  # type: ignore
+                    frame1,
+                    decoder_out["flow_grid"][:, :, :, flow_index:flow_index+2],
+                    align_corners=True,
+                    padding_mode="border",
+                ) for flow_index in range(0, self.decoder.num_flows * 2, 2)  # type: ignore
+            ) / self.decoder.num_flows if "flow" in self.train_type else frame1
             if collect_output:
                 out_collector["flow_frame2"].append(flow_frame2.cpu())
 
@@ -502,10 +511,7 @@ class WaveoneDoublyLossless(nn.Module):
             for k, v in decoder_out.items():
                 out_collector[k].append(v.cpu())
 
-            frame1 = (reconstructed_frame2
-                      if reuse_frame and iter_i % iframe_iter != 0
-                      and self.lossless is False
-                      else frame2)
+            frame1 = reconstructed_frame2 if reuse_frame and self.lossless is False else frame2
             context_vec = decoder_out["context_vec"]
             if detach:
                 frame1 = frame1.detach()
