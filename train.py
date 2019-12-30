@@ -97,6 +97,7 @@ def run_eval(  # type: ignore
         eval_loader: data.DataLoader,
         model: nn.Module,
         epoch: int,
+        train_iter: int,
         args: argparse.Namespace,
         writer: SummaryWriter,
 ) -> Dict[str, float]:
@@ -145,14 +146,14 @@ def run_eval(  # type: ignore
             }
             for key, score in scores.items():
                 score_collector[key].append(score * frame_list[0].shape[0])
-            log_context_vec(model_out["context_vec"], writer, epoch)
+            log_context_vec(model_out["context_vec"], writer, train_iter)
         total_scores: Dict[str, float] = {
             key: sum(score_list) / len(eval_loader.dataset)
             for key, score_list in score_collector.items()
         }
 
-        print(f"{eval_name} epoch {epoch}:")
-        plot_scores(writer, total_scores, epoch)
+        print(f"{eval_name} epoch {epoch} iteration {train_iter}:")
+        plot_scores(writer, total_scores, train_iter)
         print_scores(total_scores)
         return total_scores
 
@@ -311,7 +312,9 @@ def train(args) -> nn.Module:
     assert args.eval_epochs > 0, f"{args.eval_epochs} <= 0"
     checkpoint_iters = int(
         math.ceil(args.checkpoint_epochs * len(train_loader)))
+    print(f"Saving model every {checkpoint_iters} training iterations.")
     eval_iters = int(math.ceil(args.eval_epochs * len(train_loader)))
+    print(f"Evaluating every {eval_iters} training iterations.")
 
     if args.load_model:
         print(f'Loading {args.load_model}')
@@ -358,9 +361,9 @@ def train(args) -> nn.Module:
             log_flow(writer, model_out["flow"])
 
     if args.load_model or args.mode == "eval":
-        run_eval("eval", eval_loader, model, 0, args, writer)
+        run_eval("eval", eval_loader, model, 0, 0, args, writer)
         run_eval("training", train_subset_loader,
-                 model, 0, args, writer)
+                 model, 0, 0, args, writer)
 
     if args.mode == "train":
         for epoch in range(args.max_train_epochs):
@@ -371,13 +374,14 @@ def train(args) -> nn.Module:
                 if (train_iter + 1) % checkpoint_iters == 0:
                     save(args, model)
                 if (train_iter + 1) % args.eval_epochs == 0:
-                    run_eval("eval", eval_loader, model, epoch, args, writer)
+                    run_eval("eval", eval_loader, model,
+                             epoch, train_iter, args, writer)
                     run_eval("training", train_subset_loader,
-                             model, epoch, args, writer)
+                             model, epoch, train_iter, args, writer)
 
             scheduler.step()  # type: ignore
+        print('Training done.')
 
-    print('Training done.')
     return model
 
 
