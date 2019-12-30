@@ -146,10 +146,10 @@ def run_eval(  # type: ignore
                 f"{eval_name}_bpsp": model_out["bpsp"].item(),
             }
             for key, score in scores.items():
-                score_collector[key].append(frame_list[0].shape[0] * score)
+                score_collector[key].append(score * frame_list[0].shape[0])
             log_context_vec(model_out["context_vec"], writer, epoch)
         total_scores: Dict[str, float] = {
-            key: sum(score_list)/len(eval_loader.dataset)
+            key: sum(score_list) / len(eval_loader.dataset)
             for key, score_list in score_collector.items()
         }
 
@@ -370,7 +370,7 @@ def train(args) -> nn.Module:
                  model, 0, args, writer)
 
     if args.mode == "train":
-        for epoch in args.max_train_epochs:
+        for epoch in range(args.max_train_epochs):
             for frames, _ in train_loader:
                 train_iter += 1
                 train_loop(frames, log_iter=max(len(train_loader)//5, 1))
