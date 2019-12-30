@@ -319,10 +319,13 @@ class WaveoneModel(nn.Module):
                 ) for flow_index in range(0, self.decoder.num_flows * 2, 2)  # type: ignore
             ) / self.decoder.num_flows if "flow" in self.train_type else frame1
 
-            reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
-                if "residual" in self.train_type \
-                else flow_frame2
-            reconstructed_frame2 = reconstructed_frame2.clamp(-1., 1.)
+            if iter_i % iframe_iter != 0:
+                reconstructed_frame2 = flow_frame2 + decoder_out["residuals"] \
+                    if "residual" in self.train_type \
+                    else flow_frame2
+                reconstructed_frame2 = reconstructed_frame2.clamp(-1., 1.)
+            else:
+                reconstructed_frame2 = frame2
 
             if self.training is True:  # type: ignore
                 loss += self.flow_loss_fn(frame2, flow_frame2)
@@ -337,8 +340,7 @@ class WaveoneModel(nn.Module):
             for k, v in decoder_out.items():
                 out_collector[k].append(v.cpu())
 
-            frame1 = (reconstructed_frame2 if reuse_frame and
-                      iter_i % iframe_iter != 0 else frame2)
+            frame1 = reconstructed_frame2 if reuse_frame else frame2
             context_vec = decoder_out["context_vec"]
             if detach:
                 frame1 = frame1.detach()

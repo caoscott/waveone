@@ -1,5 +1,6 @@
 import argparse
 import glob
+import math
 import os
 import sys
 from collections import defaultdict
@@ -305,11 +306,15 @@ def train(args) -> nn.Module:
     ############### Training ###############
 
     train_iter = 0
-    just_resumed = False
+    assert args.checkpoint_epochs > 0, f"{args.checkpoint_epochs} <= 0"
+    assert args.eval_epochs > 0, f"{args.eval_epochs} <= 0"
+    checkpoint_iters = int(
+        math.ceil(args.checkpoint_epochs * len(train_loader)))
+    eval_iters = int(math.ceil(args.eval_epochs * len(train_loader)))
+
     if args.load_model:
         print(f'Loading {args.load_model}')
         resume(args, model)
-        just_resumed = True
 
     def train_loop(frame_list: List[torch.Tensor], log_iter: int) -> None:
         if np.random.random() < 0.5:
@@ -351,21 +356,25 @@ def train(args) -> nn.Module:
             plot_scores(writer, scores, train_iter)
             log_flow(writer, model_out["flow"])
 
-    for epoch in range(1 if args.mode == "eval" else args.max_train_epochs):
-        if args.mode == "train":
+    if args.load_model or args.mode == "eval":
+        run_eval("eval", eval_loader, model, 0, args, writer)
+        run_eval("training", train_subset_loader,
+                 model, 0, args, writer)
+
+    if args.mode == "train":
+        for epoch in args.max_train_epochs:
             for frames, _ in train_loader:
                 train_iter += 1
                 train_loop(frames, log_iter=max(len(train_loader)//5, 1))
+
+                if (train_iter + 1) % checkpoint_iters == 0:
+                    save(args, model)
+                if (train_iter + 1) % args.eval_epochs == 0:
+                    run_eval("eval", eval_loader, model, epoch, args, writer)
+                    run_eval("training", train_subset_loader,
+                             model, epoch, args, writer)
+
             scheduler.step()  # type: ignore
-
-        if (epoch + 1) % args.checkpoint_epochs == 0:
-            save(args, model)
-
-        if just_resumed or ((epoch + 1) % args.eval_epochs == 0):
-            run_eval("eval", eval_loader, model, epoch, args, writer)
-            run_eval("training", train_subset_loader,
-                     model, epoch, args, writer)
-            just_resumed = False
 
     print('Training done.')
     return model

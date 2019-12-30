@@ -83,10 +83,12 @@ parser.add_argument('--save-model', type=str, default='demo',
 # help='If true, write compressed codes during eval.')
 parser.add_argument('--save-out-img', action='store_true',
                     help='If true, save output images during eval.')
-parser.add_argument('--checkpoint-epochs', type=int, default=2,
-                    help='Model checkpoint period.')
-parser.add_argument('--eval-epochs', type=int, default=10,
-                    help='Evaluation period.')
+parser.add_argument('--checkpoint-epochs', type=float, default=2,
+                    help='Model checkpoint period.'
+                    'If decimal, rounded to the nearest training iteration.')
+parser.add_argument('--eval-epochs', type=float, default=10,
+                    help='Evaluation period. '
+                    'If decimal, rounded to the nearest training iteration.')
 parser.add_argument('--mode', choices=("train, eval"), default="train",
                     help="Choose whether to train the model.")
 # parser.add_argument('--plot-codes', action='store_true',
