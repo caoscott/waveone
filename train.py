@@ -376,7 +376,7 @@ def train(args) -> nn.Module:
                 if (train_iter + 1) % checkpoint_iters == 0:
                     save(args, model)
                 print(f"Finished saving on iteration {train_iter}")
-                if (train_iter + 1) % args.eval_epochs == 0:
+                if (train_iter + 1) % eval_iters == 0:
                     print(f"Running eval on iteration {train_iter}")
                     run_eval("eval", eval_loader, model,
                              epoch, train_iter, args, writer)
