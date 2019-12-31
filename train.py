@@ -369,15 +369,21 @@ def train(args) -> nn.Module:
         for epoch in range(args.max_train_epochs):
             for frames, _ in train_loader:
                 train_iter += 1
+                print(f"Starting training iteration {train_iter}")
                 train_loop(frames, log_iter=max(len(train_loader)//5, 1))
+                print(f"Finished training iteration {train_iter}")
 
                 if (train_iter + 1) % checkpoint_iters == 0:
                     save(args, model)
+                print(f"Finished saving on iteration {train_iter}")
                 if (train_iter + 1) % args.eval_epochs == 0:
+                    print(f"Running eval on iteration {train_iter}")
                     run_eval("eval", eval_loader, model,
                              epoch, train_iter, args, writer)
                     run_eval("training", train_subset_loader,
                              model, epoch, train_iter, args, writer)
+
+                print(f"Finished eval on iteration {train_iter}")
 
             scheduler.step()  # type: ignore
         print('Training done.')
